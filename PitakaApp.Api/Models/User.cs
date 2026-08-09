@@ -2,7 +2,7 @@ namespace PitakaApp.Api.Models;
 
 using System.ComponentModel.DataAnnotations;
 
-public class User : BaseEntity
+public class User : TimestampedEntity
 {
     [MaxLength(255)]
     public required string Name { get; set; }

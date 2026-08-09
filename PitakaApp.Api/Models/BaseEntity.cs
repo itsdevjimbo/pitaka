@@ -1,6 +1,6 @@
 namespace PitakaApp.Api.Models;
 
-public abstract class BaseEntity
+public abstract class TimestampedEntity
 {
     public int Id { get; set; }
 

@@ -3,7 +3,7 @@ namespace PitakaApp.Api.Models;
 using System.ComponentModel.DataAnnotations;
 using PitakaApp.Api.Enums;
 
-public class Category : BaseEntity
+public class Category : TimestampedEntity
 {
     public int? UserId { get; set; }
 

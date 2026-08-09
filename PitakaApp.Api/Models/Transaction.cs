@@ -2,7 +2,7 @@ namespace PitakaApp.Api.Models;
 
 using System.ComponentModel.DataAnnotations.Schema;
 using PitakaApp.Api.Enums;
-public class Transaction : BaseEntity
+public class Transaction : TimestampedEntity
 {
     public required int UserId { get; set; }
 

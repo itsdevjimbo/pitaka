@@ -4,7 +4,7 @@ using PitakaApp.Api.Enums;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-public class Account: BaseEntity
+public class Account: TimestampedEntity
 {
     public required int UserId { get; set; }
 
