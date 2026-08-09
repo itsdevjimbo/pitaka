@@ -1,3 +1,4 @@
 <Solution>
+  <Project Path="PitakaApp.Api.Tests/PitakaApp.Api.Tests.csproj" />
   <Project Path="PitakaApp.Api/PitakaApp.Api.csproj" />
 </Solution>
