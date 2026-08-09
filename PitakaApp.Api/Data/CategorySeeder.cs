@@ -13,12 +13,7 @@ public static class CategorySeeder
             return;
         }
         
-        var user = context.Set<User>().Local.FirstOrDefault(u => u.Email == "admin@pitaka.com");
-
-        if (user == null)
-        {
-            user = context.Set<User>().First(u => u.Email == "admin@pitaka.com");
-        }
+        var user = SeedHelper.ExtractTransactionUser(context);
 
         var categories = new List<Category>();
 

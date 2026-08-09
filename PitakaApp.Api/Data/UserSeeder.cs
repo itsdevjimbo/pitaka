@@ -3,11 +3,11 @@ namespace PitakaApp.Api.Data;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using PitakaApp.Api.Models;
-public static class AdminSeeder
+public static class UserSeeder
 {
     public static void Seed(DbContext context)
     {
-        var user = SeedHelper.ExtractAdminUser(context);
+        var user = SeedHelper.ExtractTransactionUser(context);
 
         if (user != null)
         {
@@ -18,9 +18,9 @@ public static class AdminSeeder
 
         user = new User
         {
-            Name = "Admin Pitaka",
-            Email = "admin@pitaka.com",
-            PasswordHash = hasher.HashPassword(null!, "adminpitaka")
+            Name = "Trasaction Pitaka",
+            Email = "transaction@pitaka.com",
+            PasswordHash = hasher.HashPassword(null!, "pitakadev")
         };
 
         context.Set<User>().Add(user);
