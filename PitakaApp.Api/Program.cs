@@ -15,6 +15,8 @@ builder.Services.AddDbContext<PitakaDbContext>(options =>
         options
             .UseMySql(connectionString, ServerVersion.AutoDetect(connectionString))
             .UseSnakeCaseNamingConvention()
+            .UseSeeding((context, _) => DbSeeder.Seed(context))
+            .UseAsyncSeeding(async (context, _, cancellationToken) => await DbSeeder.SeedAsync(context, cancellationToken))
     );
 
 var app = builder.Build();
