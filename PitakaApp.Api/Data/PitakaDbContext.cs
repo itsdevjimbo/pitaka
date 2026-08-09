@@ -22,6 +22,8 @@ public class PitakaDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<User>().HasIndex(u => u.Email).IsUnique();
+
         var enumProperties = modelBuilder.Model.GetEntityTypes()
             .SelectMany(e => e.GetProperties())
             .Where(p => (Nullable.GetUnderlyingType(p.ClrType) ?? p.ClrType).IsEnum)
