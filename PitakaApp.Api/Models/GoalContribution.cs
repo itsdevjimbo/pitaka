@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace PitakaApp.Api.Models;
 
-public class GoalContribution : BaseEntity
+public class GoalContribution : TimestampedEntity
 {
     public required int GoalId { get; set; }
 

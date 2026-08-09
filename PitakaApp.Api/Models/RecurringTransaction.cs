@@ -3,7 +3,7 @@ namespace PitakaApp.Api.Models;
 using System.ComponentModel.DataAnnotations.Schema;
 using PitakaApp.Api.Enums;
 
-public class RecurringTransaction : BaseEntity
+public class RecurringTransaction : TimestampedEntity
 {
     public required int UserId { get; set; }
 

@@ -1,7 +1,7 @@
 namespace PitakaApp.Api.Models;
 
 using System.ComponentModel.DataAnnotations;
-public class Tag : BaseEntity
+public class Tag : TimestampedEntity
 {
     public int? UserId { get; set; }
 
