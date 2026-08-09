@@ -1,0 +1,28 @@
+# Build results
+bin/
+obj/
+
+# VS Code / Rider / Visual Studio
+.vs/
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# .NET tooling
+*.dll
+*.pdb
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# EF Core
+*.mdf
+*.ldf
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
