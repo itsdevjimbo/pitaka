@@ -91,4 +91,26 @@ public class PitakaDbContext : DbContext
             .HasForeignKey<GoalContribution>(gc => gc.TransactionId)
             .OnDelete(DeleteBehavior.SetNull);
     }
+
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        foreach (var entry in ChangeTracker.Entries<TimestampedEntity>()
+             .Where(e => e.State == EntityState.Modified))
+        {
+            entry.Entity.UpdatedAt = DateTime.UtcNow;
+        }
+
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+
+    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        foreach (var entry in ChangeTracker.Entries<TimestampedEntity>()
+             .Where(e => e.State == EntityState.Modified))
+        {
+            entry.Entity.UpdatedAt = DateTime.UtcNow;
+        }
+
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
 }
