@@ -4,7 +4,7 @@ using Bogus;
 using Microsoft.Extensions.DependencyInjection;
 using PitakaApp.Api.Actions.Auth;
 using PitakaApp.Api.Data;
-using PitakaApp.Api.Models;
+using PitakaApp.Api.Tests.Factories;
 using PitakaApp.Api.Tests.Fixtures;
 
 [Collection("Database collection")]
@@ -33,16 +33,7 @@ public class RegisterUserTest : IDisposable
     public async Task Register_NotUniqueEmail_ReturnsNull()
     {
         var email = _faker.Internet.Email();
-
-        var user = new User
-        {
-            Name = _faker.Person.FullName,
-            Email = email,
-            PasswordHash = "NotHashPasswordAndItsOKay",
-        };
-
-        _context.Users.Add(user);
-        await _context.SaveChangesAsync();
+        await UserFactory.CreateAsync(_context, email);
 
         var newUser = await _registerUser.ExecuteAsync(_faker.Person.FullName, email, "Password123");
         

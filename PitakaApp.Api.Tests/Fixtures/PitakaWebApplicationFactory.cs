@@ -1,7 +1,9 @@
 namespace PitakaApp.Api.Tests.Fixtures;
 
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -24,6 +26,12 @@ public class PitakaWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
             {
                 ["ConnectionStrings:DefaultConnection"] = TestConnectionString,
             });
+        });
+
+        builder.ConfigureTestServices(services =>
+        {
+            services.AddAuthentication(defaultScheme: TestAuthHandler.SchemeName)
+                .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestAuthHandler.SchemeName, options => { });
         });
     }
 
