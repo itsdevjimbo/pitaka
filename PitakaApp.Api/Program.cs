@@ -23,6 +23,7 @@ builder.Services.AddDbContext<PitakaDbContext>((serviceProvider, options) =>
     });
 
 builder.Services.AddScoped<RegisterUser>();
+builder.Services.AddScoped<LoginUser>();
 
 var app = builder.Build();
 

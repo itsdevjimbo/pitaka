@@ -1,9 +1,9 @@
+namespace PitakaApp.Api.Actions.Auth;
+
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using PitakaApp.Api.Data;
 using PitakaApp.Api.Models;
-
-namespace PitakaApp.Api.Actions.Auth;
 
 public class RegisterUser
 {

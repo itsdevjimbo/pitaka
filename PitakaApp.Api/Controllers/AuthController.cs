@@ -7,11 +7,28 @@ using PitakaApp.Api.Actions.Auth;
 [Route("api/[controller]")]
 public class AuthController : ControllerBase
 {
+    private readonly LoginUser _loginUser;
     private readonly RegisterUser _registerUser;
 
-    public AuthController(RegisterUser registerUser)
+    public AuthController(
+        LoginUser loginUser,
+        RegisterUser registerUser
+    )
     {
+        _loginUser = loginUser;
         _registerUser = registerUser;
+    }
+
+    [HttpPost("login")]
+    public async Task<IActionResult> Login(LoginRequest request)
+    {
+        var user = await _loginUser.ExecuteAsync(request.Email, request.Password);
+        if (user == null)
+        {
+            return Unauthorized("Invalid email or password.");
+        }
+
+        return Ok(new UserResponse(user.Id, user.Name, user.Email));
     }
 
     [HttpPost("register")]
@@ -28,7 +45,7 @@ public class AuthController : ControllerBase
     }
 }
 
+public record LoginRequest(string Email, string Password);
 public record RegisterRequest(string Name, string Email, string Password);
 
-// Response DTO — deliberately excludes PasswordHash. Never return that, even hashed.
 public record UserResponse(int Id, string Name, string Email);
