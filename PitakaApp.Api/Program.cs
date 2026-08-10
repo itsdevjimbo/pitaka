@@ -4,6 +4,7 @@ using PitakaApp.Api.Data;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using PitakaApp.Api.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -30,7 +31,14 @@ builder.Services.AddScoped<LoginUser>();
 builder.Services.AddScoped<GenerateJwtToken>();
 builder.Services.AddScoped<GetCurrentUser>();
 
-var jwtKey = builder.Configuration["Jwt:Key"]!;
+builder.Services.AddOptions<JwtOption>()
+    .Bind(builder.Configuration.GetSection(JwtOption.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+
+var jwtOptionJwtOption = builder.Configuration.GetSection(JwtOption.SectionName).Get<JwtOption>()
+    ?? throw new InvalidOperationException($"Missing '{JwtOption.SectionName}' configuration section.");
+    
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -38,11 +46,11 @@ builder.Services
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
-            ValidIssuer = builder.Configuration["Jwt:Issuer"],
+            ValidIssuer = jwtOptionJwtOption.Issuer,
             ValidateAudience = true,
-            ValidAudience = builder.Configuration["Jwt:Audience"],
+            ValidAudience = jwtOptionJwtOption.Audience,
             ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptionJwtOption.Key)),
             ValidateLifetime = true,
         };
     });

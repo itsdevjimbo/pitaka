@@ -4,8 +4,11 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Bogus;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using PitakaApp.Api.Actions.Auth;
 using PitakaApp.Api.Models;
+using PitakaApp.Api.Options;
 
 public class GenerateJwtTokenTest
 {
@@ -24,7 +27,12 @@ public class GenerateJwtTokenTest
             })
             .Build();
 
-        _generateJwtToken = new GenerateJwtToken(configuration);
+        var options = new ServiceCollection()
+            .Configure<JwtOption>(configuration.GetSection("Jwt"))
+            .BuildServiceProvider()
+            .GetRequiredService<IOptions<JwtOption>>();
+
+        _generateJwtToken = new GenerateJwtToken(options);
     }
 
     [Fact]
