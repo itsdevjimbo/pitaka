@@ -17,10 +17,11 @@ public class RegisterUser
 
     public async Task<User?> ExecuteAsync(string name, string email, string password)
     {
-        var existingUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
-        if (existingUser != null)
+        var exists = await _context.Users.AnyAsync(u => u.Email == email);
+            
+        if (exists)
         {
-            return null;   // signal "already exists" — controller decides what HTTP response that means
+            return null;
         }
 
         var hasher = new PasswordHasher<User>();

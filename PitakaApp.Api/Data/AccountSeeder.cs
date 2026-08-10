@@ -15,6 +15,11 @@ public static class AccountSeeder
 
         var user = SeedHelper.ExtractTransactionUser(context);
 
+        if (user == null)
+        {
+            throw new InvalidOperationException("AccountSeeder requires the transaction user. Ensure UserSeeder runs first in DbSeeder.");
+        }
+
         var accounts = new List<Account>
         {
             new Account { UserId = 0, User = user, Name = "Checking Account", Type = AccountType.Bank, InitialBalance = 1000, CurrentBalance = 1000 },
