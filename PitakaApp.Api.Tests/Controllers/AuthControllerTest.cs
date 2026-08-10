@@ -3,11 +3,10 @@ namespace PitakaApp.Api.Tests.Controllers;
 using System.Net;
 using System.Net.Http.Json;
 using Bogus;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
 using PitakaApp.Api.Controllers;
 using PitakaApp.Api.Data;
-using PitakaApp.Api.Models;
+using PitakaApp.Api.Tests.Factories;
 using PitakaApp.Api.Tests.Fixtures;
 
 [Collection("Database collection")]
@@ -30,60 +29,39 @@ public class AuthControllerTest : IDisposable
     public async Task Login_WithExistingUser_ReturnsOkWithUser()
     {
         var email = _faker.Internet.Email();
-        var password = "TestPass123!";
-        var hasher = new PasswordHasher<User>();
+        await UserFactory.CreateAsync(_context, email);
 
-        var user = new User
-        {
-            Name = _faker.Person.FullName,
-            Email = email,
-            PasswordHash = hasher.HashPassword(null!, password),
-        };
-
-        _context.Users.Add(user);
-        await _context.SaveChangesAsync();
-
-        var request = new { email, password };
+        var request = new { email, password = UserFactory.DefaultPassword };
 
         var response = await _client.PostAsJsonAsync("/api/auth/login", request);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<UserResponse>();
+        var body = await response.Content.ReadFromJsonAsync<LoginResponse>();
 
         Assert.NotNull(body);
-        Assert.Equal(request.email, body!.Email);
+        Assert.NotNull(body.Token);
+        Assert.Equal(request.email, body!.User.Email);
     }
 
     [Fact]
     public async Task Login_WithInvalidCredential_ReturnsUnauthorized()
     {
         var email = _faker.Internet.Email();
-        var password = "TestPass123!";
-        var hasher = new PasswordHasher<User>();
+        await UserFactory.CreateAsync(_context, email);
 
-        var user = new User
+        var wrongEmailRequest = new
         {
-            Name = _faker.Person.FullName,
-            Email = email,
-            PasswordHash = hasher.HashPassword(null!, password),
-        };
-
-        _context.Users.Add(user);
-        await _context.SaveChangesAsync();
-
-        var wrongEmailRequest = new 
-        { 
-            email = "wrong@email.com", 
-            password 
+            email = "wrong@email.com",
+            password = UserFactory.DefaultPassword,
         };
 
         var response = await _client.PostAsJsonAsync("/api/auth/login", wrongEmailRequest);
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
 
-        var wrongPasswordRequest = new 
-        { 
-            email, 
+        var wrongPasswordRequest = new
+        {
+            email,
             password = "WrongPassword123!"
         };
 
@@ -114,23 +92,13 @@ public class AuthControllerTest : IDisposable
     public async Task Register_WithExistingEmail_ReturnsConflict()
     {
         var email = _faker.Internet.Email();
-
-        var user = new User
-        {
-            Name = _faker.Person.FullName,
-            Email = email,
-            PasswordHash = "NotHashPasswordAndItsOKay",
-        };
-
-        _context.Users.Add(user);
-        await _context.SaveChangesAsync();
-
+        await UserFactory.CreateAsync(_context, email);
 
         var request = new
         {
             Name = _faker.Person.FullName,
             Email = email,
-            Password = "NotHashPasswordAndItsOKay",
+            Password = "SomePassword123!",
         };
 
         var response = await _client.PostAsJsonAsync("/api/Auth/register", request);
@@ -140,6 +108,29 @@ public class AuthControllerTest : IDisposable
         var errorMessage = await response.Content.ReadAsStringAsync();
 
         Assert.Equal("A user with this email already exists.", errorMessage);
+    }
+
+    [Fact]
+    public async Task Me_WithValidToken_ReturnsCurrentUser()
+    {
+        var email = _faker.Internet.Email();
+
+        var user = await UserFactory.CreateAsync(_context, email);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/auth/me");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        
+        var body = await response.Content.ReadFromJsonAsync<UserResponse>();
+        Assert.Equal(email, body!.Email);
+    }
+
+    [Fact]
+    public async Task Me_WithoutToken_ReturnsUnauthorized()
+    {
+        var response = await _client.GetAsync("/api/auth/me");
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
     
 
