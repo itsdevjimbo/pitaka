@@ -26,7 +26,7 @@ public class GetCurrentUserTest : IDisposable
     public async Task GetCurrentUser_WithValidUser_ReturnsUser()
     {
         var validClaim = ClaimsPrincipalFactory.ForUser(await UserFactory.CreateAsync(_context));
-        var user = _getCurrentUser.ExecuteAsync(validClaim);
+        var user = await _getCurrentUser.ExecuteAsync(validClaim);
         Assert.NotNull(user);
     }
 
@@ -34,8 +34,8 @@ public class GetCurrentUserTest : IDisposable
     public async Task GetCurrentUser_WithInvalidUser_ReturnsNull()
     {
         var invalidClaim = ClaimsPrincipalFactory.WithInvalidUserIdClaim();
-        var user = _getCurrentUser.ExecuteAsync(invalidClaim);
-        Assert.NotNull(user);
+        var user = await _getCurrentUser.ExecuteAsync(invalidClaim);
+        Assert.Null(user);
     }
 
     public void Dispose() => _scope.Dispose();
