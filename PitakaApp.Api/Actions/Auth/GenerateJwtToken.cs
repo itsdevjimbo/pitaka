@@ -3,16 +3,18 @@ namespace PitakaApp.Api.Actions.Auth;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using PitakaApp.Api.Models;
+using PitakaApp.Api.Options;
 
 public class GenerateJwtToken
 {
-    private readonly IConfiguration _configuration;
+    private readonly JwtOption _jwt;
 
-    public GenerateJwtToken(IConfiguration configuration)
+    public GenerateJwtToken(IOptions<JwtOption> jwtOptions)
     {
-        _configuration = configuration;
+        _jwt = jwtOptions.Value;
     }
 
     public string Execute(User user)
@@ -23,13 +25,13 @@ public class GenerateJwtToken
             new Claim(ClaimTypes.Email, user.Email),
         };
 
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]!));
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwt.Key));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-        var expiryMinutes = _configuration.GetValue<int>("Jwt:ExpiryMinutes");
+        var expiryMinutes = _jwt.ExpiryMinutes;
 
         var token = new JwtSecurityToken(
-            issuer: _configuration["Jwt:Issuer"],
-            audience: _configuration["Jwt:Audience"],
+            issuer: _jwt.Issuer,
+            audience: _jwt.Audience,
             claims: claims,
             expires: DateTime.UtcNow.AddMinutes(expiryMinutes),
             signingCredentials: credentials

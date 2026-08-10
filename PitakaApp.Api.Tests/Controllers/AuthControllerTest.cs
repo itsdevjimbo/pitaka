@@ -132,7 +132,6 @@ public class AuthControllerTest : IDisposable
         var response = await _client.GetAsync("/api/auth/me");
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
-    
 
     public void Dispose() => _scope.Dispose();
 }
