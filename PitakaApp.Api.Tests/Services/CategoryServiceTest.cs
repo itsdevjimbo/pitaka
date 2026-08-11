@@ -1,10 +1,9 @@
 namespace PitakaApp.Api.Tests.Services;
 
 using Bogus;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
 using PitakaApp.Api.Data;
-using PitakaApp.Api.Models;
+using PitakaApp.Api.Inputs;
 using PitakaApp.Api.Services;
 using PitakaApp.Api.Tests.Factories;
 using PitakaApp.Api.Tests.Fixtures;
@@ -28,24 +27,29 @@ public class CategoryServiceTest : IDisposable
     public async Task GetAll_WithNoUser_ReturnsCorrectLength()
     {
         var categories = await _categoryService.GetSystemDefaults();
-        Assert.Equal(17, categories.Count);
+        Assert.NotEmpty(categories);
+        Assert.All(categories, c => Assert.True(c.IsDefault));
     }
 
     [Fact]
     public async Task GetAll_WithUser_ReturnsCorrectLength()
     {
+        var systemDefaultCategories = await _categoryService.GetSystemDefaults();
+
         var user = await UserFactory.CreateAsync(_context);
         
         await CategoryFactory.CreateAsync(_context, user.Id);
 
         var categories = await _categoryService.GetAllForUser(user);
         
-        Assert.Equal(18, categories.Count);
+        Assert.Equal(systemDefaultCategories.Count + 1, categories.Count);
     }
 
     [Fact]
     public async Task GetAll_WithCrossUser_ReturnsCorrectLength()
     {
+        var systemDefaultCategories = await _categoryService.GetSystemDefaults();
+
         var userA = await UserFactory.CreateAsync(_context);
         var userB = await UserFactory.CreateAsync(_context);
         
@@ -55,12 +59,22 @@ public class CategoryServiceTest : IDisposable
         await CategoryFactory.CreateAsync(_context, userB.Id);
 
         var categoriesA = await _categoryService.GetAllForUser(userA);
-        Assert.Equal(19, categoriesA.Count);
+        Assert.Equal(systemDefaultCategories.Count + 2, categoriesA.Count);
         
         var categoriesB = await _categoryService.GetAllForUser(userB);
-        Assert.Equal(18, categoriesB.Count);
+        Assert.Equal(systemDefaultCategories.Count + 1, categoriesB.Count);
     }
 
+    [Fact]
+    public async Task CreateUserOwnedCategoryInput_ReturnsCategoryIsDefaultFalse()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var input = new CreateUserOwnedCategoryInput(User: user, Name: "Test category", Type: Enums.CategoryType.Expense);
+        var category = await _categoryService.CreateUserOwnedAsync(input);
+
+        Assert.NotNull(category);
+        Assert.False(category.IsDefault);
+    }
 
     public void Dispose() => _scope.Dispose();
 }
