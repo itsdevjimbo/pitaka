@@ -66,7 +66,7 @@ public class CategoryServiceTest : IDisposable
     }
 
     [Fact]
-    public async Task CreateUserOwnedCategoryInput_ReturnsCategoryIsDefaultFalse()
+    public async Task CreateUserOwnedCategory_ReturnsCategoryIsDefaultFalse()
     {
         var user = await UserFactory.CreateAsync(_context);
         var input = new CreateUserOwnedCategoryInput(User: user, Name: "Test category", Type: Enums.CategoryType.Expense);
@@ -74,6 +74,48 @@ public class CategoryServiceTest : IDisposable
 
         Assert.NotNull(category);
         Assert.False(category.IsDefault);
+    }
+
+    [Fact]
+    public async Task GetByIdForUser_WithCorrectUser_ReturnsCategory()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var seededCategory = await CategoryFactory.CreateAsync(_context, user.Id);
+
+        var category = await _categoryService.GetByIdForUser(user, seededCategory.Id);
+        Assert.NotNull(category);
+    }
+
+    [Fact]
+    public async Task GetByIdForUser_WithSystemDefault_ReturnsCategory()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var seededCategory = await CategoryFactory.CreateAsync(_context);
+
+        var category = await _categoryService.GetByIdForUser(user, seededCategory.Id);
+        Assert.NotNull(category);
+    }
+
+    [Fact]
+    public async Task GetByIdForUser_WithCrossUser_ReturnsNull()
+    {
+        var userA = await UserFactory.CreateAsync(_context);
+        var userB = await UserFactory.CreateAsync(_context);
+        var seededCategory = await CategoryFactory.CreateAsync(_context, userA.Id);
+
+        var category = await _categoryService.GetByIdForUser(userB, seededCategory.Id);
+        Assert.Null(category);
+    }
+
+    [Fact]
+    public async Task Update_ReturnsCorrectSavedCategory()
+    {
+        var seededCategory = await CategoryFactory.CreateAsync(_context);
+        var input = new UpdateCategoryInput(Name: "Test category", Type: Enums.CategoryType.Expense, Description: "desc", Icon: "icon");
+        var category = await _categoryService.UpdateAsync(seededCategory, input);
+        Assert.Equal("Test category", category.Name);
+        Assert.Equal("desc", category.Description);
+        Assert.Equal("icon", category.Icon);
     }
 
     public void Dispose() => _scope.Dispose();

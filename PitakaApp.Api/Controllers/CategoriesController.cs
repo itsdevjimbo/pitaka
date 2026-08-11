@@ -50,19 +50,56 @@ public class CategoriesController : ControllerBase
         if (user == null)
         {
             return Unauthorized();    
-        } 
+        }
 
-        CreateUserOwnedCategoryInput input = new (
-            User: user,
-            Name: request.Name,
-            Type: request.Type,
-            Description: request.Description,
-            Icon: request.Icon,
-            Color: request.Color
-        );
-
-        var category = await _categoryService.CreateUserOwnedAsync(input);
+        var category = await _categoryService.CreateUserOwnedAsync(request.ToCreateInput(user));
 
         return StatusCode(StatusCodes.Status201Created, CategoryResource.FromModel(category));
+    }
+
+    [HttpGet("{id}")]
+    public async Task<IActionResult> Show(int id)
+    {
+        var user = await _getCurrentUser.ExecuteAsync(User);
+        
+        if (user == null)
+        {
+            return Unauthorized();    
+        }
+    
+        var category = await _categoryService.GetByIdForUser(user, id);
+
+        if (category == null)
+        {
+            return NotFound();    
+        }
+
+        return Ok(CategoryResource.FromModel(category));
+    }
+
+    [HttpPut("{id}")]
+    public async Task<IActionResult> Update(int id, CategoryRequest request)
+    {
+        var user = await _getCurrentUser.ExecuteAsync(User);
+        
+        if (user == null)
+        {
+            return Unauthorized();    
+        }
+
+        var category = await _categoryService.GetTrackedByIdAsync(id);
+
+        if (category == null)
+        {
+            return NotFound();
+        }
+
+        if (category.UserId != user.Id)
+        {
+            return Forbid();
+        }
+
+        category = await _categoryService.UpdateAsync(category, request.ToUpdateInput());
+        return Ok(CategoryResource.FromModel(category));
     }
 }

@@ -1,10 +1,8 @@
 namespace PitakaApp.Api.Inputs;
 
 using PitakaApp.Api.Enums;
-using PitakaApp.Api.Models;
 
-public record CreateUserOwnedCategoryInput (
-    User User,
+public record UpdateCategoryInput (
     string Name,
     CategoryType Type,
     string? Description = null,

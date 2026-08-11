@@ -26,6 +26,17 @@ public class CategoryService
             .Where(c => c.IsDefault)
             .ToListAsync();
 
+    public async Task<Category?> GetByIdForUser(User user, int id) =>
+        await _context.Categories
+            .AsNoTracking()
+            .Where(c => c.Id == id && (c.UserId == user.Id || c.IsDefault))
+            .FirstOrDefaultAsync();
+
+    public async Task<Category?> GetTrackedByIdAsync(int id) =>
+        await _context.Categories
+            .Where(c => c.Id == id)
+            .FirstOrDefaultAsync();
+
     public async Task<Category> CreateUserOwnedAsync(CreateUserOwnedCategoryInput input)
     {
         var category = new Category
@@ -41,6 +52,19 @@ public class CategoryService
         _context.Categories.Add(category);
 
         await _context.SaveChangesAsync();
+        return category;
+    }
+
+    public async Task<Category> UpdateAsync(Category category, UpdateCategoryInput input)
+    {
+        category.Name = input.Name;
+        category.Type = input.Type;
+        category.Description = input.Description;
+        category.Icon = input.Icon;
+        category.Color = input.Color;
+
+        await _context.SaveChangesAsync();
+
         return category;
     }
 }
