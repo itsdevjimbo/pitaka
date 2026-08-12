@@ -3,6 +3,7 @@ namespace PitakaApp.Api.Tests.Controllers;
 using System.Net;
 using System.Net.Http.Json;
 using Bogus;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using PitakaApp.Api.Data;
 using PitakaApp.Api.Enums;
@@ -42,10 +43,14 @@ public class CategoriesControllerTest : IDisposable
     }
 
     [Fact]
-    public async Task Get_WithNoLoggedinUser_ReturnsUnauthorized()
+    public async Task Get_WithNoLoggedInUser_ReturnsSystemDefaults()
     {
         var response = await _client.GetAsync("/api/categories");
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<List<CategoryResource>>(TestJsonOptions.Default);
+        Assert.NotEmpty(body!);
+        Assert.All(body!, c => Assert.True(c.IsDefault));
     }
 
     [Fact]
@@ -94,6 +99,104 @@ public class CategoriesControllerTest : IDisposable
 
         var body = await response.Content.ReadFromJsonAsync<CategoryResource>(TestJsonOptions.Default);
         Assert.Equal("Expense", body!.Type.ToString());
+    }
+
+    [Fact]
+    public async Task Create_DuplicateNameForUser_ReturnsConflict()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(user);
+
+        await CategoryFactory.CreateAsync(_context, user.Id, name: "Groceries");
+
+        var request = new
+        {
+            Name = "Groceries",
+            Type = CategoryType.Expense,
+        };
+
+        var response = await _client.PostAsJsonAsync("/api/categories", request);
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Create_SameNameDifferentUser_ReturnsCreated()
+    {
+        var userA = await UserFactory.CreateAsync(_context);
+        var userB = await UserFactory.CreateAsync(_context);
+
+        await CategoryFactory.CreateAsync(_context, userA.Id, name: "Groceries");
+
+        _client.ActAsUser(userB);
+
+        var request = new
+        {
+            Name = "Groceries",
+            Type = CategoryType.Expense,
+        };
+
+        var response = await _client.PostAsJsonAsync("/api/categories", request);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Create_WithValidParentId_ReturnsCreatedWithParentId()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(user);
+
+        var parent = await CategoryFactory.CreateAsync(_context, user.Id, name: "Bills");
+
+        var request = new
+        {
+            Name = "Electricity",
+            Type = CategoryType.Expense,
+            ParentId = parent.Id,
+        };
+
+        var response = await _client.PostAsJsonAsync("/api/categories", request);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<CategoryResource>(TestJsonOptions.Default);
+        Assert.Equal(parent.Id, body!.ParentId);
+    }
+
+    [Fact]
+    public async Task Create_WithParentBelongingToOtherUser_ReturnsBadRequest()
+    {
+        var userA = await UserFactory.CreateAsync(_context);
+        var userB = await UserFactory.CreateAsync(_context);
+
+        var parent = await CategoryFactory.CreateAsync(_context, userA.Id, name: "Bills");
+
+        _client.ActAsUser(userB);
+
+        var request = new
+        {
+            Name = "Electricity",
+            Type = CategoryType.Expense,
+            ParentId = parent.Id,
+        };
+
+        var response = await _client.PostAsJsonAsync("/api/categories", request);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Create_WithNonExistentParentId_ReturnsBadRequest()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(user);
+
+        var request = new
+        {
+            Name = "Electricity",
+            Type = CategoryType.Expense,
+            ParentId = 99999,
+        };
+
+        var response = await _client.PostAsJsonAsync("/api/categories", request);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]
@@ -194,6 +297,25 @@ public class CategoriesControllerTest : IDisposable
     }
 
     [Fact]
+    public async Task Update_SystemDefaultCategory_ReturnsForbidden()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var userB = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(user);
+
+        var category = await _context.Categories.Where(c => c.IsDefault).FirstAsync();
+
+        var request = new
+        {
+            Name = "Test category 3",
+            Type = CategoryType.Expense,
+        };
+
+        var response = await _client.PutAsJsonAsync("/api/categories/" + category.Id, request);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Update_ReturnsOk()
     {
         var user = await UserFactory.CreateAsync(_context);
@@ -212,6 +334,109 @@ public class CategoriesControllerTest : IDisposable
         
         var body = await response.Content.ReadFromJsonAsync<CategoryResource>(TestJsonOptions.Default);
         Assert.Equal("Test category 3", body!.Name);
+    }
+
+
+
+    [Fact]
+    public async Task Update_DuplicateNameForUser_ReturnsConflict()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(user);
+
+        await CategoryFactory.CreateAsync(_context, user.Id, name: "Groceries");
+        var seededCategory = await CategoryFactory.CreateAsync(_context, user.Id, name: "Rent");
+
+        var request = new
+        {
+            Name = "Groceries",
+            Type = CategoryType.Expense,
+        };
+
+        var response = await _client.PutAsJsonAsync("/api/categories/" + seededCategory.Id, request);
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Update_KeepingSameName_ReturnsOk()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(user);
+
+        var seededCategory = await CategoryFactory.CreateAsync(_context, user.Id, name: "Groceries");
+
+        var request = new
+        {
+            Name = "Groceries",
+            Type = CategoryType.Income,
+        };
+
+        var response = await _client.PutAsJsonAsync("/api/categories/" + seededCategory.Id, request);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Update_WithSelfAsParent_ReturnsBadRequest()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(user);
+
+        var seededCategory = await CategoryFactory.CreateAsync(_context, user.Id, name: "Groceries");
+
+        var request = new
+        {
+            Name = "Groceries",
+            Type = CategoryType.Expense,
+            ParentId = seededCategory.Id,
+        };
+
+        var response = await _client.PutAsJsonAsync("/api/categories/" + seededCategory.Id, request);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Delete_WithoutLoggedInUser_ReturnsUnauthorized()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var seededCategory = await CategoryFactory.CreateAsync(_context, user.Id);
+
+        var response = await _client.DeleteAsync("api/categories/" + seededCategory.Id);
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Delete_WithInvalidId_ReturnsNotFound()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(user);
+
+        var response = await _client.DeleteAsync("api/categories/99999");
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Delete_OtherUsersCategory_ReturnsForbidden()
+    {
+        var userA = await UserFactory.CreateAsync(_context);
+        var userB = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(userA);
+        
+        var seededCategory = await CategoryFactory.CreateAsync(_context, userB.Id);
+
+        var response = await _client.DeleteAsync("api/categories/" + seededCategory.Id);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Delete_ReturnsNoContent()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(user);
+        
+        var seededCategory = await CategoryFactory.CreateAsync(_context, user.Id);
+
+        var response = await _client.DeleteAsync("api/categories/" + seededCategory.Id);
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
     }
     
     public void Dispose() => _scope.Dispose();

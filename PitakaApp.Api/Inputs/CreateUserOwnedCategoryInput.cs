@@ -9,5 +9,6 @@ public record CreateUserOwnedCategoryInput (
     CategoryType Type,
     string? Description = null,
     string? Icon = null,
-    string? Color = null
+    string? Color = null,
+    int? ParentId = null
 );

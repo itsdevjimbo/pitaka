@@ -18,12 +18,14 @@ public record CategoryRequest (
     string? Icon,
 
     [MaxLength(100)]
-    string? Color
+    string? Color,
+
+    int? ParentId
 )
 {
     public CreateUserOwnedCategoryInput ToCreateInput(User user) =>
-        new(User: user, Name: Name, Type: Type, Description: Description, Icon: Icon, Color: Color);
+        new(User: user, Name: Name, Type: Type, Description: Description, Icon: Icon, Color: Color, ParentId: ParentId);
 
-    public UpdateCategoryInput ToUpdateInput() => 
-        new(Name: Name, Type: Type, Description: Description, Icon: Icon, Color: Color);
+    public UpdateCategoryInput ToUpdateInput() =>
+        new(Name: Name, Type: Type, Description: Description, Icon: Icon, Color: Color, ParentId: ParentId);
 }

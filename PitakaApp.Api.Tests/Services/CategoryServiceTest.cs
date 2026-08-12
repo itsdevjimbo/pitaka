@@ -1,6 +1,7 @@
 namespace PitakaApp.Api.Tests.Services;
 
 using Bogus;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using PitakaApp.Api.Data;
 using PitakaApp.Api.Inputs;
@@ -116,6 +117,16 @@ public class CategoryServiceTest : IDisposable
         Assert.Equal("Test category", category.Name);
         Assert.Equal("desc", category.Description);
         Assert.Equal("icon", category.Icon);
+    }
+    
+    [Fact]
+    public async Task Delete_EnsuresTheEntityIsDeleted()
+    {
+        var seededCategory = await CategoryFactory.CreateAsync(_context);
+        await _categoryService.DeleteAsync(seededCategory);
+        
+        var exists = await _context.Categories.AnyAsync(c => c.Id == seededCategory.Id);
+        Assert.False(exists);
     }
 
     public void Dispose() => _scope.Dispose();
