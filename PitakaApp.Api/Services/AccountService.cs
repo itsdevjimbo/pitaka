@@ -1,0 +1,67 @@
+using Microsoft.EntityFrameworkCore;
+using PitakaApp.Api.Data;
+using PitakaApp.Api.Inputs;
+using PitakaApp.Api.Models;
+
+namespace PitakaApp.Api.Services;
+
+public class AccountService
+{
+    private readonly PitakaDbContext _context;
+
+    public AccountService(PitakaDbContext context)
+    {
+        _context = context;
+    }
+    
+    public async Task<List<Account>> GetAllForUser(User user) =>
+        await _context.Accounts
+            .AsNoTracking()
+            .Where(a => a.UserId == user.Id)
+            .ToListAsync();
+
+    public async Task<Account?> GetByIdForUser(User user, int id) =>
+        await _context.Accounts
+            .AsNoTracking()
+            .Where(a => a.Id == id && a.UserId == user.Id)
+            .FirstOrDefaultAsync();
+
+    public async Task<Account?> GetTrackedByIdAsync(int id) =>
+        await _context.Accounts
+            .Where(a => a.Id == id)
+            .FirstOrDefaultAsync();
+    public async Task<bool> NameExistsForUserAsync(int userId, string name, int? excludeId = null) =>
+        await _context.Accounts
+            .AsNoTracking()
+            .AnyAsync(a => a.UserId == userId && a.Name == name && (excludeId == null || a.Id != excludeId));
+
+    public async Task<Account> CreateAsync(CreateAccountInput input)
+    {
+        var account = new Account
+        {
+            UserId = input.User.Id,
+            Name = input.Name,
+            Type = input.Type,
+            InitialBalance = input.InitialBalance,
+            CurrentBalance = input.InitialBalance
+        };
+
+        _context.Accounts.Add(account);
+
+        await _context.SaveChangesAsync();
+        return account; 
+    }
+
+    public async Task<Account> UpdateAsync(Account account, UpdateAccountInput input)
+    {
+        account.Name = input.Name;
+        await _context.SaveChangesAsync();
+        return account;
+    }
+
+    public async Task DeleteAsync(Account account)
+    {
+        _context.Accounts.Remove(account);
+        await _context.SaveChangesAsync();
+    }
+}

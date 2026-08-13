@@ -38,6 +38,7 @@ builder.Services.AddScoped<GenerateJwtToken>();
 builder.Services.AddScoped<GetCurrentUser>();
 builder.Services.AddScoped<CategoryService>();
 builder.Services.AddScoped<CurrentUserAccessor>();
+builder.Services.AddScoped<AccountService>();
 
 builder.Services.AddOptions<JwtOption>()
     .Bind(builder.Configuration.GetSection(JwtOption.SectionName))
