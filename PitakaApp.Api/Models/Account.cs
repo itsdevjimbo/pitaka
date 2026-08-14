@@ -6,6 +6,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 public class Account: TimestampedEntity
 {
+    public uint Version { get; set; }
     public required int UserId { get; set; }
 
     [MaxLength(255)]
