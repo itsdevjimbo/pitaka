@@ -17,11 +17,6 @@ public class UpdateAccountBalance
     {
         var account = await GetTrackedAccountOrThrowAsync(transaction.AccountId);
 
-        if (account == null)
-        {
-            throw new InvalidOperationException($"Account {transaction.AccountId} not found.");
-        }
-
         switch (transaction.Type)
         {
             case TransactionType.Income:
@@ -44,11 +39,6 @@ public class UpdateAccountBalance
     public async Task<Account> ReverseTransaction(Transaction transaction)
     {
         var account = await GetTrackedAccountOrThrowAsync(transaction.AccountId);
-
-        if (account == null)
-        {
-            throw new InvalidOperationException($"Account {transaction.AccountId} not found.");
-        }
 
         switch (transaction.Type)
         {
@@ -73,27 +63,25 @@ public class UpdateAccountBalance
     {
         var account = await GetTrackedAccountOrThrowAsync(accountId);
 
-        if (account == null)
-        {
-            throw new InvalidOperationException($"Account {accountId} not found.");
-        }
-
         account.Increase(amount);
+
         return account;
     }
 
-    private async Task<Account> ReverseTransfer(decimal amount, int? accountId)
+    private async Task ReverseTransfer(decimal amount, int? accountId)
     {
+        if (accountId == null)
+        {
+            return;
+        }
+
         var account = await GetTrackedAccountOrThrowAsync(accountId);
-
         account.Decrease(amount);
-
-        return account;
     }
 
     private async Task<Account> GetTrackedAccountOrThrowAsync(int? accountId)
-{
-    var account = await _context.Accounts.FirstOrDefaultAsync(a => a.Id == accountId);
-    return account ?? throw new InvalidOperationException($"Account {accountId} not found.");
-}
+    {
+        var account = await _context.Accounts.FirstOrDefaultAsync(a => a.Id == accountId);
+        return account ?? throw new InvalidOperationException($"Account {accountId} not found.");
+    }
 }
