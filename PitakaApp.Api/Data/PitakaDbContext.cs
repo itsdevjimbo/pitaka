@@ -44,6 +44,10 @@ public class PitakaDbContext : DbContext
             property.SetColumnType("varchar(100)"); 
         }
 
+        modelBuilder.Entity<Account>()
+            .Property(a => a.Version)
+            .IsConcurrencyToken();
+
         modelBuilder.Entity<Transaction>()
             .HasOne(t => t.Account)
             .WithMany(a => a.Transactions)
@@ -107,6 +111,12 @@ public class PitakaDbContext : DbContext
             entry.Entity.UpdatedAt = DateTime.UtcNow;
         }
 
+        foreach (var entry in ChangeTracker.Entries<Account>()
+             .Where(e => e.State == EntityState.Modified))
+        {
+            entry.Entity.Version += 1;
+        }
+
         return base.SaveChanges(acceptAllChangesOnSuccess);
     }
 
@@ -116,6 +126,12 @@ public class PitakaDbContext : DbContext
              .Where(e => e.State == EntityState.Modified))
         {
             entry.Entity.UpdatedAt = DateTime.UtcNow;
+        }
+
+        foreach (var entry in ChangeTracker.Entries<Account>()
+             .Where(e => e.State == EntityState.Modified))
+        {
+            entry.Entity.Version += 1;
         }
 
         return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
