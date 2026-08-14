@@ -7,6 +7,7 @@ using System.Text;
 using PitakaApp.Api.Options;
 using PitakaApp.Api.Services;
 using System.Text.Json.Serialization;
+using PitakaApp.Api.Actions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -39,6 +40,8 @@ builder.Services.AddScoped<GetCurrentUser>();
 builder.Services.AddScoped<CategoryService>();
 builder.Services.AddScoped<CurrentUserAccessor>();
 builder.Services.AddScoped<AccountService>();
+builder.Services.AddScoped<UpdateAccountBalance>();
+builder.Services.AddScoped<TransactionService>();
 
 builder.Services.AddOptions<JwtOption>()
     .Bind(builder.Configuration.GetSection(JwtOption.SectionName))
