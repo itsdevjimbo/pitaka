@@ -21,6 +21,11 @@ public class RealAuthWebApplicationFactory : WebApplicationFactory<Program>, IAs
     private const string TestConnectionString =
         "Server=localhost;Port=3306;Database=pitaka_test_realauth;User=root;Password=root;";
 
+    // Not a real secret — same reasoning as PitakaWebApplicationFactory's TestJwtKey. This
+    // factory validates real signatures, so the key must be set to *something* valid; the
+    // actual value only needs to be self-consistent within this factory's own host.
+    private const string TestJwtKey = "test-only-jwt-signing-key-not-for-real-use-0000";
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.ConfigureAppConfiguration((_, config) =>
@@ -28,6 +33,7 @@ public class RealAuthWebApplicationFactory : WebApplicationFactory<Program>, IAs
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["ConnectionStrings:DefaultConnection"] = TestConnectionString,
+                ["Jwt:Key"] = TestJwtKey,
             });
         });
     }
