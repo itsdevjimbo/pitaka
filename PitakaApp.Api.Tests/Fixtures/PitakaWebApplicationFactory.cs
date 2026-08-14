@@ -18,6 +18,11 @@ public class PitakaWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
     private const string TestConnectionString =
         "Server=localhost;Port=3306;Database=pitaka_test;User=root;Password=root;";
 
+    // Not a real secret — signs tokens for throwaway test runs only, nothing it signs is
+    // ever trusted outside the test process. Lets the test suite (and CI) start without
+    // needing the developer's local User Secrets file, which a CI runner never has.
+    private const string TestJwtKey = "test-only-jwt-signing-key-not-for-real-use-0000";
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.ConfigureAppConfiguration((_, config) =>
@@ -25,6 +30,7 @@ public class PitakaWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["ConnectionStrings:DefaultConnection"] = TestConnectionString,
+                ["Jwt:Key"] = TestJwtKey,
             });
         });
 
