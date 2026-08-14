@@ -484,6 +484,29 @@ public class TransactionsControllerTest : IDisposable
     }
 
     [Fact]
+    public async Task Delete_TransferTransaction_AfterDeletedTargetAccount_ReturnsNoContent()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 3000);
+        var targetAccount = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 2000);
+        
+        _client.ActAsUser(user);
+
+        var transaction = await TransactionFactory.CreateAsync(
+            _context, 
+            userId: user.Id, 
+            accountId: account.Id, 
+            type: TransactionType.Transfer,
+            transferToAccountId: targetAccount.Id
+        );
+
+        await _client.DeleteAsync("/api/accounts/" + targetAccount!.Id);
+
+        var deleteResponse = await _client.DeleteAsync("/api/transactions/" + transaction!.Id);
+        Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
+    }
+
+    [Fact]
     public async Task Delete_IncomeTransaction_ReturnsNoContent_AndReversedAccountBalance()
     {
         var user = await UserFactory.CreateAsync(_context);
