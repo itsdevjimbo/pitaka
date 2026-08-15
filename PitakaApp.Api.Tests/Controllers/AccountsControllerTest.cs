@@ -268,6 +268,26 @@ public class AccountsControllerTest : IDisposable
         Assert.False(body!.IsActive);
     }
 
+    [Fact]
+    public async Task Patch_ReactvateStatus_ReturnsOk()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.PatchAsJsonAsync("/api/accounts/" + account.Id + "/status", new { IsActive = false });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<AccountResource>(TestJsonOptions.Default);
+        Assert.False(body!.IsActive);
+
+        response = await _client.PatchAsJsonAsync("/api/accounts/" + account.Id + "/status", new { IsActive = true });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        body = await response.Content.ReadFromJsonAsync<AccountResource>(TestJsonOptions.Default);
+        Assert.True(body!.IsActive);
+    }
 
     [Fact]
     public async Task Delete_WithInvalidAccountId_ReturnsNotFound()
