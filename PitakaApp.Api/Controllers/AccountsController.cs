@@ -116,6 +116,11 @@ public class AccountsController : ControllerBase
         {
             return Forbid();
         }
+        
+        if (await _accountService.HasTransactionHistoryAsync(id))
+        {
+            return Conflict("This account has transaction history and cannot be deleted.");
+        }
 
         await _accountService.DeleteAsync(account);
         return NoContent();

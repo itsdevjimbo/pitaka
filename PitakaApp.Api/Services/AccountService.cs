@@ -64,4 +64,9 @@ public class AccountService
         _context.Accounts.Remove(account);
         await _context.SaveChangesAsync();
     }
+
+    public async Task<bool> HasTransactionHistoryAsync(int accountId) =>
+        await _context.Transactions
+            .AsNoTracking()
+            .AnyAsync(t => t.AccountId == accountId || t.TransferToAccountId == accountId);
 }
