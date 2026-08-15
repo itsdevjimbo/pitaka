@@ -241,5 +241,33 @@ public class AccountsControllerTest : IDisposable
         Assert.False(exists);
     }
 
+    [Fact]
+    public async Task Delete_WithTransactionHistory_ReturnsConflict()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.DeleteAsync("/api/accounts/" + account.Id);
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Delete_HasBeenReferenceToATransaction_ReturnsConflict()
+    {
+        var userA = await UserFactory.CreateAsync(_context);
+        var userB = await UserFactory.CreateAsync(_context);
+        var accountA = await AccountFactory.CreateAsync(_context, userA.Id);
+        var accountB = await AccountFactory.CreateAsync(_context, userB.Id);
+        await TransactionFactory.CreateAsync(_context, userB.Id, accountB.Id, TransactionType.Transfer, amount: 100, transferToAccountId: accountA.Id);
+
+        _client.ActAsUser(userA);
+
+        var response = await _client.DeleteAsync("/api/accounts/" + accountA.Id);
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
     public void Dispose() => _scope.Dispose();
 }
