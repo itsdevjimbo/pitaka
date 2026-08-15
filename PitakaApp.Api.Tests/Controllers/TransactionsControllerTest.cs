@@ -192,6 +192,46 @@ public class TransactionsControllerTest : IDisposable
         var response = await _client.PostAsJsonAsync("/api/transactions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
+    
+    [Fact]
+    public async Task Create_WithInActiveAccount_ReturnsBadRequest()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id, isActive: false);
+
+        _client.ActAsUser(user);
+        
+        var request = new
+        {
+            AccountId = account.Id,
+            Type = TransactionType.Income,
+            Amount = 5000,
+        };
+
+        var response = await _client.PostAsJsonAsync("/api/transactions", request);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+    
+    [Fact]
+    public async Task Create_TransferWithInActiveAccount_ReturnsBadRequest()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var accountA = await AccountFactory.CreateAsync(_context, user.Id);
+        var accountB = await AccountFactory.CreateAsync(_context, user.Id, isActive: false);
+
+        _client.ActAsUser(user);
+        
+        var request = new
+        {
+            AccountId = accountA.Id,
+            Type = TransactionType.Transfer,
+            Amount = 5000,
+            TransferToAccountId = accountB.Id
+        };
+
+        var response = await _client.PostAsJsonAsync("/api/transactions", request);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
 
     [Fact]
     public async Task Create_TransferTransaction_WithoutTransferAccount_ReturnsBadRequest()

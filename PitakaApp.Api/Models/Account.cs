@@ -40,4 +40,14 @@ public class Account: TimestampedEntity
     {
         CurrentBalance -= amount;
     }
+
+    public void Activate()
+    {
+        IsActive = true;
+    }
+
+    public void Deactivate()
+    {
+        IsActive = false;
+    }
 }

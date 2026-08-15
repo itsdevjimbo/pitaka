@@ -106,6 +106,6 @@ public class TransactionService
             return false;
         }
 
-        return await _context.Accounts.AnyAsync(a => a.Id == transferToAccountId && a.UserId == user.Id);
+        return await _context.Accounts.AnyAsync(a => a.Id == transferToAccountId && a.UserId == user.Id && a.IsActive);
     }
 }

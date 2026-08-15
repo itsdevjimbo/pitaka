@@ -7,6 +7,7 @@ using PitakaApp.Api.Requests;
 using PitakaApp.Api.Resources;
 using PitakaApp.Api.Services;
 
+[TypeFilter(typeof(ResolveCurrentUserFilter))]
 [Authorize]
 [ApiController]
 [Route("api/[controller]")]
@@ -23,9 +24,7 @@ public class AccountsController : ControllerBase
         _accountService = accountService;
         _currentUserAccessor = currentUserAccessor;
     }
-    
-    [TypeFilter(typeof(ResolveCurrentUserFilter))]
-    [Authorize]
+
     [HttpGet]
     public async Task<IActionResult> Get()
     {
@@ -35,8 +34,6 @@ public class AccountsController : ControllerBase
         return Ok(AccountResource.Collection(accounts));
     }
     
-    [TypeFilter(typeof(ResolveCurrentUserFilter))]
-    [Authorize]
     [HttpPost]
     public async Task<IActionResult> Create(CreateAccountRequest request)
     {
@@ -52,8 +49,6 @@ public class AccountsController : ControllerBase
         return StatusCode(StatusCodes.Status201Created, AccountResource.FromModel(account));
     }
     
-    [TypeFilter(typeof(ResolveCurrentUserFilter))]
-    [Authorize]
     [HttpGet("{id}")]
     public async Task<IActionResult> Show(int id)
     {
@@ -68,10 +63,6 @@ public class AccountsController : ControllerBase
         return Ok(AccountResource.FromModel(account));
     }
 
-
-    
-    [TypeFilter(typeof(ResolveCurrentUserFilter))]
-    [Authorize]
     [HttpPut("{id}")]
     public async Task<IActionResult> Update(int id, UpdateAccountRequest request)
     {
@@ -93,14 +84,32 @@ public class AccountsController : ControllerBase
             return Conflict("An account with this name already exists.");
         }
         
-        account = await _accountService.UpdateAsync(account, request.ToInput());
+        await _accountService.UpdateAsync(account, request.ToInput());
 
         return Ok(AccountResource.FromModel(account));
     }
 
+    [HttpPatch("{id}/status")]
+    public async Task<IActionResult> Patch(int id, PatchAccountActiveStatusRequest request)
+    {
+        var user = _currentUserAccessor.User!;
+        var account = await _accountService.GetTrackedByIdAsync(id);
 
-    [TypeFilter(typeof(ResolveCurrentUserFilter))]
-    [Authorize]
+        if (account == null)
+        {
+            return NotFound();
+        }
+
+        if (account.UserId != user.Id)
+        {
+            return Forbid();
+        }
+
+        await _accountService.PatchActiveStatus(account, request.ToInput());
+
+        return Ok(AccountResource.FromModel(account));
+    }
+
     [HttpDelete("{id}")] 
     public async Task<IActionResult> Delete(int id)
     {
