@@ -199,6 +199,95 @@ public class AccountsControllerTest : IDisposable
         Assert.Equal("Savings account", body!.Name);
     }
 
+    [Fact]
+    public async Task Patch_ActiveStatusWithoutLoggedInUser_ReturnsUnauthorized()
+    {
+        
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+
+        var request = new
+        {
+            IsActive = false
+        };
+
+        var response = await _client.PatchAsJsonAsync("/api/accounts/" + account.Id + "/status", request);
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Patch_NonExistentAccountActiveStatus_ReturnsNotFound()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(user);
+
+        var request = new
+        {
+            IsActive = false
+        };
+
+        var response = await _client.PatchAsJsonAsync("/api/accounts/999999/status", request);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Patch_OtherUserAccountActiveStatus_ReturnsForbid()
+    {
+        var userA = await UserFactory.CreateAsync(_context);
+        var userB = await UserFactory.CreateAsync(_context);
+        var accountB = await AccountFactory.CreateAsync(_context, userB.Id);
+
+        _client.ActAsUser(userA);
+
+        var request = new
+        {
+            IsActive = false
+        };
+
+        var response = await _client.PatchAsJsonAsync("/api/accounts/" + accountB.Id + "/status", request);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Patch_ActiveStatus_ReturnsOk()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+
+        _client.ActAsUser(user);
+
+        var request = new
+        {
+            IsActive = false
+        };
+
+        var response = await _client.PatchAsJsonAsync("/api/accounts/" + account.Id + "/status", request);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<AccountResource>(TestJsonOptions.Default);
+        Assert.False(body!.IsActive);
+    }
+
+    [Fact]
+    public async Task Patch_ReactvateStatus_ReturnsOk()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.PatchAsJsonAsync("/api/accounts/" + account.Id + "/status", new { IsActive = false });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<AccountResource>(TestJsonOptions.Default);
+        Assert.False(body!.IsActive);
+
+        response = await _client.PatchAsJsonAsync("/api/accounts/" + account.Id + "/status", new { IsActive = true });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        body = await response.Content.ReadFromJsonAsync<AccountResource>(TestJsonOptions.Default);
+        Assert.True(body!.IsActive);
+    }
 
     [Fact]
     public async Task Delete_WithInvalidAccountId_ReturnsNotFound()

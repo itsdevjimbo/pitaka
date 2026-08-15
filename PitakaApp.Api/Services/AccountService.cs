@@ -59,6 +59,21 @@ public class AccountService
         return account;
     }
 
+    public async Task<Account> PatchActiveStatus(Account account, PatchAccountActiveInput input)
+    {
+
+        if (input.IsActive)
+        {
+            account.Activate();
+        } else
+        {
+            account.Deactivate();
+        }
+
+        await _context.SaveChangesAsync();
+        return account;
+    }
+
     public async Task DeleteAsync(Account account)
     {
         _context.Accounts.Remove(account);

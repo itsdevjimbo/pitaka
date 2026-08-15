@@ -48,6 +48,11 @@ public class TransactionsController : ControllerBase
         {
             return BadRequest();
         }
+
+        if (!account.IsActive)
+        {
+            return BadRequest();
+        }
         
         if (!await _transactionService.VerifyCategoryExistence(user, request.CategoryId))
         {
