@@ -24,10 +24,9 @@ public class PitakaDbContext : DbContext
     {
         modelBuilder.Entity<User>().HasIndex(u => u.Email).IsUnique();
 
-        // MySQL treats NULL as distinct from NULL in a unique index, so multiple
-        // system-default categories (UserId == null) can share a name freely — this
-        // only actually constrains real users, which is the intent.
         modelBuilder.Entity<Category>().HasIndex(c => new { c.UserId, c.Name }).IsUnique();
+
+        modelBuilder.Entity<Budget>().HasIndex(c => new { c.UserId, c.Name }).IsUnique();
 
         var enumProperties = modelBuilder.Model.GetEntityTypes()
             .SelectMany(e => e.GetProperties())
