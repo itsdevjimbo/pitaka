@@ -26,12 +26,11 @@ public class AccountServiceTest : IDisposable
     {
         var user = await UserFactory.CreateAsync(_context);
         var input = new CreateAccountInput(
-            User: user,
             Name: "Savings",
             Type: Enums.AccountType.Bank,
             InitialBalance: 5000
         );
-        var account = await _accountService.CreateAsync(input);
+        var account = await _accountService.CreateAsync(user, input);
 
         Assert.Equal(account.InitialBalance, account.CurrentBalance);
     }

@@ -1,4 +1,3 @@
-using System.ComponentModel.DataAnnotations;
 using PitakaApp.Api.Inputs;
 
 namespace PitakaApp.Api.Requests;

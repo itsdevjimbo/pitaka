@@ -2,7 +2,7 @@ namespace PitakaApp.Api.Inputs;
 
 using PitakaApp.Api.Enums;
 
-public record UpdateCategoryInput (
+public record CategoryInput (
     string Name,
     CategoryType Type,
     string? Description = null,

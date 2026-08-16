@@ -62,7 +62,7 @@ public class CategoriesController : ControllerBase
             return BadRequest("Invalid parent category.");
         }
 
-        var category = await _categoryService.CreateUserOwnedAsync(request.ToCreateInput(user));
+        var category = await _categoryService.CreateUserOwnedAsync(user, request.ToInput());
         return StatusCode(StatusCodes.Status201Created, CategoryResource.FromModel(category));
     }
 
@@ -107,7 +107,7 @@ public class CategoriesController : ControllerBase
             return BadRequest("Invalid parent category.");
         }
 
-        category = await _categoryService.UpdateAsync(category, request.ToUpdateInput());
+        category = await _categoryService.UpdateAsync(category, request.ToInput());
         return Ok(CategoryResource.FromModel(category));
     }
 

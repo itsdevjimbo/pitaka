@@ -35,11 +35,11 @@ public class AccountService
             .AsNoTracking()
             .AnyAsync(a => a.UserId == userId && a.Name == name && (excludeId == null || a.Id != excludeId));
 
-    public async Task<Account> CreateAsync(CreateAccountInput input)
+    public async Task<Account> CreateAsync(User user, CreateAccountInput input)
     {
         var account = new Account
         {
-            UserId = input.User.Id,
+            UserId = user.Id,
             Name = input.Name,
             Type = input.Type,
             InitialBalance = input.InitialBalance,

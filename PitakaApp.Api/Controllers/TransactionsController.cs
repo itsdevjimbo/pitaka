@@ -66,7 +66,7 @@ public class TransactionsController : ControllerBase
 
         try
         {
-            var transaction = await _transactionService.CreateAsync(request.ToInput(account));
+            var transaction = await _transactionService.CreateAsync(account, request.ToInput());
             return StatusCode(StatusCodes.Status201Created, TransactionResource.FromModel(transaction));
         }
         catch (DbUpdateConcurrencyException)

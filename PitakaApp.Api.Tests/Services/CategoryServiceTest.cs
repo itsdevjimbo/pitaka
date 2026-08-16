@@ -70,8 +70,8 @@ public class CategoryServiceTest : IDisposable
     public async Task CreateUserOwnedCategory_ReturnsCategoryIsDefaultFalse()
     {
         var user = await UserFactory.CreateAsync(_context);
-        var input = new CreateUserOwnedCategoryInput(User: user, Name: "Test category", Type: Enums.CategoryType.Expense);
-        var category = await _categoryService.CreateUserOwnedAsync(input);
+        var input = new CategoryInput(Name: "Test category", Type: Enums.CategoryType.Expense);
+        var category = await _categoryService.CreateUserOwnedAsync(user, input);
 
         Assert.NotNull(category);
         Assert.False(category.IsDefault);
@@ -112,7 +112,7 @@ public class CategoryServiceTest : IDisposable
     public async Task Update_ReturnsCorrectSavedCategory()
     {
         var seededCategory = await CategoryFactory.CreateAsync(_context);
-        var input = new UpdateCategoryInput(Name: "Test category", Type: Enums.CategoryType.Expense, Description: "desc", Icon: "icon");
+        var input = new CategoryInput(Name: "Test category", Type: Enums.CategoryType.Expense, Description: "desc", Icon: "icon");
         var category = await _categoryService.UpdateAsync(seededCategory, input);
         Assert.Equal("Test category", category.Name);
         Assert.Equal("desc", category.Description);

@@ -1,7 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using PitakaApp.Api.Enums;
 using PitakaApp.Api.Inputs;
-using PitakaApp.Api.Models;
 
 namespace PitakaApp.Api.Requests;
 
@@ -15,6 +14,6 @@ public record CreateAccountRequest (
     decimal InitialBalance = 0
 )
 {
-    public CreateAccountInput ToInput(User user) =>
-        new(User: user, Name: Name, Type: Type, InitialBalance: InitialBalance);
+    public CreateAccountInput ToInput() =>
+        new(Name: Name, Type: Type, InitialBalance: InitialBalance);
 }

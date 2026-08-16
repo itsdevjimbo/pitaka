@@ -1,10 +1,8 @@
 namespace PitakaApp.Api.Inputs;
 
 using PitakaApp.Api.Enums;
-using PitakaApp.Api.Models;
 
 public record CreateTransactionInput (
-    Account Account,
     TransactionType Type,
     decimal Amount,
     DateTime? TransactionDate = null,
