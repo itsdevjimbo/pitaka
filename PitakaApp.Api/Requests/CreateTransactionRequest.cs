@@ -1,9 +1,6 @@
 using System.ComponentModel.DataAnnotations;
-using System.Diagnostics;
-using System.Text.Json;
 using PitakaApp.Api.Enums;
 using PitakaApp.Api.Inputs;
-using PitakaApp.Api.Models;
 
 namespace PitakaApp.Api.Requests;
 
@@ -46,9 +43,8 @@ public record CreateTransactionRequest (
         }
     }
 
-    public CreateTransactionInput ToInput(Account account) =>
+    public CreateTransactionInput ToInput() =>
         new (
-            Account: account, 
             Type: Type, 
             Amount: Amount,
             TransactionDate: TransactionDate,

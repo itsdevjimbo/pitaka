@@ -32,12 +32,12 @@ public class TransactionService
             .Where(a => a.UserId == user.Id)
             .ToListAsync();
 
-    public async Task<Transaction> CreateAsync(CreateTransactionInput input)
+    public async Task<Transaction> CreateAsync(Account account, CreateTransactionInput input)
     {
         var transaction = new Transaction
         {
-            UserId = input.Account.UserId,
-            AccountId = input.Account.Id,
+            UserId = account.UserId,
+            AccountId = account.Id,
             CategoryId = input.CategoryId,
             Type = input.Type,
             Amount = input.Amount,

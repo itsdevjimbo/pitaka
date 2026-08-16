@@ -60,11 +60,11 @@ public class CategoryService
             .AnyAsync(c => c.Id == parentId && (c.IsDefault || c.UserId == user.Id));
     }
 
-    public async Task<Category> CreateUserOwnedAsync(CreateUserOwnedCategoryInput input)
+    public async Task<Category> CreateUserOwnedAsync(User user, CategoryInput input)
     {
         var category = new Category
         {
-            UserId = input.User.Id,
+            UserId = user.Id,
             Name = input.Name,
             Type = input.Type,
             Description = input.Description,
@@ -79,7 +79,7 @@ public class CategoryService
         return category;
     }
 
-    public async Task<Category> UpdateAsync(Category category, UpdateCategoryInput input)
+    public async Task<Category> UpdateAsync(Category category, CategoryInput input)
     {
         category.Name = input.Name;
         category.Type = input.Type;

@@ -44,7 +44,7 @@ public class AccountsController : ControllerBase
             return Conflict("An account with this name already exists.");
         }
 
-        var account = await _accountService.CreateAsync(request.ToInput(user));
+        var account = await _accountService.CreateAsync(user, request.ToInput());
 
         return StatusCode(StatusCodes.Status201Created, AccountResource.FromModel(account));
     }
