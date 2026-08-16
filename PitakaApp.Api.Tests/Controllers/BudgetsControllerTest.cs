@@ -165,6 +165,16 @@ public class BudgetsControllerTest : IDisposable
         
         var response = await _client.PostAsJsonAsync("/api/budgets", request);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<BudgetResource>(TestJsonOptions.Default);
+
+        Assert.Equal("Transpo Budget", body!.Name);
+        Assert.Equal(5000, body!.AmountLimit);
+        Assert.Equal("Weekly", body!.Period.ToString());
+        Assert.Equal(DateOnly.FromDateTime(DateTime.Now).ToString(), body!.StartDate.ToString());
+        Assert.Null(body!.EndDate);
+        Assert.Null(body!.Description);
+        Assert.Null(body!.CategoryId);
     }
 
     [Fact]
@@ -240,6 +250,16 @@ public class BudgetsControllerTest : IDisposable
 
         var response = await _client.GetAsync("/api/budgets/" + budget.Id);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<BudgetResource>(TestJsonOptions.Default);
+
+        Assert.Equal("Test budget", body!.Name);
+        Assert.Equal(10000, body!.AmountLimit);
+        Assert.Equal("Weekly", body!.Period.ToString());
+        Assert.Equal(DateOnly.FromDateTime(DateTime.Now).ToString(), body!.StartDate.ToString());
+        Assert.Null(body!.EndDate);
+        Assert.Null(body!.Description);
+        Assert.Null(body!.CategoryId);
     }
 
     [Fact]
@@ -399,6 +419,38 @@ public class BudgetsControllerTest : IDisposable
     }
 
     [Fact]
+    public async Task Update_CategoryIdToNull_ReturnsOk()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var category = await CategoryFactory.CreateAsync(_context, user.Id);
+        var budget = await BudgetFactory.CreateAsync(_context, user.Id, categoryId: category.Id);
+        
+        _client.ActAsUser(user);
+
+        var request = new
+        {
+            Name = "Updated Budget",
+            AmountLimit = 5000,
+            Period = BudgetPeriod.Weekly,
+            StartDate = DateOnly.FromDateTime(DateTime.Now.AddDays(3)),
+            EndDate = DateOnly.FromDateTime(DateTime.Now.AddDays(7)),
+            Description = "Test update budget"
+        };
+
+        var response = await _client.PutAsJsonAsync("/api/budgets/" + budget.Id, request);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        
+        var body = await response.Content.ReadFromJsonAsync<BudgetResource>(TestJsonOptions.Default);
+        Assert.Equal("Updated Budget", body!.Name);
+        Assert.Equal(5000, body!.AmountLimit);
+        Assert.Equal("Weekly", body!.Period.ToString());
+        Assert.Equal(DateOnly.FromDateTime(DateTime.Now.AddDays(3)).ToString(), body!.StartDate.ToString());
+        Assert.Equal(DateOnly.FromDateTime(DateTime.Now.AddDays(7)).ToString(), body!.EndDate.ToString());
+        Assert.Equal("Test update budget", body!.Description);
+        Assert.Null(body!.CategoryId);
+    }
+
+    [Fact]
     public async Task Update_KeepingSameName_ReturnsOk()
     {
         var user = await UserFactory.CreateAsync(_context);
@@ -443,12 +495,12 @@ public class BudgetsControllerTest : IDisposable
     {
         var userA = await UserFactory.CreateAsync(_context);
         var userB = await UserFactory.CreateAsync(_context);
-        var seededCategory = await BudgetFactory.CreateAsync(_context, userB.Id);
+        var budget = await BudgetFactory.CreateAsync(_context, userB.Id);
         
         _client.ActAsUser(userA);
         
 
-        var response = await _client.DeleteAsync("api/budgets/" + seededCategory.Id);
+        var response = await _client.DeleteAsync("api/budgets/" + budget.Id);
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 

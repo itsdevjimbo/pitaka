@@ -91,7 +91,7 @@ public class BudgetsController : ControllerBase
 
         if (await _budgetService.NameExistsForUserAsync(user.Id, request.Name, excludeId: id))
         {
-            return Conflict("An budget with this name already exists.");
+            return Conflict("A budget with this name already exists.");
         }
         
         await _budgetService.UpdateAsync(budget, request.ToInput());
