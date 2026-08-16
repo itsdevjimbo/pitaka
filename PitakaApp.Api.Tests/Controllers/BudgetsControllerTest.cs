@@ -2,9 +2,6 @@ namespace PitakaApp.Api.Tests.Controllers;
 
 using System.Net;
 using System.Net.Http.Json;
-using Bogus;
-using Bogus.DataSets;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using PitakaApp.Api.Data;
 using PitakaApp.Api.Enums;
@@ -516,5 +513,99 @@ public class BudgetsControllerTest : IDisposable
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
     }
 
+    [Theory]
+    [MemberData(nameof(InvalidBudgetRequests))]
+    public async Task Create_WithInvalidData_ReturnsBadRequest(
+        string? name, 
+        decimal amountLimit, 
+        BudgetPeriod? period
+    )
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(user);
+
+        var request = new { 
+            Name = name, 
+            AmountLimit = amountLimit, 
+            Period = period, 
+            StartDate = DateOnly.FromDateTime(DateTime.Now),
+        };
+
+
+        var response = await _client.PostAsJsonAsync("/api/budgets", request);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Create_WithEndDateBeforeStartDate_ReturnsBadRequest()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(user);
+
+        var request = new { 
+            Name = "Test budget", 
+            AmountLimit = 5000, 
+            Period = BudgetPeriod.Weekly, 
+            StartDate = DateOnly.FromDateTime(DateTime.Now),
+            EndDate = DateOnly.FromDateTime(DateTime.Now.AddDays(-3)),
+        };
+
+
+        var response = await _client.PostAsJsonAsync("/api/budgets", request);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Create_WithSameStartDateAndEndDate_ReturnsCreated()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(user);
+
+        var request = new { 
+            Name = "Test budget", 
+            AmountLimit = 5000, 
+            Period = BudgetPeriod.Weekly, 
+            StartDate = DateOnly.FromDateTime(DateTime.Now),
+            EndDate = DateOnly.FromDateTime(DateTime.Now),
+        };
+
+
+        var response = await _client.PostAsJsonAsync("/api/budgets", request);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Update_WithEndDateBeforeStartDate_ReturnsBadRequest()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var category = await CategoryFactory.CreateAsync(_context, user.Id);
+        var budget = await BudgetFactory.CreateAsync(_context, user.Id);
+        
+        _client.ActAsUser(user);
+
+        var request = new
+        {
+            Name = "Updated Budget",
+            AmountLimit = 5000,
+            Period = BudgetPeriod.Weekly,
+            StartDate = DateOnly.FromDateTime(DateTime.Now),
+            EndDate = DateOnly.FromDateTime(DateTime.Now.AddDays(-3)),
+        };
+
+        var response = await _client.PutAsJsonAsync("/api/budgets/" + budget.Id, request);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    public static IEnumerable<object?[]> InvalidBudgetRequests()
+    {
+        // Missing name
+        yield return new object?[] { null, 100m, BudgetPeriod.Weekly };
+        // AmountLimit <= 0
+        yield return new object?[] { "Test Budget", -100m, BudgetPeriod.Weekly} ;
+        // // missing Period
+        yield return new object?[] { "Test Budget", 100m, null };
+    }
+
     public void Dispose() => _scope.Dispose();
 }
+

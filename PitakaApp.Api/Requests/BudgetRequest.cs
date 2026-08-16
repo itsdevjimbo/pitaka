@@ -22,8 +22,20 @@ public record BudgetRequest (
     int? CategoryId,
 
     string? Description
-)
+): IValidatableObject
 {
+
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (EndDate.HasValue && EndDate.Value < StartDate)
+        {
+            yield return new ValidationResult(
+                "EndDate must be on or after StartDate.",
+                [nameof(EndDate)]
+            );
+        }
+    }
+
     public BudgetInput ToInput() =>
         new(CategoryId: CategoryId, Name: Name, AmountLimit: AmountLimit, Period: Period, StartDate: StartDate, EndDate: EndDate, Description: Description);
 }

@@ -641,5 +641,31 @@ public class TransactionsControllerTest : IDisposable
         Assert.Equal(2000, updatedTargetAccount!.CurrentBalance);
     }
 
+    public static IEnumerable<object?[]> InvalidAmounts()
+    {
+        yield return new object?[] { 0m };
+        yield return new object?[] { -100m };
+    }
+
+    [Theory]
+    [MemberData(nameof(InvalidAmounts))]
+    public async Task Create_WithInvalidAmount_ReturnsBadRequest(decimal amount)
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+
+        _client.ActAsUser(user);
+
+        var request = new
+        {
+            AccountId = account.Id,
+            Type = TransactionType.Income,
+            Amount = amount,
+        };
+
+        var response = await _client.PostAsJsonAsync("/api/transactions", request);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
     public void Dispose() => _scope.Dispose();
 }
