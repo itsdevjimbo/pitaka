@@ -43,6 +43,7 @@ builder.Services.AddScoped<CurrentUserAccessor>();
 builder.Services.AddScoped<AccountService>();
 builder.Services.AddScoped<UpdateAccountBalance>();
 builder.Services.AddScoped<TransactionService>();
+builder.Services.AddScoped<BudgetService>();
 
 builder.Services.AddOptions<JwtOption>()
     .Bind(builder.Configuration.GetSection(JwtOption.SectionName))
