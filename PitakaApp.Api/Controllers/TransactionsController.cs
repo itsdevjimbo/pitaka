@@ -59,7 +59,7 @@ public class TransactionsController : ControllerBase
             return BadRequest();
         }
 
-        if (!await _transactionService.IsValidTransferTransaction(user, request.Type, request.TransferToAccountId))
+        if (request.Type == Enums.TransactionType.Transfer && !await _transactionService.IsValidTransferTransaction(user, request.TransferToAccountId))
         {
             return BadRequest();
         }

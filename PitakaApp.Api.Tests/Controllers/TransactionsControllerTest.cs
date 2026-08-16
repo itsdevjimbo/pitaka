@@ -641,6 +641,27 @@ public class TransactionsControllerTest : IDisposable
         Assert.Equal(2000, updatedTargetAccount!.CurrentBalance);
     }
 
+    [Fact]
+    public async Task Create_NormalTransactionWithTransferToAccountId_ReturnsBadRequest()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var sourceAccount = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 3000);
+        var targetAccount = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 2000);
+
+        _client.ActAsUser(user);
+
+        var request = new
+        {
+            AccountId = sourceAccount.Id,
+            Type = TransactionType.Income,
+            Amount = 2000,
+            TransferToAccountId = targetAccount.Id
+        };
+
+        var response = await _client.PostAsJsonAsync("/api/transactions", request);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
     public static IEnumerable<object?[]> InvalidAmounts()
     {
         yield return new object?[] { 0m };

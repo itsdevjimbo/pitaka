@@ -94,18 +94,8 @@ public class TransactionService
         return category != null;
     }
 
-    public async Task<bool> IsValidTransferTransaction(User user, TransactionType type, int? transferToAccountId)
+    public async Task<bool> IsValidTransferTransaction(User user, int? transferToAccountId)
     {
-        if (type != TransactionType.Transfer)
-        {
-            return true;
-        }
-
-        if (transferToAccountId == null)
-        {
-            return false;
-        }
-
         return await _context.Accounts.AnyAsync(a => a.Id == transferToAccountId && a.UserId == user.Id && a.IsActive);
     }
 }
