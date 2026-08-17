@@ -29,8 +29,6 @@ public class Account: TimestampedEntity
 
     public ICollection<RecurringTransaction> RecurringTransactions { get; set; } = new List<RecurringTransaction>();
 
-    public ICollection<Goal> Goals { get; set; } = new List<Goal>();
-
     public void Increase(decimal amount)
     {
         CurrentBalance += amount;
