@@ -158,6 +158,7 @@ public class GoalsControllerTest : IDisposable
 
         var body = await response.Content.ReadFromJsonAsync<GoalResource>(TestJsonOptions.Default);
 
+        Assert.Equal(goal.Id, body!.Id);
         Assert.Equal("Test goal", body!.Name);
         Assert.Equal(10000, body!.TargetAmount);
         Assert.Equal("Active", body!.Status.ToString());
@@ -326,8 +327,6 @@ public class GoalsControllerTest : IDisposable
         var response = await _client.DeleteAsync("api/goals/" + goal.Id);
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
     }
-
-
 
     [Theory]
     [MemberData(nameof(InvalidBudgetRequests))]
