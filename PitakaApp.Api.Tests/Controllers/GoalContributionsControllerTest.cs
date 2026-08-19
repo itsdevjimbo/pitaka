@@ -598,6 +598,7 @@ public class GoalContributionsControllerTest
         var response = await _client.GetAsync("/api/goalcontributions/" + contribution.Id);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
+        await _context.Entry(contribution).ReloadAsync();
         var body = await response.Content.ReadFromJsonAsync<GoalContributionResource>();
         
         Assert.Equal(contribution.Id, body!.Id);
@@ -685,7 +686,7 @@ public class GoalContributionsControllerTest
 
         var response = await _client.PutAsJsonAsync("/api/goalcontributions/" + contribution.Id, request);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
+        
         var body = await response.Content.ReadFromJsonAsync<GoalContributionResource>();
 
         Assert.Equal(contribution.AccountId, body!.AccountId);
