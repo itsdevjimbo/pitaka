@@ -101,7 +101,13 @@ public class PitakaDbContext : DbContext
             .HasOne(gc => gc.Transaction)
             .WithOne(t => t.GoalContribution)
             .HasForeignKey<GoalContribution>(gc => gc.TransactionId)
-            .OnDelete(DeleteBehavior.SetNull);
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<GoalContribution>()
+            .HasOne(gc => gc.Account)
+            .WithMany()
+            .HasForeignKey(gc => gc.AccountId);
+        
     }
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)

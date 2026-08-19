@@ -77,11 +77,16 @@ public class TransactionService
     public async Task DeleteAsync(Transaction transaction)
     {
         await _updateAccountBalance.ReverseTransaction(transaction);
+
+        var contributions = await _context.GoalContributions
+            .Where(gc => gc.TransactionId == transaction.Id)
+            .ToListAsync();
+
+        _context.GoalContributions.RemoveRange(contributions);
         _context.Transactions.Remove(transaction);
+        
         await _context.SaveChangesAsync();
     }
-
-
 
     public async Task<bool> VerifyCategoryExistence(User user, int? categoryId)
     {

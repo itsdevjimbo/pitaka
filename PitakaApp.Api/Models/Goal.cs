@@ -21,4 +21,9 @@ public class Goal : TimestampedEntity
     public User User { get; set; } = null!;
 
     public ICollection<GoalContribution> Contributions { get; set; } = new List<GoalContribution>();
+    
+    public bool IsAbandoned()
+    {
+        return Status == GoalStatus.Abandoned;
+    }
 }

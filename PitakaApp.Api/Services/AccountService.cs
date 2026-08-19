@@ -84,4 +84,9 @@ public class AccountService
         await _context.Transactions
             .AsNoTracking()
             .AnyAsync(t => t.AccountId == accountId || t.TransferToAccountId == accountId);
+
+    public async Task<bool> HasGoalContributionsAsync(int accountId) =>
+        await _context.GoalContributions
+            .AsNoTracking()
+            .AnyAsync(t => t.AccountId == accountId);
 }
