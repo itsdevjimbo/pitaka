@@ -21,5 +21,5 @@ public record CreateGoalContributionRequest (
 )
 {
     public CreateGoalContributionInput ToInput() =>
-        new(AccountId, TransactionId, Amount, ContributionDate, Note);
+        new(TransactionId, Amount, ContributionDate, Note);
 }

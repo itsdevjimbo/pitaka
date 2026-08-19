@@ -83,7 +83,7 @@ public class GoalContributionsController : ControllerBase
 
         try
         {
-            var goalContribution = await _goalContributionService.CreateAsync(goal, request.ToInput());
+            var goalContribution = await _goalContributionService.CreateAsync(goal, account, request.ToInput());
             return StatusCode(StatusCodes.Status201Created, GoalContributionResource.FromModel(goalContribution));
         }
         catch (DbUpdateConcurrencyException)

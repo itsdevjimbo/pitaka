@@ -39,12 +39,8 @@ public class GoalContributionService
             .Where(gc => gc.Id == id)
             .FirstOrDefaultAsync();
 
-    public async Task<GoalContribution> CreateAsync(Goal goal, CreateGoalContributionInput input)
+    public async Task<GoalContribution> CreateAsync(Goal goal, Account account, CreateGoalContributionInput input)
     {
-        var accountId = input.AccountId;
-        var account = await _accountService.GetTrackedByIdAsync(accountId) ?? 
-            throw new InvalidOperationException($"Account {accountId} not found.");
-
         var goalContribution = new GoalContribution
         {
             GoalId = goal.Id,
