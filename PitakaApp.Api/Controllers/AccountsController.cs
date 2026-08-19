@@ -131,6 +131,11 @@ public class AccountsController : ControllerBase
             return Conflict("This account has transaction history and cannot be deleted.");
         }
 
+        if (await _accountService.HasGoalContributionsAsync(id))
+        {
+            return Conflict("This account contains funds allocated toward a specific goal.");
+        }
+
         await _accountService.DeleteAsync(account);
         return NoContent();
     }

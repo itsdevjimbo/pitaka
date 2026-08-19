@@ -6,9 +6,12 @@ public class GoalContribution : TimestampedEntity
 {
     public required int GoalId { get; set; }
 
+    public required int AccountId { get; set; }
+
     public int? TransactionId { get; set; }
 
     [Column(TypeName = "decimal(14, 2)")]
+
     public required decimal Amount { get; set; }
 
     public required DateTime ContributionDate { get; set; }
@@ -16,6 +19,7 @@ public class GoalContribution : TimestampedEntity
     public string? Note { get; set; }
 
 
+    public Account Account {get; set; } = null!;
 
     public Goal Goal { get; set; } = null!;
 
