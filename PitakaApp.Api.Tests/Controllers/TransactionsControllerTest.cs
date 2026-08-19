@@ -642,6 +642,26 @@ public class TransactionsControllerTest : IDisposable
     }
 
     [Fact]
+    public async Task Delete_EnsuresContributionsAreDeleted()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var goal = await GoalFactory.CreateAsync(_context, user.Id);
+        var transaction = await TransactionFactory.CreateAsync(_context, user.Id, account.Id);
+
+        await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id, transactionId: transaction.Id);
+        await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id, transactionId: transaction.Id);
+        await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id, transactionId: transaction.Id);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.DeleteAsync("api/transactions/" + transaction.Id);
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Empty(await _context.GoalContributions.AsNoTracking().Where(gc => gc.TransactionId == transaction.Id).ToListAsync());
+        Assert.Null(await _context.Transactions.AsNoTracking().FirstOrDefaultAsync(t => t.Id == transaction.Id));
+    }
+
+    [Fact]
     public async Task Create_NormalTransactionWithTransferToAccountId_ReturnsBadRequest()
     {
         var user = await UserFactory.CreateAsync(_context);

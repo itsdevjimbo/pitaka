@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using PitakaApp.Api.Data;
 using PitakaApp.Api.Resources;
@@ -326,6 +327,23 @@ public class GoalsControllerTest : IDisposable
 
         var response = await _client.DeleteAsync("api/goals/" + goal.Id);
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Delete_EnsuresContributionsAreDeleted()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var goal = await GoalFactory.CreateAsync(_context, user.Id);
+        await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id);
+        await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id);
+        await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.DeleteAsync("api/goals/" + goal.Id);
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Empty(await _context.GoalContributions.AsNoTracking().Where(gc => gc.GoalId == goal.Id).ToListAsync());
     }
 
     [Theory]
