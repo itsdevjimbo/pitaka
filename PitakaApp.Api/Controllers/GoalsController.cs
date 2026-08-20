@@ -95,6 +95,27 @@ public class GoalsController : ControllerBase
         return Ok(GoalWithCurrentAmountResource.FromModel(goal, currentAmount));
     }
 
+    [HttpPatch("{id}/status")]
+    public async Task<IActionResult> Patch(int id, GoalStatusPatchRequest request)
+    {
+        var user = _currentUserAccessor.User!;
+        var goal = await _goalService.GetTrackedByIdAsync(id);
+
+        if (goal == null)
+        {
+            return NotFound();
+        }
+        
+        if (goal.UserId != user.Id)
+        {
+            return Forbid();
+        }
+
+        await _goalService.PatchStatusAsync(goal, request.Status);
+        var currentAmount = await _getGoalCurrentAmount.GetAsync(goal);
+        return Ok(GoalWithCurrentAmountResource.FromModel(goal, currentAmount));
+    }
+
     [HttpDelete("{id}")] 
     public async Task<IActionResult> Delete(int id)
     {

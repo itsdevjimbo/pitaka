@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using PitakaApp.Api.Data;
+using PitakaApp.Api.Enums;
 using PitakaApp.Api.Resources;
 using PitakaApp.Api.Tests.Factories;
 using PitakaApp.Api.Tests.Fixtures;
@@ -311,6 +312,82 @@ public class GoalsControllerTest : IDisposable
 
         var response = await _client.PutAsJsonAsync("/api/goals/" + goal.Id, request);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+
+    [Fact]
+    public async Task Patch_GoalStatusWithoutLoggedInUser_ReturnsUnauthorized()
+    {
+        
+        var user = await UserFactory.CreateAsync(_context);
+        var goal = await GoalFactory.CreateAsync(_context, user.Id);
+
+        var request = new
+        {
+            Status = GoalStatus.Completed
+        };
+
+        var response = await _client.PatchAsJsonAsync("/api/goals/" + goal.Id + "/status", request);
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Patch_NonExistentGoal_ReturnsNotFound()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(user);
+
+        var request = new
+        {
+            Status = GoalStatus.Completed
+        };
+
+        var response = await _client.PatchAsJsonAsync("/api/goals/999999/status", request);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Patch_OtherUserGoalStatus_ReturnsForbid()
+    {
+        var userA = await UserFactory.CreateAsync(_context);
+        var userB = await UserFactory.CreateAsync(_context);
+        var goal = await GoalFactory.CreateAsync(_context, userB.Id);
+
+        _client.ActAsUser(userA);
+
+        var request = new
+        {
+            Status = GoalStatus.Completed
+        };
+
+        var response = await _client.PatchAsJsonAsync("/api/goals/" + goal.Id + "/status", request);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Patch_GoalStatus_ReturnsOk()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var goal = await GoalFactory.CreateAsync(_context, user.Id);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        
+        await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id, amount: 300);
+        await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id, amount: 500);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.PatchAsJsonAsync("/api/goals/" + goal.Id + "/status", new { Status = GoalStatus.Completed });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<GoalWithCurrentAmountResource>(TestJsonOptions.Default);
+        Assert.Equal(800, body!.CurrentAmount);
+        Assert.Equal(GoalStatus.Completed, body!.Status);
+
+        response = await _client.PatchAsJsonAsync("/api/goals/" + goal.Id + "/status", new { Status = GoalStatus.Abandoned });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        
+        body = await response.Content.ReadFromJsonAsync<GoalWithCurrentAmountResource>(TestJsonOptions.Default);
+        Assert.Equal(GoalStatus.Abandoned, body!.Status);
     }
 
     [Fact]

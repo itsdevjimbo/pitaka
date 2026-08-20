@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using PitakaApp.Api.Data;
 using PitakaApp.Api.Dtos;
+using PitakaApp.Api.Enums;
 using PitakaApp.Api.Inputs;
 using PitakaApp.Api.Models;
 
@@ -59,6 +60,13 @@ public class GoalService
         goal.Name = input.Name;
         goal.TargetAmount = input.TargetAmount;
         goal.TargetDate = input.TargetDate;
+        await _context.SaveChangesAsync();
+        return goal;
+    }
+
+    public async Task<Goal> PatchStatusAsync(Goal goal, GoalStatus status)
+    {
+        goal.Status = status;
         await _context.SaveChangesAsync();
         return goal;
     }
