@@ -42,8 +42,8 @@ public class GoalContributionConcurrencyTest : IDisposable
         var accountA = await contextA.Accounts.FirstAsync(a => a.Id == account.Id);
         var accountB = await contextB.Accounts.FirstAsync(a => a.Id == account.Id);
 
-        var inputA = new CreateGoalContributionInput(null, 200, DateTime.Now);
-        var inputB = new CreateGoalContributionInput(null, 200, DateTime.Now);
+        var inputA = new CreateGoalContributionInput(null, 200, DateOnly.FromDateTime(DateTime.Now));
+        var inputB = new CreateGoalContributionInput(null, 200, DateOnly.FromDateTime(DateTime.Now));
 
         await serviceA.CreateAsync(goal, accountA, inputA);
         

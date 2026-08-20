@@ -14,7 +14,7 @@ public class GoalContribution : TimestampedEntity
 
     public required decimal Amount { get; set; }
 
-    public required DateTime ContributionDate { get; set; }
+    public required DateOnly ContributionDate { get; set; }
 
     public string? Note { get; set; }
 

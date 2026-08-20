@@ -8,7 +8,7 @@ public class GoalContributionFactory
 {
     public static GoalContribution Make(
         int goalId, int accountId, int? transactionId = null, decimal? amount = null, 
-        DateTime? contributionDate = null, string? note = null
+        DateOnly? contributionDate = null, string? note = null
     )
     {
         return new GoalContribution
@@ -17,14 +17,14 @@ public class GoalContributionFactory
             AccountId = accountId,
             TransactionId = transactionId,
             Amount = amount ?? 100,
-            ContributionDate = contributionDate ?? DateTime.Now,
+            ContributionDate = contributionDate ?? DateOnly.FromDateTime(DateTime.Now),
             Note = note,
         };
     }
 
     public static async Task<GoalContribution> CreateAsync(
         PitakaDbContext context, int goalId, int accountId, int? transactionId = null, 
-        decimal? amount = null, DateTime? contributionDate = null, string? note = null
+        decimal? amount = null, DateOnly? contributionDate = null, string? note = null
     )
     {
         var goalContribution = Make(goalId, accountId, transactionId, amount, contributionDate, note);

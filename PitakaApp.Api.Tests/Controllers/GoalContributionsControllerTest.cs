@@ -67,7 +67,7 @@ public class GoalContributionsControllerTest
             GoalId = 3,
             AccountId = 3,
             Amount = 30,
-            ContributionDate = DateTime.Now,
+            ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
         
         var response = await _client.PostAsJsonAsync("/api/goalcontributions", request);
@@ -86,7 +86,7 @@ public class GoalContributionsControllerTest
             GoalId = 999,
             AccountId = account.Id,
             Amount = 30,
-            ContributionDate = DateTime.Now,
+            ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
         
         var response = await _client.PostAsJsonAsync("/api/goalcontributions", request);
@@ -111,7 +111,7 @@ public class GoalContributionsControllerTest
             GoalId = goal.Id,
             AccountId = account.Id,
             Amount = 30,
-            ContributionDate = DateTime.Now,
+            ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
         
         var response = await _client.PostAsJsonAsync("/api/goalcontributions", request);
@@ -135,7 +135,7 @@ public class GoalContributionsControllerTest
             GoalId = goal.Id,
             AccountId = account.Id,
             Amount = 30,
-            ContributionDate = DateTime.Now,
+            ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
         
         var response = await _client.PostAsJsonAsync("/api/goalcontributions", request);
@@ -157,7 +157,7 @@ public class GoalContributionsControllerTest
             GoalId = goal.Id,
             AccountId = 999,
             Amount = 30,
-            ContributionDate = DateTime.Now,
+            ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
         
         var response = await _client.PostAsJsonAsync("/api/goalcontributions", request);
@@ -182,7 +182,7 @@ public class GoalContributionsControllerTest
             GoalId = goal.Id,
             AccountId = account.Id,
             Amount = 30,
-            ContributionDate = DateTime.Now,
+            ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
         
         var response = await _client.PostAsJsonAsync("/api/goalcontributions", request);
@@ -206,7 +206,7 @@ public class GoalContributionsControllerTest
             GoalId = goal.Id,
             AccountId = account.Id,
             Amount = 30,
-            ContributionDate = DateTime.Now,
+            ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
         
         var response = await _client.PostAsJsonAsync("/api/goalcontributions", request);
@@ -232,7 +232,7 @@ public class GoalContributionsControllerTest
             AccountId = account.Id,
             Amount = 30,
             TransactionId = transaction.Id,
-            ContributionDate = DateTime.Now,
+            ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
         
         var response = await _client.PostAsJsonAsync("/api/goalcontributions", request);
@@ -261,7 +261,7 @@ public class GoalContributionsControllerTest
             AccountId = account.Id,
             Amount = 30,
             TransactionId = transaction.Id,
-            ContributionDate = DateTime.Now,
+            ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
         
         var response = await _client.PostAsJsonAsync("/api/goalcontributions", request);
@@ -290,7 +290,7 @@ public class GoalContributionsControllerTest
             AccountId = accountA.Id,
             Amount = 30,
             TransactionId = transaction.Id,
-            ContributionDate = DateTime.Now,
+            ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
         
         var response = await _client.PostAsJsonAsync("/api/goalcontributions", request);
@@ -319,7 +319,7 @@ public class GoalContributionsControllerTest
             AccountId = accountA.Id,
             Amount = 30,
             TransactionId = transaction.Id,
-            ContributionDate = DateTime.Now,
+            ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
         
         var response = await _client.PostAsJsonAsync("/api/goalcontributions", request);
@@ -344,7 +344,7 @@ public class GoalContributionsControllerTest
             GoalId = goal.Id,
             AccountId = account.Id,
             Amount = 300,
-            ContributionDate = DateTime.Now,
+            ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
         
         var response = await _client.PostAsJsonAsync("/api/goalcontributions", request);
@@ -356,19 +356,19 @@ public class GoalContributionsControllerTest
     public static IEnumerable<object?[]> InvalidGoalContributionRequests()
     {
         // Missing goalId
-        yield return new object?[] { null, 1, 300m, DateTime.Now };
+        yield return new object?[] { null, 1, 300m, DateOnly.FromDateTime(DateTime.Now) };
 
         // Missing accountId
-        yield return new object?[] { 1, null, 300m, DateTime.Now };
+        yield return new object?[] { 1, null, 300m, DateOnly.FromDateTime(DateTime.Now) };
 
         // Invalid amount range
-        yield return new object?[] { 1, 1, 0m, DateTime.Now };
+        yield return new object?[] { 1, 1, 0m, DateOnly.FromDateTime(DateTime.Now) };
 
         // Invalid amount range
-        yield return new object?[] { 1, 1, -300m, DateTime.Now };
+        yield return new object?[] { 1, 1, -300m, DateOnly.FromDateTime(DateTime.Now) };
 
         // Missing amount 
-        yield return new object?[] { 1, 1, null, DateTime.Now };
+        yield return new object?[] { 1, 1, null, DateOnly.FromDateTime(DateTime.Now) };
 
         // Missing contribution date
         yield return new object?[] { 1, 1, 300m, null };
@@ -380,7 +380,7 @@ public class GoalContributionsControllerTest
         int? goalId,
         int? accountId,
         decimal? amount, 
-        DateTime? contributionDate
+        DateOnly? contributionDate
     )
     {
         var user = await UserFactory.CreateAsync(_context);
@@ -412,7 +412,7 @@ public class GoalContributionsControllerTest
             GoalId = goal.Id,
             AccountId = account.Id,
             Amount = 30,
-            ContributionDate = DateTime.Now,
+            ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
         
         var response = await _client.PostAsJsonAsync("/api/goalcontributions", request);
@@ -435,7 +435,7 @@ public class GoalContributionsControllerTest
             AccountId = account.Id,
             Amount = 30,
             TransactionId = transaction.Id,
-            ContributionDate = DateTime.Now,
+            ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
         
         var response = await _client.PostAsJsonAsync("/api/goalcontributions", request);
@@ -455,7 +455,7 @@ public class GoalContributionsControllerTest
 
         _client.ActAsUser(user);
 
-        var now = DateTime.Now;
+        var now = DateOnly.FromDateTime(DateTime.Now);
 
         var request = new
         {
@@ -496,7 +496,7 @@ public class GoalContributionsControllerTest
             GoalId = goal.Id,
             AccountId = account.Id,
             Amount = 5000,
-            ContributionDate = DateTime.Now,
+            ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
         
         var response = await _client.PostAsJsonAsync("/api/goalcontributions", request);
@@ -518,7 +518,7 @@ public class GoalContributionsControllerTest
             GoalId = goal.Id,
             AccountId = account.Id,
             Amount = 2000,
-            ContributionDate = DateTime.Now,
+            ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
         
         var response = await _client.PostAsJsonAsync("/api/goalcontributions", request);
@@ -540,7 +540,7 @@ public class GoalContributionsControllerTest
             GoalId = goal.Id,
             AccountId = account.Id,
             Amount = 2000,
-            ContributionDate = DateTime.Now,
+            ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
         
         var response = await _client.PostAsJsonAsync("/api/goalcontributions", request);
@@ -598,7 +598,6 @@ public class GoalContributionsControllerTest
         var response = await _client.GetAsync("/api/goalcontributions/" + contribution.Id);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        await _context.Entry(contribution).ReloadAsync();
         var body = await response.Content.ReadFromJsonAsync<GoalContributionResource>();
         
         Assert.Equal(contribution.Id, body!.Id);
@@ -620,7 +619,7 @@ public class GoalContributionsControllerTest
 
         var request = new
         {
-            ContributionDate = DateOnly.FromDateTime(DateTime.Now.AddDays(-3)),
+            ContributionDate = DateOnly.FromDateTime(DateTime.Now).AddDays(-3),
             Note = "Test note"
         };
 
@@ -637,7 +636,7 @@ public class GoalContributionsControllerTest
         
         var request = new
         {
-            ContributionDate = DateOnly.FromDateTime(DateTime.Now.AddDays(-3)),
+            ContributionDate = DateOnly.FromDateTime(DateTime.Now).AddDays(-3),
             Note = "Test note"
         };
 
@@ -658,7 +657,7 @@ public class GoalContributionsControllerTest
         
         var request = new
         {
-            ContributionDate = DateOnly.FromDateTime(DateTime.Now.AddDays(-3)),
+            ContributionDate = DateOnly.FromDateTime(DateTime.Now).AddDays(-3),
             Note = "Test note"
         };
 
@@ -676,7 +675,7 @@ public class GoalContributionsControllerTest
 
         _client.ActAsUser(user);
         
-        var contributionDate = DateTime.Now.AddDays(-3);
+        var contributionDate = DateOnly.FromDateTime(DateTime.Now).AddDays(-3);
 
         var request = new
         {
