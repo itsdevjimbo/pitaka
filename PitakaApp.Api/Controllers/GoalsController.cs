@@ -2,6 +2,7 @@ namespace PitakaApp.Api.Controllers;
 
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using PitakaApp.Api.Actions;
 using PitakaApp.Api.Filters;
 using PitakaApp.Api.Requests;
 using PitakaApp.Api.Resources;
@@ -14,14 +15,18 @@ using PitakaApp.Api.Services;
 public class GoalsController : ControllerBase
 {
     private readonly GoalService _goalService;
+
+    private readonly GetGoalCurrentAmount _getGoalCurrentAmount;
     private readonly CurrentUserAccessor _currentUserAccessor;
 
     public GoalsController(
         GoalService goalService,
+        GetGoalCurrentAmount getGoalCurrentAmount,
         CurrentUserAccessor currentUserAccessor
     )
     {
         _goalService = goalService;
+        _getGoalCurrentAmount = getGoalCurrentAmount;
         _currentUserAccessor = currentUserAccessor;
     }
 
@@ -31,7 +36,7 @@ public class GoalsController : ControllerBase
         var user = _currentUserAccessor.User!;
         var goals = await _goalService.GetAllForUser(user);
 
-        return Ok(GoalResource.Collection(goals));
+        return Ok(GoalWithCurrentAmountResource.FromDtoCollection(goals));
     }
     
     [HttpPost]
@@ -45,8 +50,8 @@ public class GoalsController : ControllerBase
         }
 
         var goal = await _goalService.CreateAsync(user, request.ToInput());
-
-        return StatusCode(StatusCodes.Status201Created, GoalResource.FromModel(goal));
+        var currentAmount = await _getGoalCurrentAmount.GetAsync(goal);
+        return StatusCode(StatusCodes.Status201Created, GoalWithCurrentAmountResource.FromModel(goal, currentAmount));
     }
     
     [HttpGet("{id}")]
@@ -60,7 +65,8 @@ public class GoalsController : ControllerBase
             return NotFound();
         }
 
-        return Ok(GoalResource.FromModel(goal));
+        var currentAmount = await _getGoalCurrentAmount.GetAsync(goal);
+        return Ok(GoalWithCurrentAmountResource.FromModel(goal, currentAmount));
     }
 
     [HttpPut("{id}")]
@@ -85,8 +91,8 @@ public class GoalsController : ControllerBase
         }
         
         await _goalService.UpdateAsync(goal, request.ToInput());
-
-        return Ok(GoalResource.FromModel(goal));
+        var currentAmount = await _getGoalCurrentAmount.GetAsync(goal);
+        return Ok(GoalWithCurrentAmountResource.FromModel(goal, currentAmount));
     }
 
     [HttpDelete("{id}")] 

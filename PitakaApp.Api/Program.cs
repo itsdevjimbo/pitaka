@@ -46,6 +46,7 @@ builder.Services.AddScoped<TransactionService>();
 builder.Services.AddScoped<BudgetService>();
 builder.Services.AddScoped<GoalService>();
 builder.Services.AddScoped<GoalContributionService>();
+builder.Services.AddScoped<GetGoalCurrentAmount>();
 
 builder.Services.AddOptions<JwtOption>()
     .Bind(builder.Configuration.GetSection(JwtOption.SectionName))
