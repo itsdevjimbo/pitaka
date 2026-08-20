@@ -3,6 +3,6 @@ namespace PitakaApp.Api.Inputs;
 public record CreateGoalContributionInput (
     int? TransactionId,
     decimal Amount,
-    DateTime ContributionDate,
+    DateOnly ContributionDate,
     string? Note = null
 );

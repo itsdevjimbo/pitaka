@@ -1,6 +1,6 @@
 namespace PitakaApp.Api.Inputs;
 
 public record UpdateGoalContributionInput (
-    DateTime? ContributionDate,
+    DateOnly? ContributionDate,
     string? Note
 );

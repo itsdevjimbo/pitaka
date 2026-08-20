@@ -3,7 +3,7 @@ using PitakaApp.Api.Inputs;
 namespace PitakaApp.Api.Requests;
 
 public record UpdateGoalContributionRequest (
-    DateTime? ContributionDate,
+    DateOnly? ContributionDate,
     string? Note
 )
 {

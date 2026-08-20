@@ -15,7 +15,7 @@ public record CreateGoalContributionRequest (
     decimal Amount,
 
     [Required] 
-    DateTime ContributionDate,
+    DateOnly ContributionDate,
 
     string? Note
 )

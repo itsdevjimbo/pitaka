@@ -9,7 +9,7 @@ public record GoalContributionResource(
     int AccountId, 
     int? TransactionId, 
     decimal Amount, 
-    DateTime ContributionDate, 
+    DateOnly ContributionDate, 
     string? Note
 )
 {
