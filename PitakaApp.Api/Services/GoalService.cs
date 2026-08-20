@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PitakaApp.Api.Data;
+using PitakaApp.Api.Dtos;
 using PitakaApp.Api.Inputs;
 using PitakaApp.Api.Models;
 
@@ -14,10 +15,13 @@ public class GoalService
         _context = context;
     }
     
-    public async Task<List<Goal>> GetAllForUser(User user) =>
+    public async Task<List<GoalWithCurrentAmount>> GetAllForUser(User user) =>
         await _context.Goals
             .AsNoTracking()
-            .Where(a => a.UserId == user.Id)
+            .Where(g => g.UserId == user.Id)
+            .Select(goal => new GoalWithCurrentAmount (
+                goal.Id, goal.Name, goal.TargetAmount, goal.TargetDate, goal.Status, goal.Contributions.Sum(gc => gc.Amount)
+            ))
             .ToListAsync();
 
     public async Task<Goal?> GetByIdForUser(User user, int id) =>
