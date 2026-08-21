@@ -3,7 +3,7 @@ namespace PitakaApp.Api.Enums;
 public enum RecurringTransactionStatus
 {
     Active,
-    Pause,
+    Paused,
     Completed,
     Cancelled
 }

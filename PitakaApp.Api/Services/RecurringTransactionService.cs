@@ -7,14 +7,11 @@ namespace PitakaApp.Api.Services;
 
 public class RecurringTransactionService
 {
-
-    private readonly CategoryService _categoryService;
     private readonly PitakaDbContext _context;
 
-    public RecurringTransactionService(PitakaDbContext context, CategoryService categoryService)
+    public RecurringTransactionService(PitakaDbContext context)
     {
         _context = context;
-        _categoryService = categoryService;
     }
     
     public async Task<List<RecurringTransaction>> GetAllForUser(User user) =>
@@ -63,9 +60,9 @@ public class RecurringTransactionService
 
     public async Task<RecurringTransaction> UpdateAsync(RecurringTransaction recurringTransaction, UpdateRecurringTransactionInput input)
     {
-        recurringTransaction.Name = input.Name ?? recurringTransaction.Name;
+        recurringTransaction.Name = input.Name;
         recurringTransaction.CategoryId = input.CategoryId;
-        recurringTransaction.Amount = input.Amount ?? recurringTransaction.Amount;
+        recurringTransaction.Amount = input.Amount;
         recurringTransaction.EndDate = input.EndDate;
         recurringTransaction.Description = input.Description;
 
@@ -78,16 +75,5 @@ public class RecurringTransactionService
     {
         _context.RecurringTransactions.Remove(recurringTransaction);
         await _context.SaveChangesAsync();
-    }
-
-    public async Task<bool> VerifyCategoryExistence(User user, int? categoryId)
-    {
-        if (categoryId is not int id)
-        {
-            return true;
-        }
-        
-        var category = await _categoryService.GetByIdForUser(user, id);
-        return category != null;
     }
 }

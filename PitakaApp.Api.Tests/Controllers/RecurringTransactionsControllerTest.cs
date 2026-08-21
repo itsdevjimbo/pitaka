@@ -220,9 +220,6 @@ public class RecurringTransactionsControllerTest : IDisposable
         // 0 amount
         yield return new object?[] { "Test", 0, RecurringTransactionType.Income, Frequency.Daily,  startDate, null };
 
-        // missing amount
-        yield return new object?[] { "Test", null, RecurringTransactionType.Income, Frequency.Daily,  startDate, null };
-
         // missing type
         yield return new object?[] { "Test", 100m, null, Frequency.Daily,  startDate, null };
 
@@ -245,12 +242,12 @@ public class RecurringTransactionsControllerTest : IDisposable
     [Theory]
     [MemberData(nameof(InvalidRecurringTransactionRequests))]
     public async Task Create_WithInvalidData_ReturnsBadRequest(
-        string name,
+        string? name,
         decimal amount,
-        RecurringTransactionType type,
-        Frequency frequency,
-        DateOnly startDate,
-        DateOnly endDate
+        RecurringTransactionType? type,
+        Frequency? frequency,
+        DateOnly? startDate,
+        DateOnly? endDate
     )
     {
         var user = await UserFactory.CreateAsync(_context);
@@ -517,6 +514,7 @@ public class RecurringTransactionsControllerTest : IDisposable
         var request = new
         {
             Name = "Test 1",
+            Amount = 501,
         };
 
         var response = await _client.PutAsJsonAsync("/api/recurringtransactions/999999", request);
@@ -536,6 +534,7 @@ public class RecurringTransactionsControllerTest : IDisposable
         var request = new
         {
             Name = "Test 1",
+            Amount = 501,
         };
 
         var response = await _client.PutAsJsonAsync("/api/recurringtransactions/" + recurringTransaction.Id, request);
@@ -555,6 +554,7 @@ public class RecurringTransactionsControllerTest : IDisposable
         var request = new
         {
             Name = "Test 1",
+            Amount = 501,
         };
 
         var response = await _client.PutAsJsonAsync("/api/recurringtransactions/" + recurringTransaction.Id, request);
@@ -572,6 +572,8 @@ public class RecurringTransactionsControllerTest : IDisposable
 
         var request = new
         {
+            Name = "Test 1",
+            Amount = 501,
             EndDate =  DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1))
         };
 
@@ -590,6 +592,8 @@ public class RecurringTransactionsControllerTest : IDisposable
 
         var request = new
         {
+            Name = "Test 1",
+            Amount = 501,
             CategoryId =  9999
         };
 
@@ -610,6 +614,8 @@ public class RecurringTransactionsControllerTest : IDisposable
 
         var request = new
         {
+            Name = "Test 1",
+            Amount = 501,
             CategoryId =  category.Id
         };
 
@@ -669,6 +675,7 @@ public class RecurringTransactionsControllerTest : IDisposable
         var request = new
         {
             Name = "Test 1",
+            Amount = 501,
         };
 
         var response = await _client.PutAsJsonAsync("/api/recurringtransactions/" + recurringTransaction.Id, request);
@@ -689,6 +696,7 @@ public class RecurringTransactionsControllerTest : IDisposable
         var request = new
         {
             Name = "Test 1",
+            Amount = 501,
         };
 
         var response = await _client.PutAsJsonAsync("/api/recurringtransactions/" + recurringTransaction.Id, request);

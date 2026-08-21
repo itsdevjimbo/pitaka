@@ -34,6 +34,6 @@ public record RecurringTransactionResource(
             rt.Status
         );
 
-    public static List<RecurringTransactionResource> Collection(IEnumerable<RecurringTransaction> categories) =>
-        categories.Select(FromModel).ToList();
+    public static List<RecurringTransactionResource> Collection(IEnumerable<RecurringTransaction> recurringTransactions) =>
+        recurringTransactions.Select(FromModel).ToList();
 } 
