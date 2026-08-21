@@ -1,5 +1,6 @@
 namespace PitakaApp.Api.Models;
 
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using PitakaApp.Api.Enums;
 
@@ -10,6 +11,9 @@ public class RecurringTransaction : TimestampedEntity
     public required int AccountId { get; set; }
 
     public int? CategoryId { get; set; }
+    
+    [MaxLength(255)]
+    public required string Name { get; set; }
 
     public required RecurringTransactionType Type { get; set; }
 
@@ -26,7 +30,7 @@ public class RecurringTransaction : TimestampedEntity
 
     public required DateOnly NextRunDate { get; set; }
 
-    public bool IsActive { get; set; } = true;
+    public RecurringTransactionStatus Status { get; set; } = RecurringTransactionStatus.Active;
 
     
     public User User { get; set;} = null!;
@@ -34,4 +38,9 @@ public class RecurringTransaction : TimestampedEntity
     public Account Account { get; set; } = null!;
 
     public Category? Category { get; set; }
+
+    public bool CanSetEndDate(DateOnly endDate)
+    {
+        return endDate > StartDate;
+    }
 }
