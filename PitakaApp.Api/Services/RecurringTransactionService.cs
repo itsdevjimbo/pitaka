@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using PitakaApp.Api.Actions;
 using PitakaApp.Api.Data;
+using PitakaApp.Api.Enums;
 using PitakaApp.Api.Inputs;
 using PitakaApp.Api.Models;
 
@@ -9,9 +11,12 @@ public class RecurringTransactionService
 {
     private readonly PitakaDbContext _context;
 
-    public RecurringTransactionService(PitakaDbContext context)
+    private readonly GetNextRunDate _getNextRunDate;
+
+    public RecurringTransactionService(PitakaDbContext context, GetNextRunDate getNextRunDate)
     {
         _context = context;
+        _getNextRunDate = getNextRunDate;
     }
     
     public async Task<List<RecurringTransaction>> GetAllForUser(User user) =>
@@ -68,6 +73,31 @@ public class RecurringTransactionService
 
         await _context.SaveChangesAsync();
 
+        return recurringTransaction;
+    }
+
+    public async Task<RecurringTransaction> PatchStatusAsync(RecurringTransaction recurringTransaction, RecurringTransactionStatus status)
+    {
+        if (status != RecurringTransactionStatus.Active)
+        {
+            recurringTransaction.Status = status;
+            await _context.SaveChangesAsync();
+            return recurringTransaction;
+        }
+
+        var nextRunDate = _getNextRunDate.GetDate(recurringTransaction.StartDate, recurringTransaction.Frequency);
+
+        if (nextRunDate > recurringTransaction.EndDate)
+        {
+            recurringTransaction.Status = RecurringTransactionStatus.Completed;
+        }
+        else
+        {
+            recurringTransaction.NextRunDate = nextRunDate;
+            recurringTransaction.Status = status;
+        }
+
+        await _context.SaveChangesAsync();
         return recurringTransaction;
     }
 

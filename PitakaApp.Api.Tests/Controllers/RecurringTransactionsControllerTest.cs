@@ -707,6 +707,209 @@ public class RecurringTransactionsControllerTest : IDisposable
     }
 
     [Fact]
+    public async Task Update_EnsuresDoesntTouchStatus_ReturnsOk()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            _context, user.Id, account.Id, name: "Test 1", endDate: DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-3)), status: RecurringTransactionStatus.Cancelled
+        );
+
+        _client.ActAsUser(user);
+
+        var request = new
+        {
+            Name = "Test 1",
+            Amount = 501,
+            EndDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(10))
+        };
+
+        var response = await _client.PutAsJsonAsync("/api/recurringtransactions/" + recurringTransaction.Id, request);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<RecurringTransactionResource>(TestJsonOptions.Default);
+        Assert.Equal(recurringTransaction.Status, body!.Status);
+    }
+
+    [Fact]
+    public async Task Patch_WithoutLoggedInUser_ReturnsUnauthorized()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(_context, user.Id, account.Id);
+
+        var response = await _client.PatchAsJsonAsync("/api/recurringtransactions/" + recurringTransaction.Id + "/status", new { Status = "Paused" });
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Patch_WithNonExistentRecurringTransaction_ReturnsNotFound()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+
+        _client.ActAsUser(user);
+        
+        var response = await _client.PatchAsJsonAsync("/api/recurringtransactions/99999/status", new { Status = "Paused" });
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Patch_WithRecurringTransactionBelongsToOtherUser_ReturnsForbidden()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var userB = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, userB.Id);
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(_context, userB.Id, account.Id);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.PatchAsJsonAsync("/api/recurringtransactions/" + recurringTransaction.Id + "/status", new { Status = "Paused" });
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Patch_WithNonExistentStatus_ReturnsBadRequest()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(_context, user.Id, account.Id);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.PatchAsJsonAsync("/api/recurringtransactions/" + recurringTransaction.Id + "/status", new { Status = "Test Sttus" });
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Patch_WithCompletedStatus_ReturnsBadRequest()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(_context, user.Id, account.Id);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.PatchAsJsonAsync("/api/recurringtransactions/" + recurringTransaction.Id + "/status", new { Status = "Completed" });
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Patch_ReturnsOk()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(_context, user.Id, account.Id);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.PatchAsJsonAsync("/api/recurringtransactions/" + recurringTransaction.Id + "/status", new { Status = "Paused" });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        
+        await _context.Entry(recurringTransaction).ReloadAsync();
+
+        var body = await response.Content.ReadFromJsonAsync<RecurringTransactionResource>(TestJsonOptions.Default);
+        Assert.Equal(recurringTransaction.NextRunDate, body!.NextRunDate);
+    }
+
+    [Fact]
+    public async Task Patch_WithResume_ReturnsOk()
+    {
+        var startDate = new DateOnly(2026, 08, 20);
+
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            _context, user.Id, account.Id, status: RecurringTransactionStatus.Paused, startDate: startDate
+        );
+
+        
+        _client.ActAsUser(user);
+
+        var response = await _client.PatchAsJsonAsync("/api/recurringtransactions/" + recurringTransaction.Id + "/status", new { Status = "Active" });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<RecurringTransactionResource>(TestJsonOptions.Default);
+        Assert.Equal(DateOnly.FromDateTime(DateTime.UtcNow), body!.NextRunDate);
+    }
+
+    [Fact]
+    public async Task Patch_ResumesInPastEndDate_ReturnsOk()
+    {
+        var startDate = new DateOnly(2026, 08, 19);
+        var endDte = new DateOnly(2026, 08, 21);
+
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            _context, user.Id, account.Id, status: RecurringTransactionStatus.Paused, 
+            startDate: startDate, endDate: endDte, nextRunDate: startDate
+        );
+        
+        _client.ActAsUser(user);
+
+        var response = await _client.PatchAsJsonAsync("/api/recurringtransactions/" + recurringTransaction.Id + "/status", new { Status = "Active" });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<RecurringTransactionResource>(TestJsonOptions.Default);
+        Assert.Equal(startDate, body!.NextRunDate);
+        Assert.Equal(RecurringTransactionStatus.Completed, body!.Status);
+    }
+
+    [Fact]
+    public async Task Patch_WithActiveToCancelled_ReturnsOk()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(_context, user.Id, account.Id);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.PatchAsJsonAsync("/api/recurringtransactions/" + recurringTransaction.Id + "/status", new { Status = "Cancelled" });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        
+        await _context.Entry(recurringTransaction).ReloadAsync();
+
+        var body = await response.Content.ReadFromJsonAsync<RecurringTransactionResource>(TestJsonOptions.Default);
+        Assert.Equal(RecurringTransactionStatus.Cancelled, body!.Status);
+    }
+
+    [Fact]
+    public async Task Patch_WithPausedToCancelled_ReturnsOk()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(_context, user.Id, account.Id, status: RecurringTransactionStatus.Paused);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.PatchAsJsonAsync("/api/recurringtransactions/" + recurringTransaction.Id + "/status", new { Status = "Cancelled" });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        
+        await _context.Entry(recurringTransaction).ReloadAsync();
+
+        var body = await response.Content.ReadFromJsonAsync<RecurringTransactionResource>(TestJsonOptions.Default);
+        Assert.Equal(RecurringTransactionStatus.Cancelled, body!.Status);
+    }
+
+    [Fact]
+    public async Task Patch_ResumesToInActiveAccount_ReturnsOk()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id, isActive: false);
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(_context, user.Id, account.Id, status: RecurringTransactionStatus.Paused);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.PatchAsJsonAsync("/api/recurringtransactions/" + recurringTransaction.Id + "/status", new { Status = "Active" });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        
+        await _context.Entry(recurringTransaction).ReloadAsync();
+
+        var body = await response.Content.ReadFromJsonAsync<RecurringTransactionResource>(TestJsonOptions.Default);
+        Assert.Equal(RecurringTransactionStatus.Active, body!.Status);
+    }
+
+    [Fact]
     public async Task Delete_WithoutLoggedInUser_ReturnsUnauthorized()
     {
         var user = await UserFactory.CreateAsync(_context);
