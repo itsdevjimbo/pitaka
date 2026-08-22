@@ -2,6 +2,7 @@ namespace PitakaApp.Api.Controllers;
 
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using PitakaApp.Api.Actions;
 using PitakaApp.Api.Filters;
 using PitakaApp.Api.Requests;
 using PitakaApp.Api.Resources;
@@ -14,14 +15,17 @@ using PitakaApp.Api.Services;
 public class BudgetsController : ControllerBase
 {
     private readonly BudgetService _budgetService;
+    private readonly VerifyCategoryExistence _verifyCategoryExistence;
     private readonly CurrentUserAccessor _currentUserAccessor;
 
     public BudgetsController(
         BudgetService budgetService,
+        VerifyCategoryExistence verifyCategoryExistence,
         CurrentUserAccessor currentUserAccessor
     )
     {
         _budgetService = budgetService;
+        _verifyCategoryExistence = verifyCategoryExistence;
         _currentUserAccessor = currentUserAccessor;
     }
 
@@ -44,7 +48,7 @@ public class BudgetsController : ControllerBase
             return Conflict("A budget with this name already exists.");
         }
         
-        if (!await _budgetService.VerifyCategoryExistence(user, request.CategoryId))
+        if (request.CategoryId is int categoryId  && !await _verifyCategoryExistence.VerifyAsync(user, categoryId))
         {
             return BadRequest();
         }
@@ -84,7 +88,7 @@ public class BudgetsController : ControllerBase
             return Forbid();
         }
         
-        if (!await _budgetService.VerifyCategoryExistence(user, request.CategoryId))
+        if (request.CategoryId is int categoryId  && !await _verifyCategoryExistence.VerifyAsync(user, categoryId))
         {
             return BadRequest();
         }

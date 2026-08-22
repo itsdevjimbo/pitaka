@@ -3,6 +3,7 @@ namespace PitakaApp.Api.Controllers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using PitakaApp.Api.Actions;
 using PitakaApp.Api.Filters;
 using PitakaApp.Api.Requests;
 using PitakaApp.Api.Resources;
@@ -16,16 +17,19 @@ public class TransactionsController : ControllerBase
 {
     private readonly AccountService _accountService;
     private readonly TransactionService _transactionService;
+    private readonly VerifyCategoryExistence _verifyCategoryExistence;
     private readonly CurrentUserAccessor _currentUserAccessor;
 
     public TransactionsController(
         AccountService accountService,
         TransactionService transactionService,
+        VerifyCategoryExistence verifyCategoryExistence,
         CurrentUserAccessor currentUserAccessor
     )
     {
         _accountService = accountService;
         _transactionService = transactionService;
+        _verifyCategoryExistence = verifyCategoryExistence;
         _currentUserAccessor = currentUserAccessor;
     }
 
@@ -54,7 +58,7 @@ public class TransactionsController : ControllerBase
             return BadRequest();
         }
         
-        if (!await _transactionService.VerifyCategoryExistence(user, request.CategoryId))
+        if (request.CategoryId is int categoryId  && !await _verifyCategoryExistence.VerifyAsync(user, categoryId))
         {
             return BadRequest();
         }
@@ -106,7 +110,7 @@ public class TransactionsController : ControllerBase
             return Forbid();
         }
         
-        if (!await _transactionService.VerifyCategoryExistence(user, request.CategoryId))
+        if (request.CategoryId is int categoryId  && !await _verifyCategoryExistence.VerifyAsync(user, categoryId))
         {
             return BadRequest();
         }

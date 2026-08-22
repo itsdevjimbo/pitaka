@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PitakaApp.Api.Actions;
 using PitakaApp.Api.Data;
-using PitakaApp.Api.Enums;
 using PitakaApp.Api.Inputs;
 using PitakaApp.Api.Models;
 
@@ -13,17 +12,13 @@ public class TransactionService
 
     private readonly UpdateAccountBalance _updateAccountBalance;
 
-    private readonly CategoryService _categoryService;
-
     public TransactionService(
         PitakaDbContext context, 
-        UpdateAccountBalance updateAccountBalance,
-        CategoryService categoryService
+        UpdateAccountBalance updateAccountBalance
     )
     {
         _context = context;
         _updateAccountBalance = updateAccountBalance;
-        _categoryService = categoryService;
     }
     
     public async Task<List<Transaction>> GetAllForUser(User user) =>
@@ -86,17 +81,6 @@ public class TransactionService
         _context.Transactions.Remove(transaction);
         
         await _context.SaveChangesAsync();
-    }
-
-    public async Task<bool> VerifyCategoryExistence(User user, int? categoryId)
-    {
-        if (categoryId is not int id)
-        {
-            return true;
-        }
-        
-        var category = await _categoryService.GetByIdForUser(user, id);
-        return category != null;
     }
 
     public async Task<bool> IsValidTransferTransaction(User user, int? transferToAccountId)

@@ -7,14 +7,11 @@ namespace PitakaApp.Api.Services;
 
 public class BudgetService
 {
-
-    private readonly CategoryService _categoryService;
     private readonly PitakaDbContext _context;
 
-    public BudgetService(PitakaDbContext context, CategoryService categoryService)
+    public BudgetService(PitakaDbContext context)
     {
         _context = context;
-        _categoryService = categoryService;
     }
     
     public async Task<List<Budget>> GetAllForUser(User user) =>
@@ -77,16 +74,5 @@ public class BudgetService
     {
         _context.Budgets.Remove(budget);
         await _context.SaveChangesAsync();
-    }
-
-    public async Task<bool> VerifyCategoryExistence(User user, int? categoryId)
-    {
-        if (categoryId is not int id)
-        {
-            return true;
-        }
-        
-        var category = await _categoryService.GetByIdForUser(user, id);
-        return category != null;
     }
 }
