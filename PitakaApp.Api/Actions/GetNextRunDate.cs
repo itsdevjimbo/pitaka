@@ -11,16 +11,22 @@ public class GetNextRunDate
         _timeProvider = timeProvider;
     }
 
-    public DateOnly GetDate(DateOnly startDate, Frequency frequency)
+    public DateOnly InclusiveOfToday(DateOnly startDate, Frequency frequency) =>
+        GetOccurrenceOnOrAfter(startDate, frequency, includeToday: true);
+
+    public DateOnly ExclusiveOfToday(DateOnly startDate, Frequency frequency) =>
+        GetOccurrenceOnOrAfter(startDate, frequency, includeToday: false);
+
+    private DateOnly GetOccurrenceOnOrAfter(DateOnly startDate, Frequency frequency, bool includeToday)
     {
         DateOnly now = DateOnly.FromDateTime(_timeProvider.GetUtcNow().DateTime);
         var occurrences = Math.Max(NumberOfOccurrences(startDate, now, frequency), 0);
         var candidate = AddOccurrences(startDate, frequency, occurrences);
-        
-        if (candidate < now)
+
+        var needsAdvance = includeToday ? candidate < now : candidate <= now;
+        if (needsAdvance)
         {
-            occurrences++;
-            candidate = AddOccurrences(startDate, frequency, occurrences);
+            candidate = AddOccurrences(startDate, frequency, occurrences + 1);
         }
 
         return candidate;
