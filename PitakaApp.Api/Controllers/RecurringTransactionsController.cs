@@ -126,6 +126,26 @@ public class RecurringTransactionsController : ControllerBase
         return Ok(RecurringTransactionResource.FromModel(recurringTransaction));
     }
 
+    [HttpPatch("{id}/status")]
+    public async Task<IActionResult> Patch(int id, RecurringTransactionPatchRequest request)
+    {
+        var user = _currentUserAccessor.User!;
+        var recurringTransaction = await _recurringTransactionService.GetTrackedByIdAsync(id);
+
+        if (recurringTransaction == null)
+        {
+            return NotFound();
+        }
+        
+        if (recurringTransaction.UserId != user.Id)
+        {
+            return Forbid();
+        }
+
+        await _recurringTransactionService.PatchStatusAsync(recurringTransaction, request.Status);
+        return Ok(RecurringTransactionResource.FromModel(recurringTransaction));
+    }
+
     [HttpDelete("{id}")] 
     public async Task<IActionResult> Delete(int id)
     {

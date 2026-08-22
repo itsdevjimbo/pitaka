@@ -33,7 +33,7 @@ builder.Services.AddDbContext<PitakaDbContext>((serviceProvider, options) =>
             .UseSeeding((context, _) => DbSeeder.Seed(context))
             .UseAsyncSeeding(async (context, _, cancellationToken) => await DbSeeder.SeedAsync(context, cancellationToken));
     });
-
+builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<RegisterUser>();
 builder.Services.AddScoped<LoginUser>();
 builder.Services.AddScoped<GenerateJwtToken>();
@@ -49,6 +49,7 @@ builder.Services.AddScoped<GoalContributionService>();
 builder.Services.AddScoped<GetGoalCurrentAmount>();
 builder.Services.AddScoped<RecurringTransactionService>();
 builder.Services.AddScoped<VerifyCategoryExistence>();
+builder.Services.AddScoped<GetNextRunDate>();
 
 builder.Services.AddOptions<JwtOption>()
     .Bind(builder.Configuration.GetSection(JwtOption.SectionName))
