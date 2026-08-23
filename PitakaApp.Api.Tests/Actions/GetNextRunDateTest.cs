@@ -7,7 +7,7 @@ namespace PitakaApp.Api.Tests.Actions;
 public class GetNextRunDateTest
 {
     [Fact]
-    public void GetNextRunDate_Daily()
+    public void GetNextRunDate_InclusiveOfToday_Daily()
     {
         var fakeClock = new FakeTimeProvider();
 
@@ -16,11 +16,11 @@ public class GetNextRunDateTest
         fakeClock.SetUtcNow(mockUtcTime);
 
         var service = new GetNextRunDate(fakeClock);
-        Assert.Equal(new DateOnly(2026, 08, 28), service.GetDate(startDate, Frequency.Daily));
+        Assert.Equal(new DateOnly(2026, 08, 28), service.InclusiveOfToday(startDate, Frequency.Daily));
     }
 
     [Fact]
-    public void GetNextRunDate_WithTheSameDate_Daily()
+    public void GetNextRunDate_InclusiveOfToday_WithTheSameDate_Daily()
     {
         var fakeClock = new FakeTimeProvider();
 
@@ -29,7 +29,20 @@ public class GetNextRunDateTest
         fakeClock.SetUtcNow(mockUtcTime);
 
         var service = new GetNextRunDate(fakeClock);
-        Assert.Equal(new DateOnly(2026, 08, 21), service.GetDate(startDate, Frequency.Daily));
+        Assert.Equal(new DateOnly(2026, 08, 21), service.InclusiveOfToday(startDate, Frequency.Daily));
+    }
+
+    [Fact]
+    public void GetNextRunDate_ExclusiveOfToday_WithTheSameDate_Daily()
+    {
+        var fakeClock = new FakeTimeProvider();
+
+        var startDate = new DateOnly(2026, 08, 21);
+        var mockUtcTime = new DateTime(2026, 08, 21, 12, 0 ,0, DateTimeKind.Utc);
+        fakeClock.SetUtcNow(mockUtcTime);
+
+        var service = new GetNextRunDate(fakeClock);
+        Assert.Equal(new DateOnly(2026, 08, 22), service.ExclusiveOfToday(startDate, Frequency.Daily));
     }
     
     [Fact]
@@ -42,7 +55,7 @@ public class GetNextRunDateTest
         fakeClock.SetUtcNow(mockUtcTime);
 
         var service = new GetNextRunDate(fakeClock);
-        Assert.Equal(new DateOnly(2026, 08, 24), service.GetDate(startDate, Frequency.Daily));
+        Assert.Equal(new DateOnly(2026, 08, 24), service.InclusiveOfToday(startDate, Frequency.Daily));
     }
 
     [Fact]
@@ -55,11 +68,11 @@ public class GetNextRunDateTest
         fakeClock.SetUtcNow(mockUtcTime);
 
         var service = new GetNextRunDate(fakeClock);
-        Assert.Equal(startDate.AddDays(14), service.GetDate(startDate, Frequency.Weekly));
+        Assert.Equal(startDate.AddDays(14), service.InclusiveOfToday(startDate, Frequency.Weekly));
     }
 
     [Fact]
-    public void GetNextRunDate_WithTheSameDate_Weekly()
+    public void GetNextRunDate_InclusiveOfToday_WithTheSameDate_Weekly()
     {
         var fakeClock = new FakeTimeProvider();
 
@@ -68,7 +81,20 @@ public class GetNextRunDateTest
         fakeClock.SetUtcNow(mockUtcTime);
 
         var service = new GetNextRunDate(fakeClock);
-        Assert.Equal(startDate, service.GetDate(startDate, Frequency.Weekly));
+        Assert.Equal(startDate, service.InclusiveOfToday(startDate, Frequency.Weekly));
+    }
+
+    [Fact]
+    public void GetNextRunDate_ExclusiveOfToday_WithTheSameDate_Weekly()
+    {
+        var fakeClock = new FakeTimeProvider();
+
+        var startDate = new DateOnly(2026, 08, 21);
+        var mockUtcTime = new DateTime(2026, 08, 21, 12, 0 ,0, DateTimeKind.Utc);
+        fakeClock.SetUtcNow(mockUtcTime);
+
+        var service = new GetNextRunDate(fakeClock);
+        Assert.Equal(new DateOnly(2026, 08, 28), service.ExclusiveOfToday(startDate, Frequency.Weekly));
     }
 
     [Fact]
@@ -81,11 +107,11 @@ public class GetNextRunDateTest
         fakeClock.SetUtcNow(mockUtcTime);
 
         var service = new GetNextRunDate(fakeClock);
-        Assert.Equal(startDate.AddMonths(1), service.GetDate(startDate, Frequency.Monthly));
+        Assert.Equal(startDate.AddMonths(1), service.InclusiveOfToday(startDate, Frequency.Monthly));
     }
 
     [Fact]
-    public void GetNextRunDate_WithTheSameDate_Monthly()
+    public void GetNextRunDate_InclusiveOfToday_WithTheSameDate_Monthly()
     {
         var fakeClock = new FakeTimeProvider();
 
@@ -94,7 +120,20 @@ public class GetNextRunDateTest
         fakeClock.SetUtcNow(mockUtcTime);
 
         var service = new GetNextRunDate(fakeClock);
-        Assert.Equal(new DateOnly(2026, 09, 21), service.GetDate(startDate, Frequency.Monthly));
+        Assert.Equal(new DateOnly(2026, 09, 21), service.InclusiveOfToday(startDate, Frequency.Monthly));
+    }
+
+    [Fact]
+    public void GetNextRunDate_ExclusiveOfToday_WithTheSameDate_Monthly()
+    {
+        var fakeClock = new FakeTimeProvider();
+
+        var startDate = new DateOnly(2026, 08, 21);
+        var mockUtcTime = new DateTime(2026, 09, 21, 12, 0 ,0, DateTimeKind.Utc);
+        fakeClock.SetUtcNow(mockUtcTime);
+
+        var service = new GetNextRunDate(fakeClock);
+        Assert.Equal(new DateOnly(2026, 10, 21), service.ExclusiveOfToday(startDate, Frequency.Monthly));
     }
 
     [Fact]
@@ -107,7 +146,7 @@ public class GetNextRunDateTest
         fakeClock.SetUtcNow(mockUtcTime);
 
         var service = new GetNextRunDate(fakeClock);
-        Assert.Equal(new DateOnly(2026, 02, 28), service.GetDate(startDate, Frequency.Monthly));
+        Assert.Equal(new DateOnly(2026, 02, 28), service.InclusiveOfToday(startDate, Frequency.Monthly));
     }
 
     [Fact]
@@ -120,6 +159,32 @@ public class GetNextRunDateTest
         fakeClock.SetUtcNow(mockUtcTime);
 
         var service = new GetNextRunDate(fakeClock);
-        Assert.Equal(startDate.AddYears(1), service.GetDate(startDate, Frequency.Yearly));
+        Assert.Equal(startDate.AddYears(1), service.InclusiveOfToday(startDate, Frequency.Yearly));
+    }
+
+    [Fact]
+    public void GetNextRunDate_InclusiveOfToday_WithTheSameDay_Yearly()
+    {
+        var fakeClock = new FakeTimeProvider();
+
+        var startDate = new DateOnly(2026, 08, 21);
+        var mockUtcTime = new DateTime(2027, 08, 21, 12, 0 ,0, DateTimeKind.Utc);
+        fakeClock.SetUtcNow(mockUtcTime);
+
+        var service = new GetNextRunDate(fakeClock);
+        Assert.Equal(new DateOnly(2027, 08, 21), service.InclusiveOfToday(startDate, Frequency.Yearly));
+    }
+
+    [Fact]
+    public void GetNextRunDate_ExclusiveOfToday_WithTheSameDay_Yearly()
+    {
+        var fakeClock = new FakeTimeProvider();
+
+        var startDate = new DateOnly(2026, 08, 21);
+        var mockUtcTime = new DateTime(2027, 08, 21, 12, 0 ,0, DateTimeKind.Utc);
+        fakeClock.SetUtcNow(mockUtcTime);
+
+        var service = new GetNextRunDate(fakeClock);
+        Assert.Equal(new DateOnly(2028, 08, 21), service.ExclusiveOfToday(startDate, Frequency.Yearly));
     }
 }

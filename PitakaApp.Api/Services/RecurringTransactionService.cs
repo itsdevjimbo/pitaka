@@ -85,7 +85,7 @@ public class RecurringTransactionService
             return recurringTransaction;
         }
 
-        var nextRunDate = _getNextRunDate.GetDate(recurringTransaction.StartDate, recurringTransaction.Frequency);
+        var nextRunDate = _getNextRunDate.InclusiveOfToday(recurringTransaction.StartDate, recurringTransaction.Frequency);
 
         if (nextRunDate > recurringTransaction.EndDate)
         {

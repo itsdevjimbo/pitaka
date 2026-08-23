@@ -9,6 +9,7 @@ using PitakaApp.Api.Services;
 using System.Text.Json.Serialization;
 using PitakaApp.Api.Actions;
 using Microsoft.Extensions.Options;
+using PitakaApp.Api.Jobs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -50,6 +51,8 @@ builder.Services.AddScoped<GetGoalCurrentAmount>();
 builder.Services.AddScoped<RecurringTransactionService>();
 builder.Services.AddScoped<VerifyCategoryExistence>();
 builder.Services.AddScoped<GetNextRunDate>();
+builder.Services.AddScoped<GetDueRecurringTransactions>();
+builder.Services.AddScoped<GenerateDueRecurringTransactions>();
 
 builder.Services.AddOptions<JwtOption>()
     .Bind(builder.Configuration.GetSection(JwtOption.SectionName))
