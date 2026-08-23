@@ -34,6 +34,7 @@ public class RealAuthWebApplicationFactory : WebApplicationFactory<Program>, IAs
             {
                 ["ConnectionStrings:DefaultConnection"] = TestConnectionString,
                 ["Jwt:Key"] = TestJwtKey,
+                ["RecurringTransaction:Enabled"] = "false"
             });
         });
     }

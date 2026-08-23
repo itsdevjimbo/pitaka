@@ -59,9 +59,17 @@ builder.Services.AddOptions<JwtOption>()
     .ValidateDataAnnotations()
     .ValidateOnStart();
 
+builder.Services.AddOptions<RecurringTransactionGenerationOption>()
+    .Bind(builder.Configuration.GetSection(RecurringTransactionGenerationOption.SectionName))
+    .ValidateDataAnnotations()
+    .Validate(o => !o.Enabled || o.Interval > TimeSpan.Zero) 
+    .ValidateOnStart();
+
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer();
+
+builder.Services.AddHostedService<RecurringTransactionGenerationWorker>();
 
 // Configured via IOptions<JwtOption> (resolved from DI, after the host is built) rather
 // than a raw builder.Configuration read at top-level-statement time — a raw read here

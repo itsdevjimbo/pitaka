@@ -31,12 +31,14 @@ public class GenerateDueRecurringTransactions
         _logger = logger;
     }
 
-    public async Task GenerateAsync()
+    public async Task GenerateAsync(CancellationToken cancellationToken = default)
     {
         var dueRecurringTransactions = await _getDueRecurringTransactions.GetAsync();
         
         foreach (var recurringTransaction in dueRecurringTransactions)
         {
+            if (cancellationToken.IsCancellationRequested) break;
+
             try
             {
                 var freshRecurringTransaction = await _context.RecurringTransactions.Where(rt => rt.Id == recurringTransaction.Id).FirstOrDefaultAsync();

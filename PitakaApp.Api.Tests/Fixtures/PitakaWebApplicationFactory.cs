@@ -31,6 +31,7 @@ public class PitakaWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
             {
                 ["ConnectionStrings:DefaultConnection"] = TestConnectionString,
                 ["Jwt:Key"] = TestJwtKey,
+                ["RecurringTransaction:Enabled"] = "false"
             });
         });
 
