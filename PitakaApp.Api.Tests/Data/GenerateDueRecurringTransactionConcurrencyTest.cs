@@ -56,9 +56,11 @@ public class GenerateDueRecurringTransactionConcurrencyTest : IDisposable
 
         using var scopeC = _factory.Services.CreateScope();
         var contextC = scopeC.ServiceProvider.GetRequiredService<PitakaDbContext>();
-
         Assert.True(await contextC.Transactions.AnyAsync(t => t.RecurringTransactionId == recurringTransactionB.Id));
         Assert.False(await contextC.Transactions.AnyAsync(t => t.RecurringTransactionId == recurringTransactionA.Id));
+
+        var staleRecurringTransaction = await contextC.RecurringTransactions.Where(rt => rt.Id == recurringTransactionA.Id).FirstAsync();
+        Assert.Equal(now, staleRecurringTransaction.NextRunDate);
     }
     public void Dispose() => _scope.Dispose();
 }

@@ -31,7 +31,6 @@ public class GenerateDueRecurringTransactions
         _logger = logger;
     }
 
-
     public async Task GenerateAsync()
     {
         var dueRecurringTransactions = await _getDueRecurringTransactions.GetAsync();
@@ -40,26 +39,32 @@ public class GenerateDueRecurringTransactions
         {
             try
             {
-                var transactionDate = recurringTransaction.NextRunDate.ToDateTime(TimeOnly.MinValue);
-                var transaction = GenerateTransaction.GetTransaction(recurringTransaction, transactionDate);
+                var freshRecurringTransaction = await _context.RecurringTransactions.Where(rt => rt.Id == recurringTransaction.Id).FirstOrDefaultAsync();
 
+                if (freshRecurringTransaction == null)
+                {
+                    _logger.LogWarning("Missing recurring transaction: {Id}", recurringTransaction.Id);
+                    continue;
+                }
+
+                var transactionDate = freshRecurringTransaction.NextRunDate.ToDateTime(TimeOnly.MinValue);
+                var transaction = GenerateTransaction.GetTransaction(freshRecurringTransaction, transactionDate);
+                
                 await _updateAccountBalance.ApplyTransaction(transaction);
                 _context.Transactions.Add(transaction);
 
-                var nextRunDate = _getNextRunDate.ExclusiveOfToday(recurringTransaction.StartDate, recurringTransaction.Frequency);
+                var nextRunDate = _getNextRunDate.ExclusiveOfToday(freshRecurringTransaction.StartDate, freshRecurringTransaction.Frequency);
 
-                _context.RecurringTransactions.Attach(recurringTransaction);
-                
-                if (nextRunDate > recurringTransaction.EndDate)
+                if (nextRunDate > freshRecurringTransaction.EndDate)
                 {
-                    recurringTransaction.Status = Enums.RecurringTransactionStatus.Completed;
+                    freshRecurringTransaction.Status = Enums.RecurringTransactionStatus.Completed;
                 }
                 else
                 {
-                    recurringTransaction.NextRunDate = nextRunDate;
+                    freshRecurringTransaction.NextRunDate = nextRunDate;
                 }
 
-                await _context.SaveChangesAsync();   
+                await _context.SaveChangesAsync();
             } 
             catch (DbUpdateConcurrencyException ex)
             {
