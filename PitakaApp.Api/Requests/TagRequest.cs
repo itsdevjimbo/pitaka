@@ -4,7 +4,7 @@ using PitakaApp.Api.Inputs;
 namespace PitakaApp.Api.Requests;
 
 public record TagRequest (
-    [Required]
+    [Required, MaxLength(255)]
     string Name
 )
 {

@@ -174,8 +174,10 @@ public class TagsControllerTest : IDisposable
     [Fact]
     public async Task Update_WithNonExistentTag_ReturnsNotFound()
     {
+        var user = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(user);
         var response = await _client.PutAsJsonAsync("/api/tags/9999", new { Name = "Update tag" });
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Fact]
@@ -215,6 +217,8 @@ public class TagsControllerTest : IDisposable
         var response = await _client.PutAsJsonAsync("/api/tags/" + tag.Id, new { Name = "Update Name" });
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
+        await _context.Entry(tag).ReloadAsync();
+        Assert.Equal("Update Name", tag.Name);
     }
 
     [Fact]
@@ -260,6 +264,8 @@ public class TagsControllerTest : IDisposable
 
         var response = await _client.DeleteAsync("/api/tags/" + tag.Id);
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+
+        Assert.False(await _context.Tags.AnyAsync(t => t.Id == tag.Id));
     }
 
     public void Dispose() => _scope.Dispose();
