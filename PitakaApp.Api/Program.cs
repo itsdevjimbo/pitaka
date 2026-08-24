@@ -53,6 +53,7 @@ builder.Services.AddScoped<VerifyCategoryExistence>();
 builder.Services.AddScoped<GetNextRunDate>();
 builder.Services.AddScoped<GetDueRecurringTransactions>();
 builder.Services.AddScoped<GenerateDueRecurringTransactions>();
+builder.Services.AddScoped<TagService>();
 
 builder.Services.AddOptions<JwtOption>()
     .Bind(builder.Configuration.GetSection(JwtOption.SectionName))

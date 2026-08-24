@@ -32,6 +32,8 @@ public class PitakaDbContext : DbContext
 
         modelBuilder.Entity<RecurringTransaction>().HasIndex(c => new { c.UserId, c.Name }).IsUnique();
 
+        modelBuilder.Entity<Tag>().HasIndex(c => new { c.UserId, c.Name }).IsUnique();
+
         var enumProperties = modelBuilder.Model.GetEntityTypes()
             .SelectMany(e => e.GetProperties())
             .Where(p => (Nullable.GetUnderlyingType(p.ClrType) ?? p.ClrType).IsEnum)
