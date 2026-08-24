@@ -32,7 +32,7 @@ public class TagsControllerTest : IDisposable
     }
 
     [Fact]
-    public async Task Get_WithLoggedInUser_ReturnsTheirGoals()
+    public async Task Get_WithLoggedInUser_ReturnsTheirTags()
     {
         var user = await UserFactory.CreateAsync(_context);
 
