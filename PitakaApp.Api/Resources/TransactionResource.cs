@@ -14,13 +14,14 @@ public record TransactionResource(
     int? CategoryId,
     int? RecurringTransactionId,
     int? TransferToAccountId,
-    string? Description
+    string? Description,
+    List<TagResource> Tags
 )
 {
     public static TransactionResource FromModel(Transaction t) =>
         new(
             t.Id, t.UserId, t.AccountId, t.Type, t.Amount, t.TransactionDate, t.IsRecurring,
-            t.CategoryId, t.RecurringTransactionId, t.TransferToAccountId, t.Description
+            t.CategoryId, t.RecurringTransactionId, t.TransferToAccountId, t.Description, TagResource.Collection(t.Tags)
         );
 
     public static List<TransactionResource> Collection(IEnumerable<Transaction> transactions) =>
