@@ -5,7 +5,8 @@ namespace PitakaApp.Api.Requests;
 public record UpdateTransactionRequest (
     DateTime? TransactionDate,
     int? CategoryId,
-    string? Description
+    string? Description,
+    int[]? TagIds
 )
 {
     public UpdateTransactionInput ToInput() => new (

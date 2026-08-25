@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PitakaApp.Api.Actions;
 using PitakaApp.Api.Filters;
+using PitakaApp.Api.Models;
 using PitakaApp.Api.Requests;
 using PitakaApp.Api.Resources;
 using PitakaApp.Api.Services;
@@ -17,18 +18,23 @@ public class TransactionsController : ControllerBase
 {
     private readonly AccountService _accountService;
     private readonly TransactionService _transactionService;
+
+    private readonly TagService _tagService;
+
     private readonly VerifyCategoryExistence _verifyCategoryExistence;
     private readonly CurrentUserAccessor _currentUserAccessor;
 
     public TransactionsController(
         AccountService accountService,
         TransactionService transactionService,
+        TagService tagService,
         VerifyCategoryExistence verifyCategoryExistence,
         CurrentUserAccessor currentUserAccessor
     )
     {
         _accountService = accountService;
         _transactionService = transactionService;
+        _tagService = tagService;
         _verifyCategoryExistence = verifyCategoryExistence;
         _currentUserAccessor = currentUserAccessor;
     }
@@ -48,6 +54,9 @@ public class TransactionsController : ControllerBase
         var user = _currentUserAccessor.User!;
         var account = await _accountService.GetByIdForUser(user, request.AccountId);
 
+        List<Tag>? tags = null; 
+        var distictTagIds = request.TagIds?.Distinct().ToArray();
+        
         if (account == null)
         {
             return BadRequest();
@@ -68,9 +77,19 @@ public class TransactionsController : ControllerBase
             return BadRequest();
         }
 
+        if (distictTagIds != null)
+        {
+            tags = await _tagService.GetByTagsIdsForUser(user, distictTagIds);
+        }
+
+        if (tags?.Count != distictTagIds?.Length)
+        {
+            return BadRequest();
+        }
+
         try
         {
-            var transaction = await _transactionService.CreateAsync(account, request.ToInput());
+            var transaction = await _transactionService.CreateAsync(account, request.ToInput(), tags);
             return StatusCode(StatusCodes.Status201Created, TransactionResource.FromModel(transaction));
         }
         catch (DbUpdateConcurrencyException)
@@ -99,6 +118,9 @@ public class TransactionsController : ControllerBase
     {
         var user = _currentUserAccessor.User!;
         var transaction = await _transactionService.GetTrackedByIdAsync(id);
+        
+        List<Tag>? tags = null; 
+        var distictTagIds = request.TagIds?.Distinct().ToArray();
 
         if (transaction == null)
         {
@@ -115,7 +137,18 @@ public class TransactionsController : ControllerBase
             return BadRequest();
         }
 
-        await _transactionService.UpdateAsync(transaction, request.ToInput());
+        if (distictTagIds != null)
+        {
+            tags = await _tagService.GetByTagsIdsForUser(user, distictTagIds);
+        }
+
+        if (tags?.Count != distictTagIds?.Length)
+        {
+            return BadRequest();
+        }
+
+
+        await _transactionService.UpdateAsync(transaction, request.ToInput(), tags);
         return Ok(TransactionResource.FromModel(transaction));
     }
 

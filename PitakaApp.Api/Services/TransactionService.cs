@@ -24,10 +24,11 @@ public class TransactionService
     public async Task<List<Transaction>> GetAllForUser(User user) =>
         await _context.Transactions
             .AsNoTracking()
+            .Include(t => t.Tags)
             .Where(a => a.UserId == user.Id)
             .ToListAsync();
 
-    public async Task<Transaction> CreateAsync(Account account, CreateTransactionInput input)
+    public async Task<Transaction> CreateAsync(Account account, CreateTransactionInput input, List<Tag>? tags = null)
     {
         var transaction = new Transaction
         {
@@ -44,27 +45,42 @@ public class TransactionService
         };
 
         _context.Transactions.Add(transaction);
+
+        if (tags != null)
+        {
+            AttachTag(transaction, tags);
+        }
+        
         await _updateAccountBalance.ApplyTransaction(transaction);
+        
         await _context.SaveChangesAsync();
+
         return transaction;
     }
     public async Task<Transaction?> GetByIdForUser(User user, int id) =>
         await _context.Transactions
             .AsNoTracking()
+            .Include(t => t.Tags)
             .Where(t => t.Id == id && t.UserId == user.Id)
             .FirstOrDefaultAsync();
 
     public async Task<Transaction?> GetTrackedByIdAsync(int id) => 
         await _context.Transactions
+            .Include(t => t.Tags)
             .Where(c => c.Id == id)
             .FirstOrDefaultAsync();
 
-    public async Task<Transaction> UpdateAsync(Transaction transaction, UpdateTransactionInput input)
+    public async Task<Transaction> UpdateAsync(Transaction transaction, UpdateTransactionInput input, List<Tag>? tags = null)
     {
         transaction.CategoryId = input.CategoryId;
         transaction.Description = input.Description;
         transaction.TransactionDate = input.TransactionDate ?? transaction.TransactionDate;
         
+        if (tags != null)
+        {
+            SyncTags(transaction, tags);
+        }
+
         await _context.SaveChangesAsync();
         return transaction;
     }
@@ -86,5 +102,39 @@ public class TransactionService
     public async Task<bool> IsValidTransferTransaction(User user, int? transferToAccountId)
     {
         return await _context.Accounts.AnyAsync(a => a.Id == transferToAccountId && a.UserId == user.Id && a.IsActive);
+    }
+
+    private void AttachTag(Transaction transaction, List<Tag> tags)
+    {
+        foreach (var tag in tags)
+        {
+            transaction.Tags.Add(tag);
+        }
+    }
+
+    private void DetachTag(Transaction transaction, List<Tag> tags)
+    {
+        foreach (var tag in tags)
+        {
+            transaction.Tags.Remove(tag);
+        }
+    }
+
+    private void SyncTags(Transaction transaction, List<Tag> tags)
+    {
+        var tagIds = tags.Select(tag => tag.Id);
+        var toRemoveTags = transaction.Tags
+            .Where(t => !tagIds.Contains(t.Id))
+            .ToList();
+            
+        if (toRemoveTags.Count > 0)
+        {
+            DetachTag(transaction, toRemoveTags);
+        }
+
+        var tagIdsToSkip = transaction.Tags.Select(tag => tag.Id).ToArray();
+        var toAttachTags = tags.Where(t => !tagIdsToSkip.Contains(t.Id)).ToList();
+        
+        AttachTag(transaction, toAttachTags);
     }
 }

@@ -20,7 +20,9 @@ public record CreateTransactionRequest (
 
     int? TransferToAccountId,
 
-    string? Description
+    string? Description,
+
+    int[]? TagIds
 ): IValidatableObject
 {
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)

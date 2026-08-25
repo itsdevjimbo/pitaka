@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using PitakaApp.Api.Data;
 using PitakaApp.Api.Enums;
+using PitakaApp.Api.Models;
 using PitakaApp.Api.Resources;
 using PitakaApp.Api.Tests.Factories;
 using PitakaApp.Api.Tests.Fixtures;
@@ -680,6 +681,206 @@ public class TransactionsControllerTest : IDisposable
 
         var response = await _client.PostAsJsonAsync("/api/transactions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Create_WithNonExistentTags_ReturnsBadRequest()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+
+        _client.ActAsUser(user);
+
+        var request = new
+        {
+            AccountId = account.Id,
+            Type = TransactionType.Income,
+            Amount = 5000,
+            TagIds = new int[] { 9999, 9998}
+        };
+
+        var response = await _client.PostAsJsonAsync("/api/transactions", request);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Create_WithTagsThatDoesntBelongToUser_ReturnsBadRequest()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var userB = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var tagA = await TagFactory.CreateAsync(_context, user.Id);
+        var tagB = await TagFactory.CreateAsync(_context, userB.Id);
+
+        _client.ActAsUser(user);
+
+        var request = new
+        {
+            AccountId = account.Id,
+            Type = TransactionType.Income,
+            Amount = 5000,
+            TagIds = new int[] { tagA.Id, tagB.Id }
+        };
+
+        var response = await _client.PostAsJsonAsync("/api/transactions", request);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Create_WithTags_ReturnsCreated()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var tag = await TagFactory.CreateAsync(_context, user.Id);
+
+        _client.ActAsUser(user);
+
+        var request = new
+        {
+            AccountId = account.Id,
+            Type = TransactionType.Income,
+            Amount = 5000,
+            TagIds = new int[] { tag.Id, tag.Id }
+        };
+
+        var response = await _client.PostAsJsonAsync("/api/transactions", request);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<TransactionResource>(TestJsonOptions.Default);
+        Assert.NotEmpty(body!.Tags);
+        Assert.Single(body!.Tags);
+        Assert.Contains(body!.Tags, tagResource => tagResource.Id == tag.Id);
+    }
+
+    [Fact]
+    public async Task Create_WithoutTags_ReturnsCreated()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+
+        _client.ActAsUser(user);
+
+        var request = new
+        {
+            AccountId = account.Id,
+            Type = TransactionType.Income,
+            Amount = 5000,
+        };
+
+        var response = await _client.PostAsJsonAsync("/api/transactions", request);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<TransactionResource>(TestJsonOptions.Default);
+        Assert.Empty(body!.Tags);
+    }
+
+    [Fact]
+    public async Task Update_WithNonExistentTags_ReturnsBadRequest()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var transaction = await TransactionFactory.CreateAsync(_context, user.Id, account.Id);
+        
+        _client.ActAsUser(user);
+        
+        var response = await _client.PutAsJsonAsync("/api/transactions/" + transaction.Id, new { TagIds = new int[] { 9999, 9998 } });
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Update_WithTagsThatDoesntBelongToUser_ReturnsBadRequest()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var userB = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var transaction = await TransactionFactory.CreateAsync(_context, user.Id, account.Id);
+        var tagA = await TagFactory.CreateAsync(_context, user.Id);
+        var tagB = await TagFactory.CreateAsync(_context, userB.Id);
+        
+        _client.ActAsUser(user);
+        
+        var response = await _client.PutAsJsonAsync("/api/transactions/" + transaction.Id, new { TagIds = new int[] { tagA.Id, tagB.Id }});
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Update_WithTags_ReturnsOk()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var transaction = await TransactionFactory.CreateAsync(_context, user.Id, account.Id);
+
+        var tagA = await TagFactory.CreateAsync(_context, user.Id, "Test 1");
+        var tagB = await TagFactory.CreateAsync(_context, user.Id, "Test 2");
+
+        await _context.Entry(transaction).Collection(t => t.Tags).LoadAsync();
+
+        transaction.Tags.Add(tagA);
+        transaction.Tags.Add(tagB);
+        await _context.SaveChangesAsync();
+
+        _client.ActAsUser(user);
+        
+        var response = await _client.PutAsJsonAsync("/api/transactions/" + transaction.Id, new { TagIds = new int[] { tagA.Id, tagA.Id }});
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<TransactionResource>(TestJsonOptions.Default);
+        Assert.NotEmpty(body!.Tags);
+        Assert.Single(body!.Tags);
+        Assert.DoesNotContain(body!.Tags, tagResource => tagResource.Id == tagB.Id);
+    }
+
+    [Fact]
+    public async Task Update_WithEmptyTags_ReturnsOk()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var transaction = await TransactionFactory.CreateAsync(_context, user.Id, account.Id);
+
+        var tagA = await TagFactory.CreateAsync(_context, user.Id, "Test 1");
+        var tagB = await TagFactory.CreateAsync(_context, user.Id, "Test 2");
+
+        await _context.Entry(transaction).Collection(t => t.Tags).LoadAsync();
+
+        transaction.Tags.Add(tagA);
+        transaction.Tags.Add(tagB);
+
+        await _context.SaveChangesAsync();
+
+        _client.ActAsUser(user);
+        
+        var response = await _client.PutAsJsonAsync("/api/transactions/" + transaction.Id, new { TagIds = new int[] { }});
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<TransactionResource>(TestJsonOptions.Default);
+        Assert.Empty(body!.Tags);
+        Assert.DoesNotContain(body!.Tags, tagResource => tagResource.Id == tagA.Id);
+        Assert.DoesNotContain(body!.Tags, tagResource => tagResource.Id == tagB.Id);
+    }
+
+    [Fact]
+    public async Task Update_WithNullTags_ReturnsOk()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var transaction = await TransactionFactory.CreateAsync(_context, user.Id, account.Id);
+
+        var tag = await TagFactory.CreateAsync(_context, user.Id, "Test 1");
+
+        await _context.Entry(transaction).Collection(t => t.Tags).LoadAsync();
+
+        transaction.Tags.Add(tag);
+
+        await _context.SaveChangesAsync();
+
+        _client.ActAsUser(user);
+        
+        var response = await _client.PutAsJsonAsync("/api/transactions/" + transaction.Id, new { Amount = 400});
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<TransactionResource>(TestJsonOptions.Default);
+        Assert.Single(body!.Tags);
+        Assert.Contains(body!.Tags, tagResource => tagResource.Id == tag.Id);
     }
 
     public static IEnumerable<object?[]> InvalidAmounts()
