@@ -23,7 +23,6 @@ public class TagService
 
     public async Task<List<Tag>> GetByTagsIdsForUser(User user, int[] tagIds) =>
         await _context.Tags
-            .AsNoTracking()
             .Where(t => tagIds.Contains(t.Id) && t.UserId == user.Id)
             .ToListAsync();
 
