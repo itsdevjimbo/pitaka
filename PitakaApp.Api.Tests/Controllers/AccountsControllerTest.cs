@@ -1,7 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
 using Bogus;
-using Bogus.DataSets;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using PitakaApp.Api.Data;
@@ -56,7 +55,7 @@ public class AccountsControllerTest : IDisposable
     }
 
     [Fact]
-    public async Task Post_ValidRequest_ReturnsCreated()
+    public async Task Create_ValidRequest_ReturnsCreated()
     {
 
         var user = await UserFactory.CreateAsync(_context);
@@ -74,7 +73,7 @@ public class AccountsControllerTest : IDisposable
     }
 
     [Fact]
-    public async Task Post_RequestWithExistingAccountName_ReturnsConflict()
+    public async Task Create_RequestWithExistingAccountName_ReturnsConflict()
     {
         var user = await UserFactory.CreateAsync(_context);
         await AccountFactory.CreateAsync(_context, user.Id, "Savings account");
