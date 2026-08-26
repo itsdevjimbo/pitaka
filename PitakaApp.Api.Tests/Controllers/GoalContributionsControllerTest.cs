@@ -28,7 +28,7 @@ public class GoalContributionsControllerTest
     [Fact]
     public async Task Get_WithoutLoggedInUser_ReturnsUnauthorized()
     {
-        var response = await _client.GetAsync("/api/goalcontributions");
+        var response = await _client.GetAsync("/api/goal-contributions");
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
@@ -52,7 +52,7 @@ public class GoalContributionsControllerTest
         
         _client.ActAsUser(userA);
 
-        var response = await _client.GetAsync("/api/goalcontributions");
+        var response = await _client.GetAsync("/api/goal-contributions");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var body = await response.Content.ReadFromJsonAsync<List<GoalContributionResource>>(TestJsonOptions.Default);
@@ -70,7 +70,7 @@ public class GoalContributionsControllerTest
             ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
         
-        var response = await _client.PostAsJsonAsync("/api/goalcontributions", request);
+        var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
@@ -89,7 +89,7 @@ public class GoalContributionsControllerTest
             ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
         
-        var response = await _client.PostAsJsonAsync("/api/goalcontributions", request);
+        var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         
         string responseBody = await response.Content.ReadAsStringAsync();
@@ -114,7 +114,7 @@ public class GoalContributionsControllerTest
             ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
         
-        var response = await _client.PostAsJsonAsync("/api/goalcontributions", request);
+        var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
         string responseBody = await response.Content.ReadAsStringAsync();
@@ -138,7 +138,7 @@ public class GoalContributionsControllerTest
             ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
         
-        var response = await _client.PostAsJsonAsync("/api/goalcontributions", request);
+        var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
         string responseBody = await response.Content.ReadAsStringAsync();
@@ -160,7 +160,7 @@ public class GoalContributionsControllerTest
             ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
         
-        var response = await _client.PostAsJsonAsync("/api/goalcontributions", request);
+        var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
         string responseBody = await response.Content.ReadAsStringAsync();
@@ -185,7 +185,7 @@ public class GoalContributionsControllerTest
             ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
         
-        var response = await _client.PostAsJsonAsync("/api/goalcontributions", request);
+        var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
         string responseBody = await response.Content.ReadAsStringAsync();
@@ -209,7 +209,7 @@ public class GoalContributionsControllerTest
             ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
         
-        var response = await _client.PostAsJsonAsync("/api/goalcontributions", request);
+        var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
         string responseBody = await response.Content.ReadAsStringAsync();
@@ -235,7 +235,7 @@ public class GoalContributionsControllerTest
             ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
         
-        var response = await _client.PostAsJsonAsync("/api/goalcontributions", request);
+        var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
         string responseBody = await response.Content.ReadAsStringAsync();
@@ -264,7 +264,7 @@ public class GoalContributionsControllerTest
             ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
         
-        var response = await _client.PostAsJsonAsync("/api/goalcontributions", request);
+        var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
         string responseBody = await response.Content.ReadAsStringAsync();
@@ -293,7 +293,7 @@ public class GoalContributionsControllerTest
             ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
         
-        var response = await _client.PostAsJsonAsync("/api/goalcontributions", request);
+        var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
         string responseBody = await response.Content.ReadAsStringAsync();
@@ -322,7 +322,7 @@ public class GoalContributionsControllerTest
             ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
         
-        var response = await _client.PostAsJsonAsync("/api/goalcontributions", request);
+        var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
         string responseBody = await response.Content.ReadAsStringAsync();
@@ -347,7 +347,7 @@ public class GoalContributionsControllerTest
             ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
         
-        var response = await _client.PostAsJsonAsync("/api/goalcontributions", request);
+        var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
         string responseBody = await response.Content.ReadAsStringAsync();
@@ -394,7 +394,7 @@ public class GoalContributionsControllerTest
         };
 
 
-        var response = await _client.PostAsJsonAsync("/api/goalcontributions", request);
+        var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
@@ -415,7 +415,7 @@ public class GoalContributionsControllerTest
             ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
         
-        var response = await _client.PostAsJsonAsync("/api/goalcontributions", request);
+        var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
     }
 
@@ -438,7 +438,7 @@ public class GoalContributionsControllerTest
             ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
         
-        var response = await _client.PostAsJsonAsync("/api/goalcontributions", request);
+        var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
     }
 
@@ -466,7 +466,7 @@ public class GoalContributionsControllerTest
             ContributionDate = now,
         };
         
-        var response = await _client.PostAsJsonAsync("/api/goalcontributions", request);
+        var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         
         var goalContribution = await _context.GoalContributions.Where(gc => gc.GoalId == goal.Id).FirstAsync();
@@ -499,7 +499,7 @@ public class GoalContributionsControllerTest
             ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
         
-        var response = await _client.PostAsJsonAsync("/api/goalcontributions", request);
+        var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
     }
 
@@ -521,7 +521,7 @@ public class GoalContributionsControllerTest
             ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
         
-        var response = await _client.PostAsJsonAsync("/api/goalcontributions", request);
+        var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
     }
 
@@ -543,7 +543,7 @@ public class GoalContributionsControllerTest
             ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
         
-        var response = await _client.PostAsJsonAsync("/api/goalcontributions", request);
+        var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
     }
 
@@ -555,7 +555,7 @@ public class GoalContributionsControllerTest
         var goal = await GoalFactory.CreateAsync(_context, user.Id);
         var contribution = await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id);
 
-        var response = await _client.GetAsync("/api/goalcontributions/" + contribution.Id);
+        var response = await _client.GetAsync("/api/goal-contributions/" + contribution.Id);
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
@@ -566,7 +566,7 @@ public class GoalContributionsControllerTest
 
         _client.ActAsUser(user);
 
-        var response = await _client.GetAsync("/api/goalcontributions/99999");
+        var response = await _client.GetAsync("/api/goal-contributions/99999");
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
@@ -581,7 +581,7 @@ public class GoalContributionsControllerTest
         
         _client.ActAsUser(userA);
 
-        var response = await _client.GetAsync("/api/goalcontributions/" + contribution.Id);
+        var response = await _client.GetAsync("/api/goal-contributions/" + contribution.Id);
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
     
@@ -595,7 +595,7 @@ public class GoalContributionsControllerTest
         
         _client.ActAsUser(user);
 
-        var response = await _client.GetAsync("/api/goalcontributions/" + contribution.Id);
+        var response = await _client.GetAsync("/api/goal-contributions/" + contribution.Id);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var body = await response.Content.ReadFromJsonAsync<GoalContributionResource>();
@@ -623,7 +623,7 @@ public class GoalContributionsControllerTest
             Note = "Test note"
         };
 
-        var response = await _client.PutAsJsonAsync("/api/goalcontributions/" + contribution.Id, request);
+        var response = await _client.PutAsJsonAsync("/api/goal-contributions/" + contribution.Id, request);
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
@@ -640,7 +640,7 @@ public class GoalContributionsControllerTest
             Note = "Test note"
         };
 
-        var response = await _client.PutAsJsonAsync("/api/goalcontributions/99999", request);
+        var response = await _client.PutAsJsonAsync("/api/goal-contributions/99999", request);
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
@@ -661,7 +661,7 @@ public class GoalContributionsControllerTest
             Note = "Test note"
         };
 
-        var response = await _client.PutAsJsonAsync("/api/goalcontributions/" + contribution.Id, request);
+        var response = await _client.PutAsJsonAsync("/api/goal-contributions/" + contribution.Id, request);
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
@@ -683,7 +683,7 @@ public class GoalContributionsControllerTest
             Note = "Test note"
         };
 
-        var response = await _client.PutAsJsonAsync("/api/goalcontributions/" + contribution.Id, request);
+        var response = await _client.PutAsJsonAsync("/api/goal-contributions/" + contribution.Id, request);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         
         var body = await response.Content.ReadFromJsonAsync<GoalContributionResource>();
@@ -702,7 +702,7 @@ public class GoalContributionsControllerTest
         var goal = await GoalFactory.CreateAsync(_context, user.Id);
         var contribution = await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id);
 
-        var response = await _client.DeleteAsync("api/goalcontributions/" + contribution.Id);
+        var response = await _client.DeleteAsync("api/goal-contributions/" + contribution.Id);
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
@@ -712,7 +712,7 @@ public class GoalContributionsControllerTest
         var user = await UserFactory.CreateAsync(_context);
         _client.ActAsUser(user);
 
-        var response = await _client.DeleteAsync("api/goalcontributions/99999");
+        var response = await _client.DeleteAsync("api/goal-contributions/99999");
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
@@ -727,7 +727,7 @@ public class GoalContributionsControllerTest
 
         _client.ActAsUser(userA);
 
-        var response = await _client.DeleteAsync("api/goalcontributions/" + contribution.Id);
+        var response = await _client.DeleteAsync("api/goal-contributions/" + contribution.Id);
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
@@ -741,7 +741,7 @@ public class GoalContributionsControllerTest
 
         _client.ActAsUser(user);
 
-        var response = await _client.DeleteAsync("api/goalcontributions/" + contribution.Id);
+        var response = await _client.DeleteAsync("api/goal-contributions/" + contribution.Id);
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
     }
 }
