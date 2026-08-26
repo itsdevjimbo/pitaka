@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using PitakaApp.Api.Enums;
 using PitakaApp.Api.Inputs;
+using PitakaApp.Api.Attributes;
 
 namespace PitakaApp.Api.Requests;
 
@@ -16,6 +17,7 @@ public record CreateTransactionRequest (
     
     int? CategoryId,
     
+    [RequiresUtcOffset]
     DateTime? TransactionDate,
 
     int? TransferToAccountId,

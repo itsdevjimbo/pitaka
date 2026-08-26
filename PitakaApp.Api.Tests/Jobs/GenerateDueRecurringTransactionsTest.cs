@@ -130,5 +130,28 @@ public class GenerateDueRecurringTransactionsTest : IDisposable
         Assert.Equal(1300, account.CurrentBalance);
     }
 
+    [Fact]
+    public async Task Generate_TransactionDateKindStaysUnspecified_NotConvertedToUtc()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+
+        var date = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            _context, user.Id, account.Id, startDate: date.AddDays(-1), nextRunDate: date
+        );
+
+        await _generateDueRecurringTransactions.GenerateAsync();
+
+        var transaction = await _context.Transactions.FirstAsync(t => t.RecurringTransactionId == recurringTransaction.Id);
+
+        // Deliberately not UTC: NextRunDate is a bare DateOnly with no timezone ever attached
+        // to it, and this app has no per-user timezone field. Stamping it UTC would make a
+        // client correctly convert it to local time on display, landing on the wrong calendar
+        // day for every user west of UTC, since there's no real instant here to convert from.
+        Assert.Equal(DateTimeKind.Unspecified, transaction.TransactionDate.Kind);
+    }
+
     public void Dispose() => _scope.Dispose();
 }

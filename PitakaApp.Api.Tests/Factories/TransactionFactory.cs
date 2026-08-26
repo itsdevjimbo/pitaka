@@ -25,7 +25,7 @@ public class TransactionFactory
             Amount = amount,
             TransferToAccountId = transferToAccountId,
             Description = description,
-            TransactionDate = transactionDate ?? DateTime.Now,
+            TransactionDate = transactionDate ?? DateTime.UtcNow,
             IsRecurring = recurringTransactionId != null ? true : false,
             RecurringTransactionId = recurringTransactionId
         };
