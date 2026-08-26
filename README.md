@@ -28,7 +28,7 @@ Docker (with Compose) is the only thing you need installed. No local .NET SDK, n
    docker compose run --rm migrator
    ```
 
-3. The API is now available at `http://localhost:8080`.
+3. The API is now available at `http://pitaka.localhost`. No DNS setup needed — `.localhost` is a reserved TLD that every OS and browser resolves to `127.0.0.1` automatically.
 
 ## Running tests
 
