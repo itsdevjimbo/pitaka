@@ -37,7 +37,7 @@ public class TransactionService
             CategoryId = input.CategoryId,
             Type = input.Type,
             Amount = input.Amount,
-            TransactionDate = input.TransactionDate ?? DateTime.Now,
+            TransactionDate = input.TransactionDate?.ToUniversalTime() ?? DateTime.UtcNow,
             Description = input.Description,
             TransferToAccountId = input.TransferToAccountId,
             IsRecurring = input.IsRecurring ?? false,
@@ -74,7 +74,7 @@ public class TransactionService
     {
         transaction.CategoryId = input.CategoryId;
         transaction.Description = input.Description;
-        transaction.TransactionDate = input.TransactionDate ?? transaction.TransactionDate;
+        transaction.TransactionDate = input.TransactionDate?.ToUniversalTime() ?? transaction.TransactionDate;
         
         if (tags != null)
         {
