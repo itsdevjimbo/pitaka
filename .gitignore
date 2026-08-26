@@ -26,3 +26,6 @@ artifacts/
 
 # Logs
 *.log
+
+# Secrets
+.env

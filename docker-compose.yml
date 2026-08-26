@@ -1,0 +1,74 @@
+services:
+  api:
+    build:
+      context: ./PitakaApp.Api
+    ports:
+      - "8080:8080"
+    environment:
+      - ConnectionStrings__DefaultConnection=Server=mysql;Port=3306;Database=pitaka;User=root;Password=${MYSQL_ROOT_PASSWORD}
+      - Jwt__Key=${JWT_KEY}
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  mysql:
+    image: mysql:8
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=pitaka
+    ports:
+      - "3306:3306"
+    volumes:
+      - pitaka_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  test: 
+    build:
+      context: .
+      dockerfile: PitakaApp.Api.Tests/Dockerfile
+    environment:
+      - TEST_DB_CONNECTION=Server=mysql;Port=3306;Database=pitaka_test;User=root;Password=${MYSQL_ROOT_PASSWORD}
+      - REALAUTH_TEST_DB_CONNECTION=Server=mysql;Port=3306;Database=pitaka_test_realauth;User=root;Password=${MYSQL_ROOT_PASSWORD}
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  migrator:
+    build:
+      context: ./PitakaApp.Api
+      target: build
+    entrypoint: ["dotnet", "ef", "database", "update"]
+    environment:
+      - ConnectionStrings__DefaultConnection=Server=mysql;Port=3306;Database=pitaka;User=root;Password=${MYSQL_ROOT_PASSWORD}
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  # General-purpose SDK shell with the live source bind-mounted (not baked in via
+  # COPY like the other services), so anything it writes — a new migration file,
+  # a csproj change from `dotnet add package` — lands back on the host as a real
+  # file. Invoked ad hoc, e.g.:
+  #   docker compose run --rm dev dotnet ef migrations add SomeMigrationName
+  dev:
+    build:
+      context: ./PitakaApp.Api
+      target: build
+    volumes:
+      - ./PitakaApp.Api:/src
+      # Keep the image's own restored obj/bin (built for the container's Linux/NuGet
+      # cache) instead of letting the bind mount above replace them with the host's —
+      # host obj/bin point at host-only package paths, which broke `dotnet ef` here.
+      - /src/obj
+      - /src/bin
+    environment:
+      - ConnectionStrings__DefaultConnection=Server=mysql;Port=3306;Database=pitaka;User=root;Password=${MYSQL_ROOT_PASSWORD}
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+volumes:
+  pitaka_mysql_data:

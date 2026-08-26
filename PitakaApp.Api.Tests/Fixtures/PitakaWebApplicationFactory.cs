@@ -15,8 +15,9 @@ using PitakaApp.Api.Data;
 // of the class's public surface and avoids colliding with the base class's version.
 public class PitakaWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
-    private const string TestConnectionString =
-        "Server=localhost;Port=3306;Database=pitaka_test;User=root;Password=root;";
+    private static readonly string TestConnectionString =
+        Environment.GetEnvironmentVariable("TEST_DB_CONNECTION")
+        ?? "Server=localhost;Port=3306;Database=pitaka_test;User=root;Password=root;";
 
     // Not a real secret — signs tokens for throwaway test runs only, nothing it signs is
     // ever trusted outside the test process. Lets the test suite (and CI) start without
