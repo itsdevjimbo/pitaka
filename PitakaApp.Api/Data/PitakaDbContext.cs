@@ -24,6 +24,8 @@ public class PitakaDbContext : DbContext
     {
         modelBuilder.Entity<User>().HasIndex(u => u.Email).IsUnique();
 
+        modelBuilder.Entity<Account>().HasIndex(c => new { c.UserId, c.Name }).IsUnique();
+
         modelBuilder.Entity<Category>().HasIndex(c => new { c.UserId, c.Name }).IsUnique();
 
         modelBuilder.Entity<Budget>().HasIndex(c => new { c.UserId, c.Name }).IsUnique();
