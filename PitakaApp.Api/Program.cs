@@ -2,11 +2,15 @@ using Microsoft.EntityFrameworkCore;
 using PitakaApp.Api.Data;
 using System.Text.Json.Serialization;
 using PitakaApp.Api.Infra;
+using Microsoft.AspNetCore.Mvc.ApplicationModels;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddControllers()
+builder.Services.AddControllers(options =>
+    {
+        options.Conventions.Add(new RouteTokenTransformerConvention(new SlugifyParameterTransformer()));
+    })
     .AddJsonOptions(options =>
         {
             options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
