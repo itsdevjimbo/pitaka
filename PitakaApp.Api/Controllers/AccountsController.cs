@@ -41,7 +41,7 @@ public class AccountsController : ControllerBase
 
         if (await _accountService.NameExistsForUserAsync(user.Id, request.Name))
         {
-            return Conflict("An account with this name already exists.");
+            return Problem(detail: "An account with this name already exists.", statusCode: StatusCodes.Status409Conflict);
         }
 
         var account = await _accountService.CreateAsync(user, request.ToInput());
@@ -81,7 +81,7 @@ public class AccountsController : ControllerBase
 
         if (await _accountService.NameExistsForUserAsync(user.Id, request.Name, excludeId: id))
         {
-            return Conflict("An account with this name already exists.");
+            return Problem(detail: "An account with this name already exists.", statusCode: StatusCodes.Status409Conflict);
         }
         
         await _accountService.UpdateAsync(account, request.ToInput());
@@ -128,12 +128,12 @@ public class AccountsController : ControllerBase
         
         if (await _accountService.HasTransactionHistoryAsync(id))
         {
-            return Conflict("This account has transaction history and cannot be deleted.");
+            return Problem(detail: "This account has transaction history and cannot be deleted.", statusCode: StatusCodes.Status409Conflict);
         }
 
         if (await _accountService.HasGoalContributionsAsync(id))
         {
-            return Conflict("This account contains funds allocated toward a specific goal.");
+            return Problem(detail: "This account contains funds allocated toward a specific goal.", statusCode: StatusCodes.Status409Conflict);
         }
 
         await _accountService.DeleteAsync(account);

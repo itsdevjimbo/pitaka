@@ -41,7 +41,7 @@ public class TagsController : ControllerBase
 
         if (await _tagService.NameExistsForUserAsync(user.Id, request.Name))
         {
-            return Conflict("A tag with this name already exists.");
+            return Problem(detail: "A tag with this name already exists.", statusCode: StatusCodes.Status409Conflict);
         }
 
         var tag = await _tagService.CreateAsync(user, request.ToInput());
@@ -81,7 +81,7 @@ public class TagsController : ControllerBase
 
         if (await _tagService.NameExistsForUserAsync(user.Id, request.Name, excludeId: id))
         {
-            return Conflict("A tag with this name already exists.");
+            return Problem(detail: "A tag with this name already exists.", statusCode: StatusCodes.Status409Conflict);
         }
         
         await _tagService.UpdateAsync(tag, request.ToInput());

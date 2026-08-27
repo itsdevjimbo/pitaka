@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using PitakaApp.Api.Data;
@@ -92,8 +93,8 @@ public class GoalContributionsControllerTest
         var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         
-        string responseBody = await response.Content.ReadAsStringAsync();
-        Assert.Equal("Goal doesnt exists", responseBody);
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal("Goal doesnt exists", problem!.Detail);
     }
 
     [Fact]
@@ -117,8 +118,8 @@ public class GoalContributionsControllerTest
         var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
-        string responseBody = await response.Content.ReadAsStringAsync();
-        Assert.Equal("Goal doesnt exists", responseBody);
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal("Goal doesnt exists", problem!.Detail);
     }
 
     [Fact]
@@ -141,8 +142,8 @@ public class GoalContributionsControllerTest
         var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
-        string responseBody = await response.Content.ReadAsStringAsync();
-        Assert.Equal("Cannot make contributions to an abandoned goal", responseBody);
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal("Cannot make contributions to an abandoned goal", problem!.Detail);
     }
 
     [Fact]
@@ -163,8 +164,8 @@ public class GoalContributionsControllerTest
         var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
-        string responseBody = await response.Content.ReadAsStringAsync();
-        Assert.Equal("Account doesnt exists", responseBody);
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal("Account doesnt exists", problem!.Detail);
     }
 
     [Fact]
@@ -188,8 +189,8 @@ public class GoalContributionsControllerTest
         var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
-        string responseBody = await response.Content.ReadAsStringAsync();
-        Assert.Equal("Account doesnt exists", responseBody);
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal("Account doesnt exists", problem!.Detail);
     }
 
     [Fact]
@@ -212,8 +213,8 @@ public class GoalContributionsControllerTest
         var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
-        string responseBody = await response.Content.ReadAsStringAsync();
-        Assert.Equal("Account is inactive", responseBody);
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal("Account is inactive", problem!.Detail);
     }
 
     [Fact]
@@ -238,8 +239,8 @@ public class GoalContributionsControllerTest
         var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
-        string responseBody = await response.Content.ReadAsStringAsync();
-        Assert.Equal("Cannot make contribution base on this transaction", responseBody);
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal("Cannot make contribution base on this transaction", problem!.Detail);
     }
 
     [Fact]
@@ -267,8 +268,8 @@ public class GoalContributionsControllerTest
         var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
-        string responseBody = await response.Content.ReadAsStringAsync();
-        Assert.Equal("Cannot make contribution base on this transaction", responseBody);
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal("Cannot make contribution base on this transaction", problem!.Detail);
     }
 
     [Fact]
@@ -296,8 +297,8 @@ public class GoalContributionsControllerTest
         var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
-        string responseBody = await response.Content.ReadAsStringAsync();
-        Assert.Equal("Cannot make contribution base on this transaction", responseBody);
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal("Cannot make contribution base on this transaction", problem!.Detail);
     }
 
 
@@ -325,8 +326,8 @@ public class GoalContributionsControllerTest
         var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
-        string responseBody = await response.Content.ReadAsStringAsync();
-        Assert.Equal("Cannot make contribution base on this transaction", responseBody);
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal("Cannot make contribution base on this transaction", problem!.Detail);
     }
 
     [Fact]
@@ -350,8 +351,8 @@ public class GoalContributionsControllerTest
         var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
-        string responseBody = await response.Content.ReadAsStringAsync();
-        Assert.Equal("Contributions cannot exceed the account's balance", responseBody);
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal("Contributions cannot exceed the account's balance", problem!.Detail);
     }
     public static IEnumerable<object?[]> InvalidGoalContributionRequests()
     {

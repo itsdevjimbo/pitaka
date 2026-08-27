@@ -53,22 +53,22 @@ public class RecurringTransactionsController : ControllerBase
 
         if (account == null)
         {
-            return BadRequest("Account doesnt exists");
+            return Problem(detail: "Account doesnt exists", statusCode: StatusCodes.Status400BadRequest);
         }
 
         if (!account.IsActive)
         {
-            return BadRequest("Account is inactive");
+            return Problem(detail: "Account is inactive", statusCode: StatusCodes.Status400BadRequest);
         }
         
         if (request.CategoryId is int categoryId  && !await _verifyCategoryExistence.VerifyAsync(user, categoryId))
         {
-            return BadRequest("Category doesnt exists");
+            return Problem(detail: "Category doesnt exists", statusCode: StatusCodes.Status400BadRequest);
         }
 
         if (await _recurringTransactionService.NameExistsForUserAsync(user.Id, request.Name))
         {
-            return Conflict("A recurring transaction with this name already exists.");
+            return Problem(detail: "A recurring transaction with this name already exists.", statusCode: StatusCodes.Status409Conflict);
         }
 
         var recurringTransaction = await _recurringTransactionService.CreateAsync(account, request.ToInput());
@@ -113,12 +113,12 @@ public class RecurringTransactionsController : ControllerBase
 
         if(request.EndDate is DateOnly endDate && !recurringTransaction.CanSetEndDate(endDate))
         {
-            return BadRequest("End date must be after start date");
+            return Problem(detail: "End date must be after start date", statusCode: StatusCodes.Status400BadRequest);
         }
 
         if (await _recurringTransactionService.NameExistsForUserAsync(user.Id, request.Name, excludeId: id))
         {
-            return Conflict("A recurringTransaction with this name already exists.");
+            return Problem(detail: "A recurringTransaction with this name already exists.", statusCode: StatusCodes.Status409Conflict);
         }
         
         await _recurringTransactionService.UpdateAsync(recurringTransaction, request.ToInput());

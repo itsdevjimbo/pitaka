@@ -45,7 +45,7 @@ public class BudgetsController : ControllerBase
 
         if (await _budgetService.NameExistsForUserAsync(user.Id, request.Name))
         {
-            return Conflict("A budget with this name already exists.");
+            return Problem(detail: "A budget with this name already exists.", statusCode: StatusCodes.Status409Conflict);
         }
         
         if (request.CategoryId is int categoryId  && !await _verifyCategoryExistence.VerifyAsync(user, categoryId))
@@ -95,7 +95,7 @@ public class BudgetsController : ControllerBase
 
         if (await _budgetService.NameExistsForUserAsync(user.Id, request.Name, excludeId: id))
         {
-            return Conflict("A budget with this name already exists.");
+            return Problem(detail: "A budget with this name already exists.", statusCode: StatusCodes.Status409Conflict);
         }
         
         await _budgetService.UpdateAsync(budget, request.ToInput());

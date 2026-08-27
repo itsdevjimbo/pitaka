@@ -3,6 +3,7 @@ using PitakaApp.Api.Data;
 using System.Text.Json.Serialization;
 using PitakaApp.Api.Infra;
 using Microsoft.AspNetCore.Mvc.ApplicationModels;
+using PitakaApp.Api.Handlers;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -31,6 +32,8 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddApplicationServices();
 builder.AddJwtAuthentication();
 builder.AddRecurringTransactionGeneration();
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
 
 builder.Services.AddAuthorization();
 
@@ -41,6 +44,8 @@ if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
+
+app.UseExceptionHandler();
 
 app.UseHttpsRedirection();
 

@@ -53,32 +53,32 @@ public class GoalContributionsController : ControllerBase
 
         if (account == null)
         {
-            return BadRequest("Account doesnt exists");
+            return Problem(detail: "Account doesnt exists", statusCode: StatusCodes.Status400BadRequest);
         }
 
         if (!account.IsActive)
         {
-            return BadRequest("Account is inactive");
+            return Problem(detail: "Account is inactive", statusCode: StatusCodes.Status400BadRequest);
         }
 
         if (goal == null)
         {
-            return BadRequest("Goal doesnt exists");
+            return Problem(detail: "Goal doesnt exists", statusCode: StatusCodes.Status400BadRequest);
         }
 
         if (goal.IsAbandoned())
         {
-            return BadRequest("Cannot make contributions to an abandoned goal");
+            return Problem(detail: "Cannot make contributions to an abandoned goal", statusCode: StatusCodes.Status400BadRequest);
         }
 
         if (!await _goalContributionService.CanEarmarkTransaction(account.Id, request.TransactionId))
         {
-            return BadRequest("Cannot make contribution base on this transaction");
+            return Problem(detail: "Cannot make contribution base on this transaction", statusCode: StatusCodes.Status400BadRequest);
         }
 
         if (!await _goalContributionService.CanEarmarkAmount(account, request.Amount))
         {
-            return BadRequest("Contributions cannot exceed the account's balance");
+            return Problem(detail: "Contributions cannot exceed the account's balance", statusCode: StatusCodes.Status400BadRequest);
         }
 
         try
@@ -88,7 +88,7 @@ public class GoalContributionsController : ControllerBase
         }
         catch (DbUpdateConcurrencyException)
         {
-            return Conflict("This account was updated by another request. Please try again.");
+            return Problem(detail: "This account was updated by another request. Please try again.", statusCode: StatusCodes.Status409Conflict);
         }
     }
     

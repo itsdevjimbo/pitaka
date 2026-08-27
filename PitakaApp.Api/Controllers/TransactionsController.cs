@@ -94,7 +94,7 @@ public class TransactionsController : ControllerBase
         }
         catch (DbUpdateConcurrencyException)
         {
-            return Conflict("This account was updated by another request. Please try again.");
+            return Problem(detail: "This account was updated by another request. Please try again.", statusCode: StatusCodes.Status409Conflict);
         }
 
     }
@@ -175,7 +175,7 @@ public class TransactionsController : ControllerBase
         }
         catch (DbUpdateConcurrencyException)
         {
-            return Conflict("This account was updated by another request. Please try again.");
+            return Problem(detail: "This account was updated by another request. Please try again.", statusCode: StatusCodes.Status409Conflict);
         }
     }
 }
