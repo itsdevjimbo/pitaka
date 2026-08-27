@@ -14,14 +14,17 @@ using PitakaApp.Api.Services;
 public class AccountsController : ControllerBase
 {
     private readonly AccountService _accountService;
+    private readonly TransactionService _transactionService;
     private readonly CurrentUserAccessor _currentUserAccessor;
 
     public AccountsController(
         AccountService accountService,
+        TransactionService transactionService,
         CurrentUserAccessor currentUserAccessor
     )
     {
         _accountService = accountService;
+        _transactionService = transactionService;
         _currentUserAccessor = currentUserAccessor;
     }
 
@@ -138,5 +141,20 @@ public class AccountsController : ControllerBase
 
         await _accountService.DeleteAsync(account);
         return NoContent();
+    }
+    
+    [HttpGet("{id}/transactions")]
+    public async Task<IActionResult> GetTransactions(int id)
+    {
+        var user = _currentUserAccessor.User!;
+        var account = await _accountService.GetByIdForUser(user, id);
+
+        if (account == null)
+        {
+            return NotFound();
+        }
+        
+        var transactions = await _transactionService.GetAllForAccount(account);
+        return Ok(TransactionResource.Collection(transactions));
     }
 }

@@ -10,21 +10,21 @@ public class GoalContributionService
 {
     private readonly PitakaDbContext _context;
 
-    private readonly AccountService _accountService;
-
-    public GoalContributionService(
-        PitakaDbContext context,
-        AccountService accountService
-    )
+    public GoalContributionService(PitakaDbContext context)
     {
         _context = context;
-        _accountService = accountService;
     }
     
     public async Task<List<GoalContribution>> GetAllForUser(User user) =>
         await _context.GoalContributions
             .AsNoTracking()
             .Where(a => a.Goal.UserId == user.Id)
+            .ToListAsync();
+    
+    public async Task<List<GoalContribution>> GetAllForGoal(Goal goal) =>
+        await _context.GoalContributions
+            .AsNoTracking()
+            .Where(a => a.GoalId == goal.Id)
             .ToListAsync();
 
     public async Task<GoalContribution?> GetByIdForUser(User user, int id) =>

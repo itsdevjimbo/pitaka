@@ -15,17 +15,19 @@ using PitakaApp.Api.Services;
 public class GoalsController : ControllerBase
 {
     private readonly GoalService _goalService;
-
+    private readonly GoalContributionService _goalContributionService;
     private readonly GetGoalCurrentAmount _getGoalCurrentAmount;
     private readonly CurrentUserAccessor _currentUserAccessor;
 
     public GoalsController(
         GoalService goalService,
+        GoalContributionService goalContributionService,
         GetGoalCurrentAmount getGoalCurrentAmount,
         CurrentUserAccessor currentUserAccessor
     )
     {
         _goalService = goalService;
+        _goalContributionService = goalContributionService;
         _getGoalCurrentAmount = getGoalCurrentAmount;
         _currentUserAccessor = currentUserAccessor;
     }
@@ -134,5 +136,20 @@ public class GoalsController : ControllerBase
 
         await _goalService.DeleteAsync(goal);
         return NoContent();
+    }
+    
+    [HttpGet("{id}/contributions")]
+    public async Task<IActionResult> GetContributions(int id)
+    {
+        var user = _currentUserAccessor.User!;
+        var goal = await _goalService.GetByIdForUser(user, id);
+
+        if (goal == null)
+        {
+            return NotFound();
+        }
+        
+        var contributions = await _goalContributionService.GetAllForGoal(goal);
+        return Ok(GoalContributionResource.Collection(contributions));
     }
 }
