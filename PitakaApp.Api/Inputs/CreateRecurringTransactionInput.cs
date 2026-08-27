@@ -1,6 +1,6 @@
-namespace PitakaApp.Api.Inputs;
-
 using PitakaApp.Api.Enums;
+
+namespace PitakaApp.Api.Inputs;
 
 public record CreateRecurringTransactionInput (
     int AccountId,

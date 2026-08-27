@@ -1,8 +1,8 @@
-namespace PitakaApp.Api.Controllers;
-
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PitakaApp.Api.Actions.Auth;
+
+namespace PitakaApp.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]

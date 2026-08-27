@@ -1,8 +1,8 @@
-namespace PitakaApp.Api.Requests;
-
 using System.ComponentModel.DataAnnotations;
 using PitakaApp.Api.Enums;
 using PitakaApp.Api.Inputs;
+
+namespace PitakaApp.Api.Requests;
 
 public record BudgetRequest (
     [Required, MaxLength(255)]

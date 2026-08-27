@@ -1,5 +1,3 @@
-namespace PitakaApp.Api.Controllers;
-
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -9,6 +7,8 @@ using PitakaApp.Api.Models;
 using PitakaApp.Api.Requests;
 using PitakaApp.Api.Resources;
 using PitakaApp.Api.Services;
+
+namespace PitakaApp.Api.Controllers;
 
 [TypeFilter(typeof(ResolveCurrentUserFilter))]
 [Authorize]
@@ -55,7 +55,7 @@ public class TransactionsController : ControllerBase
         var account = await _accountService.GetByIdForUser(user, request.AccountId);
 
         List<Tag>? tags = null; 
-        var distictTagIds = request.TagIds?.Distinct().ToArray();
+        var distinctTagIds = request.TagIds?.Distinct().ToArray();
         
         if (account == null)
         {
@@ -77,12 +77,12 @@ public class TransactionsController : ControllerBase
             return BadRequest();
         }
 
-        if (distictTagIds != null)
+        if (distinctTagIds != null)
         {
-            tags = await _tagService.GetByTagsIdsForUser(user, distictTagIds);
+            tags = await _tagService.GetByTagsIdsForUser(user, distinctTagIds);
         }
 
-        if (tags?.Count != distictTagIds?.Length)
+        if (tags?.Count != distinctTagIds?.Length)
         {
             return BadRequest();
         }
@@ -120,7 +120,7 @@ public class TransactionsController : ControllerBase
         var transaction = await _transactionService.GetTrackedByIdAsync(id);
         
         List<Tag>? tags = null; 
-        var distictTagIds = request.TagIds?.Distinct().ToArray();
+        var distinctTagIds = request.TagIds?.Distinct().ToArray();
 
         if (transaction == null)
         {
@@ -137,12 +137,12 @@ public class TransactionsController : ControllerBase
             return BadRequest();
         }
 
-        if (distictTagIds != null)
+        if (distinctTagIds != null)
         {
-            tags = await _tagService.GetByTagsIdsForUser(user, distictTagIds);
+            tags = await _tagService.GetByTagsIdsForUser(user, distinctTagIds);
         }
 
-        if (tags?.Count != distictTagIds?.Length)
+        if (tags?.Count != distinctTagIds?.Length)
         {
             return BadRequest();
         }

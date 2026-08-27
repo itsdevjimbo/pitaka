@@ -1,5 +1,3 @@
-namespace PitakaApp.Api.Controllers;
-
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PitakaApp.Api.Actions;
@@ -7,6 +5,8 @@ using PitakaApp.Api.Filters;
 using PitakaApp.Api.Requests;
 using PitakaApp.Api.Resources;
 using PitakaApp.Api.Services;
+
+namespace PitakaApp.Api.Controllers;
 
 [TypeFilter(typeof(ResolveCurrentUserFilter))]
 [Authorize]
@@ -53,7 +53,7 @@ public class RecurringTransactionsController : ControllerBase
 
         if (account == null)
         {
-            return Problem(detail: "Account doesnt exists", statusCode: StatusCodes.Status400BadRequest);
+            return Problem(detail: "Account does not exist", statusCode: StatusCodes.Status400BadRequest);
         }
 
         if (!account.IsActive)
@@ -63,7 +63,7 @@ public class RecurringTransactionsController : ControllerBase
         
         if (request.CategoryId is int categoryId  && !await _verifyCategoryExistence.VerifyAsync(user, categoryId))
         {
-            return Problem(detail: "Category doesnt exists", statusCode: StatusCodes.Status400BadRequest);
+            return Problem(detail: "Category does not exist", statusCode: StatusCodes.Status400BadRequest);
         }
 
         if (await _recurringTransactionService.NameExistsForUserAsync(user.Id, request.Name))

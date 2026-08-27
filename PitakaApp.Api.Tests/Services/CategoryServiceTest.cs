@@ -1,5 +1,3 @@
-namespace PitakaApp.Api.Tests.Services;
-
 using Bogus;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -8,6 +6,8 @@ using PitakaApp.Api.Inputs;
 using PitakaApp.Api.Services;
 using PitakaApp.Api.Tests.Factories;
 using PitakaApp.Api.Tests.Fixtures;
+
+namespace PitakaApp.Api.Tests.Services;
 
 [Collection("Database collection")]
 public class CategoryServiceTest : IDisposable

@@ -1,8 +1,8 @@
-namespace PitakaApp.Api.Tests.Factories;
-
 using PitakaApp.Api.Data;
 using PitakaApp.Api.Enums;
 using PitakaApp.Api.Models;
+
+namespace PitakaApp.Api.Tests.Factories;
 
 public class TransactionFactory
 {

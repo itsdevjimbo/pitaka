@@ -1,7 +1,7 @@
-namespace PitakaApp.Api.Tests.Factories;
-
 using System.Security.Claims;
 using PitakaApp.Api.Models;
+
+namespace PitakaApp.Api.Tests.Factories;
 
 public static class ClaimsPrincipalFactory
 {

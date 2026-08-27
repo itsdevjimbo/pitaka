@@ -1,5 +1,3 @@
-namespace PitakaApp.Api.Tests.Actions.Auth;
-
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Bogus;
@@ -9,6 +7,8 @@ using Microsoft.Extensions.Options;
 using PitakaApp.Api.Actions.Auth;
 using PitakaApp.Api.Models;
 using PitakaApp.Api.Options;
+
+namespace PitakaApp.Api.Tests.Actions.Auth;
 
 public class GenerateJwtTokenTest
 {

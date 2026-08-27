@@ -1,6 +1,6 @@
-namespace PitakaApp.Api.Options;
-
 using System.ComponentModel.DataAnnotations;
+
+namespace PitakaApp.Api.Options;
 
 public class JwtOption
 {

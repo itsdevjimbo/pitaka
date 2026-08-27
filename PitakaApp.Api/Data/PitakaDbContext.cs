@@ -1,8 +1,8 @@
-namespace PitakaApp.Api.Data;
-
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using PitakaApp.Api.Models;
+
+namespace PitakaApp.Api.Data;
 
 public class PitakaDbContext : DbContext
 {

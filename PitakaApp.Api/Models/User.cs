@@ -1,6 +1,6 @@
-namespace PitakaApp.Api.Models;
-
 using System.ComponentModel.DataAnnotations;
+
+namespace PitakaApp.Api.Models;
 
 public class User : TimestampedEntity
 {

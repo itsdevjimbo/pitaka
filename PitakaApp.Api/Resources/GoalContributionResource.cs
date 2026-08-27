@@ -1,6 +1,6 @@
-namespace PitakaApp.Api.Resources;
-
 using PitakaApp.Api.Models;
+
+namespace PitakaApp.Api.Resources;
 
 
 public record GoalContributionResource(
