@@ -1,5 +1,3 @@
-namespace PitakaApp.Api.Controllers;
-
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -7,6 +5,8 @@ using PitakaApp.Api.Filters;
 using PitakaApp.Api.Requests;
 using PitakaApp.Api.Resources;
 using PitakaApp.Api.Services;
+
+namespace PitakaApp.Api.Controllers;
 
 [TypeFilter(typeof(ResolveCurrentUserFilter))]
 [Authorize]
@@ -53,7 +53,7 @@ public class GoalContributionsController : ControllerBase
 
         if (account == null)
         {
-            return Problem(detail: "Account doesnt exists", statusCode: StatusCodes.Status400BadRequest);
+            return Problem(detail: "Account does not exist", statusCode: StatusCodes.Status400BadRequest);
         }
 
         if (!account.IsActive)
@@ -63,7 +63,7 @@ public class GoalContributionsController : ControllerBase
 
         if (goal == null)
         {
-            return Problem(detail: "Goal doesnt exists", statusCode: StatusCodes.Status400BadRequest);
+            return Problem(detail: "Goal does not exist", statusCode: StatusCodes.Status400BadRequest);
         }
 
         if (goal.IsAbandoned())
@@ -73,7 +73,7 @@ public class GoalContributionsController : ControllerBase
 
         if (!await _goalContributionService.CanEarmarkTransaction(account.Id, request.TransactionId))
         {
-            return Problem(detail: "Cannot make contribution base on this transaction", statusCode: StatusCodes.Status400BadRequest);
+            return Problem(detail: "Cannot make a contribution based on this transaction", statusCode: StatusCodes.Status400BadRequest);
         }
 
         if (!await _goalContributionService.CanEarmarkAmount(account, request.Amount))

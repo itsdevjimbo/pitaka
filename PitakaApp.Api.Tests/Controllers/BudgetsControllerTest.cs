@@ -1,5 +1,3 @@
-namespace PitakaApp.Api.Tests.Controllers;
-
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.Extensions.DependencyInjection;
@@ -8,6 +6,8 @@ using PitakaApp.Api.Enums;
 using PitakaApp.Api.Resources;
 using PitakaApp.Api.Tests.Factories;
 using PitakaApp.Api.Tests.Fixtures;
+
+namespace PitakaApp.Api.Tests.Controllers;
 
 [Collection("Database collection")]
 public class BudgetsControllerTest : IDisposable

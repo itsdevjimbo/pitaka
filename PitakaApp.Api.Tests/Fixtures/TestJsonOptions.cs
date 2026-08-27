@@ -1,7 +1,7 @@
-namespace PitakaApp.Api.Tests.Fixtures;
-
 using System.Text.Json;
 using System.Text.Json.Serialization;
+
+namespace PitakaApp.Api.Tests.Fixtures;
 
 public static class TestJsonOptions
 {

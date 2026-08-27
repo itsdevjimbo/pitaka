@@ -1,11 +1,11 @@
-namespace PitakaApp.Api.Tests.Data;
-
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using PitakaApp.Api.Data;
 using PitakaApp.Api.Jobs;
 using PitakaApp.Api.Tests.Factories;
 using PitakaApp.Api.Tests.Fixtures;
+
+namespace PitakaApp.Api.Tests.Data;
 
 [Collection("Database collection")]
 public class GenerateDueRecurringTransactionConcurrencyTest : IDisposable

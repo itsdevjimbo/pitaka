@@ -1,7 +1,7 @@
-namespace PitakaApp.Api.Models;
-
 using System.ComponentModel.DataAnnotations;
 using PitakaApp.Api.Enums;
+
+namespace PitakaApp.Api.Models;
 
 public class Category : TimestampedEntity
 {

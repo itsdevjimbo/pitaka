@@ -1,8 +1,8 @@
-namespace PitakaApp.Api.Models;
-
 using PitakaApp.Api.Enums;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+
+namespace PitakaApp.Api.Models;
 
 public class Account: TimestampedEntity
 {

@@ -1,8 +1,8 @@
-namespace PitakaApp.Api.Data;
-
 using Microsoft.EntityFrameworkCore;
 using PitakaApp.Api.Models;
 using PitakaApp.Api.Enums;
+
+namespace PitakaApp.Api.Data;
 
 public static class CategorySeeder
 {
@@ -12,9 +12,6 @@ public static class CategorySeeder
         {
             return;
         }
-        
-        var user = SeedHelper.ExtractTransactionUser(context);
-
         var categories = new List<Category>();
 
         var systemCategories = new Dictionary<CategoryType, List<string>>
@@ -46,16 +43,5 @@ public static class CategorySeeder
         }
 
         context.Set<Category>().AddRange(categories);
-
-
-        var userCategory = new Category
-        {
-            User = user,
-            Name = "Freelance Income",
-            Type = CategoryType.Income,
-            IsDefault = false,
-        };
-
-        context.Set<Category>().Add(userCategory);
     }
 }

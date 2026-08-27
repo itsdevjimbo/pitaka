@@ -1,5 +1,3 @@
-namespace PitakaApp.Api.Actions.Auth;
-
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -7,6 +5,8 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using PitakaApp.Api.Models;
 using PitakaApp.Api.Options;
+
+namespace PitakaApp.Api.Actions.Auth;
 
 public class GenerateJwtToken
 {

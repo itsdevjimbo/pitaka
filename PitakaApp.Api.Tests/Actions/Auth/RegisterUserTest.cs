@@ -1,11 +1,11 @@
-namespace PitakaApp.Api.Tests.Actions.Auth;
-
 using Bogus;
 using Microsoft.Extensions.DependencyInjection;
 using PitakaApp.Api.Actions.Auth;
 using PitakaApp.Api.Data;
 using PitakaApp.Api.Tests.Factories;
 using PitakaApp.Api.Tests.Fixtures;
+
+namespace PitakaApp.Api.Tests.Actions.Auth;
 
 [Collection("Database collection")]
 public class RegisterUserTest : IDisposable

@@ -94,7 +94,7 @@ public class GoalContributionsControllerTest
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         
         var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
-        Assert.Equal("Goal doesnt exists", problem!.Detail);
+        Assert.Equal("Goal does not exist", problem!.Detail);
     }
 
     [Fact]
@@ -119,7 +119,7 @@ public class GoalContributionsControllerTest
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
         var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
-        Assert.Equal("Goal doesnt exists", problem!.Detail);
+        Assert.Equal("Goal does not exist", problem!.Detail);
     }
 
     [Fact]
@@ -165,7 +165,7 @@ public class GoalContributionsControllerTest
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
         var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
-        Assert.Equal("Account doesnt exists", problem!.Detail);
+        Assert.Equal("Account does not exist", problem!.Detail);
     }
 
     [Fact]
@@ -190,7 +190,7 @@ public class GoalContributionsControllerTest
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
         var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
-        Assert.Equal("Account doesnt exists", problem!.Detail);
+        Assert.Equal("Account does not exist", problem!.Detail);
     }
 
     [Fact]
@@ -240,7 +240,7 @@ public class GoalContributionsControllerTest
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
         var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
-        Assert.Equal("Cannot make contribution base on this transaction", problem!.Detail);
+        Assert.Equal("Cannot make a contribution based on this transaction", problem!.Detail);
     }
 
     [Fact]
@@ -269,7 +269,7 @@ public class GoalContributionsControllerTest
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
         var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
-        Assert.Equal("Cannot make contribution base on this transaction", problem!.Detail);
+        Assert.Equal("Cannot make a contribution based on this transaction", problem!.Detail);
     }
 
     [Fact]
@@ -298,7 +298,7 @@ public class GoalContributionsControllerTest
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
         var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
-        Assert.Equal("Cannot make contribution base on this transaction", problem!.Detail);
+        Assert.Equal("Cannot make a contribution based on this transaction", problem!.Detail);
     }
 
 
@@ -327,7 +327,7 @@ public class GoalContributionsControllerTest
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
         var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
-        Assert.Equal("Cannot make contribution base on this transaction", problem!.Detail);
+        Assert.Equal("Cannot make a contribution based on this transaction", problem!.Detail);
     }
 
     [Fact]

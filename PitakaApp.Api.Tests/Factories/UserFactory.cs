@@ -1,9 +1,9 @@
-namespace PitakaApp.Api.Tests.Factories;
-
 using Bogus;
 using Microsoft.AspNetCore.Identity;
 using PitakaApp.Api.Data;
 using PitakaApp.Api.Models;
+
+namespace PitakaApp.Api.Tests.Factories;
 
 public static class UserFactory
 {

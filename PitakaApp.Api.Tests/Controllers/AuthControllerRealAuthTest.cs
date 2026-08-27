@@ -1,5 +1,3 @@
-namespace PitakaApp.Api.Tests.Controllers;
-
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -9,6 +7,8 @@ using PitakaApp.Api.Controllers;
 using PitakaApp.Api.Data;
 using PitakaApp.Api.Tests.Factories;
 using PitakaApp.Api.Tests.Fixtures;
+
+namespace PitakaApp.Api.Tests.Controllers;
 
 // Uses RealAuthWebApplicationFactory instead of PitakaWebApplicationFactory — the only
 // difference that matters here is TestAuthHandler is NOT registered, so [Authorize]

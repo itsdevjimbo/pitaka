@@ -1,11 +1,11 @@
-namespace PitakaApp.Api.Tests.Fixtures;
-
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using PitakaApp.Api.Data;
+
+namespace PitakaApp.Api.Tests.Fixtures;
 
 // Deliberately does NOT register TestAuthHandler, unlike PitakaWebApplicationFactory —
 // [Authorize] here resolves to the real JwtBearerHandler configured in Program.cs, so

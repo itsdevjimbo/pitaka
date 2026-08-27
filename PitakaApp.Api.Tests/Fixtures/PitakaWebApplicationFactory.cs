@@ -1,5 +1,3 @@
-namespace PitakaApp.Api.Tests.Fixtures;
-
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -8,6 +6,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using PitakaApp.Api.Data;
+
+namespace PitakaApp.Api.Tests.Fixtures;
 
 // WebApplicationFactory<T> already implements IAsyncDisposable.DisposeAsync() (returns
 // ValueTask). Xunit's IAsyncLifetime also declares a DisposeAsync() (returns Task) with

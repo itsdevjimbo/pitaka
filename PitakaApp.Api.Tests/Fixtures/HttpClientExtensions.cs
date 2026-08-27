@@ -1,6 +1,6 @@
-namespace PitakaApp.Api.Tests.Fixtures;
-
 using PitakaApp.Api.Models;
+
+namespace PitakaApp.Api.Tests.Fixtures;
 
 public static class HttpClientExtensions
 {

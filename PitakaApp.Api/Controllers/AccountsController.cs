@@ -1,11 +1,11 @@
-namespace PitakaApp.Api.Controllers;
-
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PitakaApp.Api.Filters;
 using PitakaApp.Api.Requests;
 using PitakaApp.Api.Resources;
 using PitakaApp.Api.Services;
+
+namespace PitakaApp.Api.Controllers;
 
 [TypeFilter(typeof(ResolveCurrentUserFilter))]
 [Authorize]

@@ -1,10 +1,10 @@
 // Filters/ResolveCurrentUserFilter.cs
-namespace PitakaApp.Api.Filters;
-
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using PitakaApp.Api.Actions.Auth;
 using PitakaApp.Api.Services;
+
+namespace PitakaApp.Api.Filters;
 
 public class ResolveCurrentUserFilter : IAsyncActionFilter
 {

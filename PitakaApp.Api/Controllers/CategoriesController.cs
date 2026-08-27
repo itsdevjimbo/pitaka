@@ -1,5 +1,3 @@
-namespace PitakaApp.Api.Controllers;
-
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PitakaApp.Api.Actions.Auth;
@@ -8,6 +6,8 @@ using PitakaApp.Api.Models;
 using PitakaApp.Api.Requests;
 using PitakaApp.Api.Resources;
 using PitakaApp.Api.Services;
+
+namespace PitakaApp.Api.Controllers;
 
 [Authorize]
 [ApiController]
