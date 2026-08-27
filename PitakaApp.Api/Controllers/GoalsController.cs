@@ -46,7 +46,7 @@ public class GoalsController : ControllerBase
 
         if (await _goalService.NameExistsForUserAsync(user.Id, request.Name))
         {
-            return Conflict("An goal with this name already exists.");
+            return Problem(detail: "An goal with this name already exists.", statusCode: StatusCodes.Status409Conflict);
         }
 
         var goal = await _goalService.CreateAsync(user, request.ToInput());
@@ -87,7 +87,7 @@ public class GoalsController : ControllerBase
 
         if (await _goalService.NameExistsForUserAsync(user.Id, request.Name, excludeId: id))
         {
-            return Conflict("A goal with this name already exists.");
+            return Problem(detail: "A goal with this name already exists.", statusCode: StatusCodes.Status409Conflict);
         }
         
         await _goalService.UpdateAsync(goal, request.ToInput());

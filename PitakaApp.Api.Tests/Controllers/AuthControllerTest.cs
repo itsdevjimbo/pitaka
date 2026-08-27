@@ -3,6 +3,7 @@ namespace PitakaApp.Api.Tests.Controllers;
 using System.Net;
 using System.Net.Http.Json;
 using Bogus;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using PitakaApp.Api.Controllers;
 using PitakaApp.Api.Data;
@@ -105,9 +106,9 @@ public class AuthControllerTest : IDisposable
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
 
-        var errorMessage = await response.Content.ReadAsStringAsync();
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
 
-        Assert.Equal("A user with this email already exists.", errorMessage);
+        Assert.Equal("A user with this email already exists.", problem!.Detail);
     }
 
     [Fact]

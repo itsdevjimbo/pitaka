@@ -49,7 +49,7 @@ public class AuthController : ControllerBase
 
         if (user == null)
         {
-            return Conflict("A user with this email already exists.");
+            return Problem(detail: "A user with this email already exists.", statusCode: StatusCodes.Status409Conflict);
         }
 
         return Ok(new UserResponse(user.Id, user.Name, user.Email));
