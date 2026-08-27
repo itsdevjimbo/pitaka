@@ -28,6 +28,13 @@ public class TransactionService
             .Where(a => a.UserId == user.Id)
             .ToListAsync();
 
+    public async Task<List<Transaction>> GetAllForAccount(Account account) =>
+        await _context.Transactions
+            .AsNoTracking()
+            .Include(t => t.Tags)
+            .Where(a => a.AccountId == account.Id)
+            .ToListAsync();
+
     public async Task<Transaction> CreateAsync(Account account, CreateTransactionInput input, List<Tag>? tags = null)
     {
         var transaction = new Transaction

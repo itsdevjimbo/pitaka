@@ -374,5 +374,71 @@ public class AccountsControllerTest : IDisposable
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
     }
 
+    [Fact]
+    public async Task GetTransactions_WithoutLoggedInUser_ReturnsUnauthorized()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id);
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id);
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id);
+
+        var response = await _client.GetAsync("/api/accounts/" + account.Id + "/transactions");
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetTransactions_WithNonExistentAccount_ReturnsNotFound()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id);
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id);
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/accounts/9999/transactions");
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetTransactions_AccountBelongsToOtherUser_ReturnsNotFound()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var userB = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, userB.Id);
+
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id);
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id);
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/accounts/" + account.Id + "/transactions");
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetTransactions_ReturnsOk()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id);
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id);
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/accounts/" + account.Id + "/transactions");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        
+        var body = await response.Content.ReadFromJsonAsync<List<TransactionResource>>(TestJsonOptions.Default);
+        Assert.Equal(3, body!.Count);
+    }
+
     public void Dispose() => _scope.Dispose();
 }

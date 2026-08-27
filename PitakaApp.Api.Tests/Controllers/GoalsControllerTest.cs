@@ -480,5 +480,74 @@ public class GoalsControllerTest : IDisposable
         yield return new object?[] { "New car" , -100m};
     }
 
+    [Fact]
+    public async Task GetContributions_WithoutLoggedInUser_ReturnsUnauthorized()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var goal = await GoalFactory.CreateAsync(_context, user.Id);
+
+        await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id);
+        await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id);
+        await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id);
+
+        var response = await _client.GetAsync("/api/goals/" + goal.Id + "/contributions");
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetContributions_WithNonExistentGoal_ReturnsNotFound()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var goal = await GoalFactory.CreateAsync(_context, user.Id);
+
+        await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id);
+        await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id);
+        await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/goals/9999/contributions");
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetContributions_GoalBelongsToOtherUser_ReturnsNotFound()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var userB = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, userB.Id);
+        var goal = await GoalFactory.CreateAsync(_context, userB.Id);
+
+        await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id);
+        await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id);
+        await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/goals/" + goal.Id + "/contributions");
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetContributions_ReturnsOk()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var goal = await GoalFactory.CreateAsync(_context, user.Id);
+
+        await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id);
+        await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id);
+        await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/goals/" + goal.Id + "/contributions");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        
+        var body = await response.Content.ReadFromJsonAsync<List<GoalContributionResource>>(TestJsonOptions.Default);
+        Assert.Equal(3, body!.Count);
+    }
     public void Dispose() => _scope.Dispose();
 }

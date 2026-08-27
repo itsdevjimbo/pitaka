@@ -36,6 +36,12 @@ Docker (with Compose) is the only thing you need installed. No local .NET SDK, n
 docker compose run --rm test
 ```
 
+`test` (like `api` and `migrator`) copies your source into the image at *build* time — it doesn't see changes automatically. If you've changed code since the image was last built, rebuild first or the suite will silently run against stale source:
+
+```bash
+docker compose build test && docker compose run --rm test
+```
+
 ## Working with migrations
 
 Applying migrations (what you already ran in setup) and generating new ones are two different services, because generating a migration needs to write a real file back onto your machine — see [`docker-compose.yml`](docker-compose.yml) for why `dev` uses a bind mount instead of a build-time copy like the other services.
