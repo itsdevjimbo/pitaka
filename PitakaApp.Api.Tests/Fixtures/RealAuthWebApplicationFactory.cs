@@ -18,8 +18,9 @@ using PitakaApp.Api.Data;
 // dropping/recreating the same database is exactly the bug fixed a few sessions back.
 public class RealAuthWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
-    private const string TestConnectionString =
-        "Server=localhost;Port=3306;Database=pitaka_test_realauth;User=root;Password=root;";
+    private static readonly string TestConnectionString =
+        Environment.GetEnvironmentVariable("REALAUTH_TEST_DB_CONNECTION")
+        ?? "Server=localhost;Port=3306;Database=pitaka_test_realauth;User=root;Password=root;";
 
     // Not a real secret — same reasoning as PitakaWebApplicationFactory's TestJwtKey. This
     // factory validates real signatures, so the key must be set to *something* valid; the
