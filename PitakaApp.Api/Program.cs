@@ -32,6 +32,7 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddApplicationServices();
 builder.AddJwtAuthentication();
 builder.AddRecurringTransactionGeneration();
+builder.AddPitakaCors();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
 
@@ -46,6 +47,10 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseExceptionHandler();
+
+// Before UseHttpsRedirection deliberately (Microsoft's docs order it the other way) so a
+// plain-HTTP preflight is answered rather than 307'd. Reasoning: ADR 0002 and the slice 1 spec.
+app.UseCors(CorsExtensions.PolicyName);
 
 app.UseHttpsRedirection();
 
