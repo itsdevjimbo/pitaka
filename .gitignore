@@ -29,3 +29,6 @@ artifacts/
 
 # Secrets
 .env
+
+# Local agent issue tracker
+.scratch/
