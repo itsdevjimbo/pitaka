@@ -1,15 +1,19 @@
+using System.Net;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.HttpsPolicy;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using PitakaApp.Api.Tests.Fixtures;
 
 namespace PitakaApp.Api.Tests.Controllers;
 
-// Exercises the request pipeline — the CORS policy — rather than a controller, but reaches
-// it through the same HTTP seam every controller test uses: the shared web application
-// factory and its client. Assertions are about what a browser can observe (response
-// status and CORS response headers for a request carrying an Origin), never about which
-// middleware was registered, that an options type was bound, or the policy's name.
+// Exercises the request pipeline — the CORS policy and the HTTPS-redirect guard — rather
+// than a controller, but reaches it through the same HTTP seam every controller test
+// uses: the shared web application factory and its client. Assertions are about what a
+// browser can observe (response status, CORS response headers, and whether a request is
+// redirected), never about which middleware was registered, that an options type was
+// bound, or the policy's name.
 //
 // AuthControllerRealAuthTest is the model for a class that tests pipeline behaviour and
 // needs a differently-configured host for some cases; AccountsControllerTest is the model
@@ -26,6 +30,8 @@ public class CorsPipelineTest
     private const string AllowOrigin = "Access-Control-Allow-Origin";
     private const string AllowCredentials = "Access-Control-Allow-Credentials";
     private const string AllowHeaders = "Access-Control-Allow-Headers";
+
+    private static readonly WebApplicationFactoryClientOptions NoAutoRedirect = new() { AllowAutoRedirect = false };
 
     private readonly HttpClient _client;
 
@@ -105,6 +111,54 @@ public class CorsPipelineTest
         Assert.False(realResponse.Headers.Contains(AllowCredentials));
     }
 
+    [Fact]
+    public async Task InDevelopment_PlainHttpRequest_IsNotRedirected_EvenWithAnHttpsPortToRedirectTo()
+    {
+        // The HTTPS port is given on purpose: without one the redirect middleware can't
+        // determine a target and is inert, so this test would pass whether or not the
+        // guard exists. With one, an unguarded UseHttpsRedirection would 307 this request.
+        using var factory = PipelineHost("Development");
+        var client = factory.CreateClient(NoAutoRedirect);
+
+        var response = await client.GetAsync(Endpoint);
+
+        Assert.NotEqual(HttpStatusCode.TemporaryRedirect, response.StatusCode);
+        Assert.Null(response.Headers.Location);
+    }
+
+    [Fact]
+    public async Task OutsideDevelopment_PlainHttpRequest_IsStillRedirectedToHttps()
+    {
+        // Proves the change is a guard and not a deletion: the same host configuration,
+        // outside Development, still redirects.
+        using var factory = PipelineHost("Production");
+        var client = factory.CreateClient(NoAutoRedirect);
+
+        var response = await client.GetAsync(Endpoint);
+
+        Assert.Equal(HttpStatusCode.TemporaryRedirect, response.StatusCode);
+        Assert.Equal(Uri.UriSchemeHttps, response.Headers.Location!.Scheme);
+    }
+
+    [Fact]
+    public async Task OutsideDevelopment_Preflight_IsAnsweredWithCorsHeaders_NotRedirected()
+    {
+        // CORS runs before the redirect in the pipeline: even on a host that is actively
+        // redirecting plain HTTP, a preflight is answered with CORS headers rather than
+        // turned into a 307 that would carry none.
+        using var factory = PipelineHost("Production");
+        var client = factory.CreateClient(NoAutoRedirect);
+
+        var request = new HttpRequestMessage(HttpMethod.Options, Endpoint);
+        request.Headers.TryAddWithoutValidation("Origin", AllowedOrigin);
+        request.Headers.TryAddWithoutValidation("Access-Control-Request-Method", "GET");
+
+        var response = await client.SendAsync(request);
+
+        Assert.NotEqual(HttpStatusCode.TemporaryRedirect, response.StatusCode);
+        Assert.Equal(AllowedOrigin, Assert.Single(response.Headers.GetValues(AllowOrigin)));
+    }
+
     [Theory]
     [InlineData]                                 // empty origin list
     [InlineData("http://localhost:4200/")]       // trailing slash
@@ -151,4 +205,16 @@ public class CorsPipelineTest
 
                 config.AddInMemoryCollection(settings);
             }));
+
+    // Same fresh-factory approach as FactoryWithConfiguredOrigins above, for the same
+    // reason — never WithWebHostBuilder on the shared fixture. Pinned to a named
+    // environment and given a concrete HTTPS port so the redirect middleware has a target
+    // and its behaviour turns on the environment alone.
+    private static WebApplicationFactory<Program> PipelineHost(string environment) =>
+        new PitakaWebApplicationFactory().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment(environment);
+            builder.ConfigureServices(services =>
+                services.Configure<HttpsRedirectionOptions>(options => options.HttpsPort = 5001));
+        });
 }
