@@ -52,7 +52,13 @@ app.UseExceptionHandler();
 // plain-HTTP preflight is answered rather than 307'd. Reasoning: ADR 0002 and the slice 1 spec.
 app.UseCors(CorsExtensions.PolicyName);
 
-app.UseHttpsRedirection();
+// Only outside Development. An unguarded redirect 307s the client's plain-HTTP requests
+// (the SDK loop's `https` profile has a live TLS port) and strips their CORS headers.
+// Environment is the whole decision; no host here terminates TLS. Refines ADR 0002.
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseAuthentication();
 
