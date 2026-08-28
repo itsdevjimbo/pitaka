@@ -15,14 +15,16 @@ namespace PitakaApp.Api.Tests.Fixtures;
 // of the class's public surface and avoids colliding with the base class's version.
 public class PitakaWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
-    private static readonly string TestConnectionString =
+    // internal so pipeline tests that derive their own throwaway host (see CorsPipelineTest)
+    // reuse these rather than pasting a third copy of the connection string.
+    internal static readonly string TestConnectionString =
         Environment.GetEnvironmentVariable("TEST_DB_CONNECTION")
         ?? "Server=localhost;Port=3306;Database=pitaka_test;User=root;Password=root;";
 
     // Not a real secret — signs tokens for throwaway test runs only, nothing it signs is
     // ever trusted outside the test process. Lets the test suite (and CI) start without
     // needing the developer's local User Secrets file, which a CI runner never has.
-    private const string TestJwtKey = "test-only-jwt-signing-key-not-for-real-use-0000";
+    internal const string TestJwtKey = "test-only-jwt-signing-key-not-for-real-use-0000";
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
