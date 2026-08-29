@@ -32,6 +32,7 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddApplicationServices();
 builder.AddJwtAuthentication();
 builder.AddRecurringTransactionGeneration();
+builder.AddEmailSender();
 builder.AddPitakaCors();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
