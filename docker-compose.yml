@@ -7,9 +7,13 @@ services:
     environment:
       - ConnectionStrings__DefaultConnection=Server=mysql;Port=3306;Database=pitaka;User=root;Password=${MYSQL_ROOT_PASSWORD}
       - Jwt__Key=${JWT_KEY}
+      - Email__Host=smtp4dev
+      - Email__Port=25
     depends_on:
       mysql:
         condition: service_healthy
+      smtp4dev:
+        condition: service_started
 
   mysql:
     image: mysql:8
@@ -26,7 +30,17 @@ services:
       timeout: 5s
       retries: 10
 
-  test: 
+  # Local SMTP sink. Catches every mail the API sends and shows it in a web UI
+  # instead of delivering it anywhere. Its SMTP port is reachable inside the
+  # Compose network as smtp4dev:25 (what the api service points at); the web UI
+  # is published on the host at http://localhost:5080.
+  smtp4dev:
+    image: rnwood/smtp4dev:v3
+    ports:
+      - "5080:80"
+      - "2525:25"
+
+  test:
     build:
       context: .
       dockerfile: PitakaApp.Api.Tests/Dockerfile
