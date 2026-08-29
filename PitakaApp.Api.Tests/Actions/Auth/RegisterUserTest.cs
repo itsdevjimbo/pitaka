@@ -2,6 +2,7 @@ using Bogus;
 using Microsoft.Extensions.DependencyInjection;
 using PitakaApp.Api.Actions.Auth;
 using PitakaApp.Api.Data;
+using PitakaApp.Api.Inputs;
 using PitakaApp.Api.Tests.Factories;
 using PitakaApp.Api.Tests.Fixtures;
 
@@ -25,7 +26,8 @@ public class RegisterUserTest : IDisposable
     [Fact]
     public async Task Register_UniqueEmail_ReturnsUser()
     {
-        var user = await _registerUser.ExecuteAsync(_faker.Person.FullName, _faker.Internet.Email(), "TestPass123!");
+        var user = await _registerUser.ExecuteAsync(
+            new RegisterInput(_faker.Person.FullName, _faker.Internet.Email(), "TestPass123!"));
         Assert.NotNull(user);
     }
 
@@ -35,8 +37,9 @@ public class RegisterUserTest : IDisposable
         var email = _faker.Internet.Email();
         await UserFactory.CreateAsync(_context, email);
 
-        var newUser = await _registerUser.ExecuteAsync(_faker.Person.FullName, email, "Password123");
-        
+        var newUser = await _registerUser.ExecuteAsync(
+            new RegisterInput(_faker.Person.FullName, email, "Password123"));
+
         Assert.Null(newUser);
     }
 

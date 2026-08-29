@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
 using PitakaApp.Api.Actions.Auth;
 using PitakaApp.Api.Data;
+using PitakaApp.Api.Inputs;
 using PitakaApp.Api.Models;
 using PitakaApp.Api.Tests.Fixtures;
 
@@ -40,7 +41,7 @@ public class LoginUserTest : IDisposable
         );
         await _context.SaveChangesAsync();
 
-        var loggedInUser = await _loginUser.ExecuteAsync(email, password);
+        var loggedInUser = await _loginUser.ExecuteAsync(new LoginInput(email, password));
         
         Assert.NotNull(loggedInUser);
     }
@@ -62,7 +63,7 @@ public class LoginUserTest : IDisposable
         );
         await _context.SaveChangesAsync();
 
-        var user = await _loginUser.ExecuteAsync("wrong@email.com", password);
+        var user = await _loginUser.ExecuteAsync(new LoginInput("wrong@email.com", password));
         
         Assert.Null(user);
     }
@@ -83,7 +84,7 @@ public class LoginUserTest : IDisposable
         );
         await _context.SaveChangesAsync();
 
-        var user = await _loginUser.ExecuteAsync(email, "wrongpassword123!");
+        var user = await _loginUser.ExecuteAsync(new LoginInput(email, "wrongpassword123!"));
         
         Assert.Null(user);
     }

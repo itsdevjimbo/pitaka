@@ -46,32 +46,58 @@ public class AuthControllerTest : IDisposable
     }
 
     [Fact]
-    public async Task Login_WithInvalidCredential_ReturnsUnauthorized()
+    public async Task Login_WithInvalidCredential_ReturnsProblemDetailsUnauthorized()
     {
         var email = _faker.Internet.Email();
         await UserFactory.CreateAsync(_context, email);
 
-        var wrongEmailRequest = new
+        var wrongEmailResponse = await _client.PostAsJsonAsync("/api/auth/login", new
         {
             email = "wrong@email.com",
             password = UserFactory.DefaultPassword,
-        };
+        });
 
-        var response = await _client.PostAsJsonAsync("/api/auth/login", wrongEmailRequest);
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-
-        var wrongPasswordRequest = new
+        var wrongPasswordResponse = await _client.PostAsJsonAsync("/api/auth/login", new
         {
             email,
-            password = "WrongPassword123!"
-        };
+            password = "WrongPassword123!",
+        });
 
-        response = await _client.PostAsJsonAsync("/api/auth/login", wrongPasswordRequest);
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, wrongEmailResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, wrongPasswordResponse.StatusCode);
+
+        // ProblemDetails, not a bare quoted string — Content-Type and a populated detail.
+        Assert.Equal("application/problem+json", wrongEmailResponse.Content.Headers.ContentType?.MediaType);
+        Assert.Equal("application/problem+json", wrongPasswordResponse.Content.Headers.ContentType?.MediaType);
+
+        var wrongEmailProblem = await wrongEmailResponse.Content.ReadFromJsonAsync<ProblemDetails>();
+        var wrongPasswordProblem = await wrongPasswordResponse.Content.ReadFromJsonAsync<ProblemDetails>();
+
+        Assert.Equal("Invalid email or password.", wrongEmailProblem!.Detail);
+
+        // The two failure modes stay indistinguishable — same status, same title, same
+        // detail. (A per-request traceId is the only thing that differs, by design.)
+        Assert.Equal(wrongEmailProblem.Status, wrongPasswordProblem!.Status);
+        Assert.Equal(wrongEmailProblem.Title, wrongPasswordProblem.Title);
+        Assert.Equal(wrongEmailProblem.Detail, wrongPasswordProblem.Detail);
+    }
+
+    [Theory]
+    [InlineData("missing email")]
+    [InlineData("missing password")]
+    public async Task Login_WithMissingField_ReturnsBadRequestNotUnauthorized(string missing)
+    {
+        object request = missing == "missing email"
+            ? new { password = UserFactory.DefaultPassword }
+            : new { email = _faker.Internet.Email() };
+
+        var response = await _client.PostAsJsonAsync("/api/auth/login", request);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]
-    public async Task Register_WithNewEmail_ReturnsOkWithUser()
+    public async Task Register_WithNewEmail_ReturnsCreatedWithSession()
     {
         var request = new
         {
@@ -82,11 +108,89 @@ public class AuthControllerTest : IDisposable
 
         var response = await _client.PostAsJsonAsync("/api/Auth/register", request);
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.Null(response.Headers.Location);
 
-        var body = await response.Content.ReadFromJsonAsync<UserResponse>();
+        var body = await response.Content.ReadFromJsonAsync<LoginResponse>();
         Assert.NotNull(body);
-        Assert.Equal(request.email, body!.Email);
+        Assert.False(string.IsNullOrWhiteSpace(body!.Token));
+        Assert.Equal(request.email, body.User.Email);
+        Assert.Equal(request.name, body.User.Name);
+    }
+
+    [Fact]
+    public async Task Register_TwiceWithSameEmail_SecondReturnsConflict()
+    {
+        var request = new
+        {
+            name = _faker.Person.FullName,
+            email = _faker.Internet.Email(),
+            password = "TestPass123!",
+        };
+
+        var first = await _client.PostAsJsonAsync("/api/auth/register", request);
+        var second = await _client.PostAsJsonAsync("/api/auth/register", request);
+
+        Assert.Equal(HttpStatusCode.Created, first.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
+
+        var problem = await second.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal("A user with this email already exists.", problem!.Detail);
+    }
+
+    [Theory]
+    [InlineData("name", "Name")]
+    [InlineData("email", "Email")]
+    [InlineData("password", "Password")]
+    public async Task Register_WithInvalidField_ReturnsBadRequestNamingTheField(string field, string expectedKey)
+    {
+        var request = new Dictionary<string, string>
+        {
+            ["name"] = _faker.Person.FullName,
+            ["email"] = _faker.Internet.Email(),
+            ["password"] = "TestPass123!",
+        };
+
+        request[field] = field switch
+        {
+            "name" => "",
+            "email" => "not-an-email",
+            "password" => "short12", // 7 characters — under the floor
+            _ => request[field],
+        };
+
+        var response = await _client.PostAsJsonAsync("/api/auth/register", request);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>();
+        Assert.NotNull(problem);
+        Assert.Contains(expectedKey, problem!.Errors.Keys);
+    }
+
+    [Fact]
+    public async Task Register_WithLongPassword_IsRejectedForLengthOnly()
+    {
+        // A 129-character password fails the ceiling; a compliant-length password with no
+        // digits, symbols or case mix must still succeed — length only, no complexity.
+        var tooLong = await _client.PostAsJsonAsync("/api/auth/register", new
+        {
+            name = _faker.Person.FullName,
+            email = _faker.Internet.Email(),
+            password = new string('a', 129),
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, tooLong.StatusCode);
+
+        var tooLongProblem = await tooLong.Content.ReadFromJsonAsync<ValidationProblemDetails>();
+        Assert.Contains("Password", tooLongProblem!.Errors.Keys);
+
+        var noComplexity = await _client.PostAsJsonAsync("/api/auth/register", new
+        {
+            name = _faker.Person.FullName,
+            email = _faker.Internet.Email(),
+            password = "aaaaaaaa",
+        });
+        Assert.Equal(HttpStatusCode.Created, noComplexity.StatusCode);
     }
 
     [Fact]
