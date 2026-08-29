@@ -14,18 +14,24 @@ public class AuthController : ControllerBase
     private readonly GenerateJwtToken _generateJwtToken;
 
     private readonly GetCurrentUser _getCurrentUser;
+    private readonly RequestPasswordReset _requestPasswordReset;
+    private readonly ResetPassword _resetPassword;
 
     public AuthController(
         LoginUser loginUser,
         RegisterUser registerUser,
         GenerateJwtToken generateJwtToken,
-        GetCurrentUser getCurrentUser
+        GetCurrentUser getCurrentUser,
+        RequestPasswordReset requestPasswordReset,
+        ResetPassword resetPassword
     )
     {
         _loginUser = loginUser;
         _registerUser = registerUser;
         _generateJwtToken = generateJwtToken;
         _getCurrentUser = getCurrentUser;
+        _requestPasswordReset = requestPasswordReset;
+        _resetPassword = resetPassword;
     }
 
     [HttpPost("login")]
@@ -59,6 +65,34 @@ public class AuthController : ControllerBase
         // 201 with no Location header — matches AccountsController.Create. There is no
         // canonical GET /users/{id} to point at; GET /api/auth/me is derived from the token.
         return StatusCode(StatusCodes.Status201Created, new LoginResponse(token, userResponse));
+    }
+
+    // Always 202 Accepted with no body, for a known address and an unknown one alike —
+    // the response deliberately does not report whether anything was sent. A malformed
+    // email still 400s on Email via [ApiController] validation.
+    [HttpPost("forgot-password")]
+    public async Task<IActionResult> ForgotPassword(ForgotPasswordRequest request)
+    {
+        await _requestPasswordReset.ExecuteAsync(request.ToInput());
+        return Accepted();
+    }
+
+    // Token and new password only. Unknown, expired and already-spent tokens all fail
+    // as one 400 ProblemDetails with one non-specific detail. Success is 204 and does
+    // not hand back a session — possession of an emailed token is not proof while B5 is
+    // out of scope.
+    [HttpPost("reset-password")]
+    public async Task<IActionResult> ResetPassword(ResetPasswordRequest request)
+    {
+        var succeeded = await _resetPassword.ExecuteAsync(request.ToInput());
+        if (!succeeded)
+        {
+            return Problem(
+                detail: "This password reset link is invalid or has expired.",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        return NoContent();
     }
 
     [Authorize]

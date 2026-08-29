@@ -17,6 +17,16 @@ public static class EmailExtensions
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
+        // Password reset is IEmailSender's only consumer, so its option is bound here
+        // rather than in a module of its own. Validated on start like the JWT and CORS
+        // settings: a missing reset URL fails on boot, not on the first person who
+        // forgets their password.
+        builder.Services.AddOptions<PasswordResetOption>()
+            .Bind(builder.Configuration.GetSection(PasswordResetOption.SectionName))
+            .ValidateDataAnnotations()
+            .Validate(o => o.TokenLifetime > TimeSpan.Zero, "PasswordReset:TokenLifetime must be greater than zero.")
+            .ValidateOnStart();
+
         builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
 
         return builder;
