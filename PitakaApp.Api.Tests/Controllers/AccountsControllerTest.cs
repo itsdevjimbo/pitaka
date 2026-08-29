@@ -284,21 +284,24 @@ public class AccountsControllerTest : IDisposable
     }
 
     [Fact]
-    public async Task Update_WithAnotherUserOwnedAccount_ReturnsForBid()
+    public async Task Update_WithAnotherUserOwnedAccount_ReturnsNotFound()
     {
         var userA = await UserFactory.CreateAsync(_context);
         var userB = await UserFactory.CreateAsync(_context);
 
-        var account = await AccountFactory.CreateAsync(_context, userB.Id);
+        var account = await AccountFactory.CreateAsync(_context, userB.Id, "Allowance account");
 
         _client.ActAsUser(userA);
-        var request = new 
+        var request = new
         {
             Name = "Savings account"
         };
 
         var response = await _client.PutAsJsonAsync("/api/accounts/" + account.Id, request);
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+
+        var stored = await _context.Accounts.AsNoTracking().SingleAsync(a => a.Id == account.Id);
+        Assert.Equal("Allowance account", stored.Name);
     }
 
     [Fact]
@@ -371,7 +374,7 @@ public class AccountsControllerTest : IDisposable
     }
 
     [Fact]
-    public async Task Patch_OtherUserAccountActiveStatus_ReturnsForbid()
+    public async Task Patch_OtherUserAccountActiveStatus_ReturnsNotFound()
     {
         var userA = await UserFactory.CreateAsync(_context);
         var userB = await UserFactory.CreateAsync(_context);
@@ -385,7 +388,10 @@ public class AccountsControllerTest : IDisposable
         };
 
         var response = await _client.PatchAsJsonAsync("/api/accounts/" + accountB.Id + "/status", request);
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+
+        var stored = await _context.Accounts.AsNoTracking().SingleAsync(a => a.Id == accountB.Id);
+        Assert.True(stored.IsActive);
     }
 
     [Fact]
@@ -442,7 +448,7 @@ public class AccountsControllerTest : IDisposable
     }
 
     [Fact]
-    public async Task Delete_OtherUserAccount_ReturnsForBid()
+    public async Task Delete_OtherUserAccount_ReturnsNotFound()
     {
         var userA = await UserFactory.CreateAsync(_context);
         var userB = await UserFactory.CreateAsync(_context);
@@ -452,7 +458,10 @@ public class AccountsControllerTest : IDisposable
         _client.ActAsUser(userA);
 
         var response = await _client.DeleteAsync("/api/accounts/" + account.Id);
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+
+        var exists = await _context.Accounts.AsNoTracking().AnyAsync(a => a.Id == account.Id);
+        Assert.True(exists);
     }
 
     [Fact]
