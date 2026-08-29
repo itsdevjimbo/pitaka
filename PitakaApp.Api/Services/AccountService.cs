@@ -27,9 +27,9 @@ public class AccountService
             .Where(a => a.Id == id && a.UserId == user.Id)
             .FirstOrDefaultAsync();
 
-    public async Task<Account?> GetTrackedByIdAsync(int id) =>
+    public async Task<Account?> GetTrackedByIdForUserAsync(User user, int id) =>
         await _context.Accounts
-            .Where(a => a.Id == id)
+            .Where(a => a.Id == id && a.UserId == user.Id)
             .FirstOrDefaultAsync();
     public async Task<bool> NameExistsForUserAsync(int userId, string name, int? excludeId = null) =>
         await _context.Accounts

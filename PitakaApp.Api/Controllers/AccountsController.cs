@@ -70,16 +70,11 @@ public class AccountsController : ControllerBase
     public async Task<IActionResult> Update(int id, UpdateAccountRequest request)
     {
         var user = _currentUserAccessor.User!;
-        var account = await _accountService.GetTrackedByIdAsync(id);
+        var account = await _accountService.GetTrackedByIdForUserAsync(user, id);
 
         if (account == null)
         {
             return NotFound();
-        }
-        
-        if (account.UserId != user.Id)
-        {
-            return Forbid();
         }
 
         if (await _accountService.NameExistsForUserAsync(user.Id, request.Name, excludeId: id))
@@ -96,16 +91,11 @@ public class AccountsController : ControllerBase
     public async Task<IActionResult> Patch(int id, PatchAccountActiveStatusRequest request)
     {
         var user = _currentUserAccessor.User!;
-        var account = await _accountService.GetTrackedByIdAsync(id);
+        var account = await _accountService.GetTrackedByIdForUserAsync(user, id);
 
         if (account == null)
         {
             return NotFound();
-        }
-
-        if (account.UserId != user.Id)
-        {
-            return Forbid();
         }
 
         await _accountService.PatchActiveStatus(account, request.ToInput());
@@ -117,18 +107,13 @@ public class AccountsController : ControllerBase
     public async Task<IActionResult> Delete(int id)
     {
         var user = _currentUserAccessor.User!;
-        var account = await _accountService.GetTrackedByIdAsync(id);
+        var account = await _accountService.GetTrackedByIdForUserAsync(user, id);
 
         if (account == null)
         {
             return NotFound();
         }
-        
-        if (account.UserId != user.Id)
-        {
-            return Forbid();
-        }
-        
+
         if (await _accountService.HasTransactionHistoryAsync(id))
         {
             return Problem(detail: "This account has transaction history and cannot be deleted.", statusCode: StatusCodes.Status409Conflict);
