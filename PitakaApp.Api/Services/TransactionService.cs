@@ -26,6 +26,8 @@ public class TransactionService
             .AsNoTracking()
             .Include(t => t.Tags)
             .Where(a => a.UserId == user.Id)
+            .OrderByDescending(t => t.TransactionDate)
+            .ThenByDescending(t => t.Id)
             .ToListAsync();
 
     public async Task<List<Transaction>> GetAllForAccount(Account account) =>
@@ -33,6 +35,8 @@ public class TransactionService
             .AsNoTracking()
             .Include(t => t.Tags)
             .Where(a => a.AccountId == account.Id)
+            .OrderByDescending(t => t.TransactionDate)
+            .ThenByDescending(t => t.Id)
             .ToListAsync();
 
     public async Task<Transaction> CreateAsync(Account account, CreateTransactionInput input, List<Tag>? tags = null)
