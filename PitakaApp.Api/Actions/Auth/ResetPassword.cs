@@ -23,7 +23,7 @@ public class ResetPassword
     // happen.
     public async Task<bool> ExecuteAsync(ResetPasswordInput input)
     {
-        var tokenHash = RequestPasswordReset.HashToken(input.Token);
+        var tokenHash = PasswordResetToken.Hash(input.Token);
         var now = _timeProvider.GetUtcNow().UtcDateTime;
 
         var presented = await _context.PasswordResetTokens

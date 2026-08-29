@@ -1,6 +1,5 @@
 using System.Buffers.Text;
 using System.Security.Cryptography;
-using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using PitakaApp.Api.Data;
@@ -47,7 +46,7 @@ public class RequestPasswordReset
 
         // Base64Url so it survives a query string unescaped.
         var token = Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(TokenByteLength));
-        var tokenHash = HashToken(token);
+        var tokenHash = PasswordResetToken.Hash(token);
 
         _context.PasswordResetTokens.Add(new PasswordResetToken
         {
@@ -59,11 +58,6 @@ public class RequestPasswordReset
 
         await _emailSender.SendAsync(user.Email, "Reset your Pitaka password", ComposeBody(token));
     }
-
-    // Only the hex SHA-256 digest is ever persisted; the plaintext lives in the email
-    // and nowhere else. Shared with ResetPassword so a presented token hashes the same.
-    public static string HashToken(string token) =>
-        Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
 
     // Plain text. Says Profile, never "user" or "account", per CONTEXT.md. States that
     // ignoring the message leaves the password unchanged. Carries the configured client

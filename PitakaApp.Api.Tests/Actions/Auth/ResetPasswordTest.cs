@@ -82,7 +82,7 @@ public class ResetPasswordTest : IDisposable
         _context.PasswordResetTokens.Add(new PasswordResetToken
         {
             UserId = user.Id,
-            TokenHash = RequestPasswordReset.HashToken(plaintext),
+            TokenHash = PasswordResetToken.Hash(plaintext),
             ExpiresAt = expiresAt,
         });
         await _context.SaveChangesAsync();

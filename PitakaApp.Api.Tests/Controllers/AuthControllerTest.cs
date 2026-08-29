@@ -5,9 +5,9 @@ using Bogus;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using PitakaApp.Api.Actions.Auth;
 using PitakaApp.Api.Controllers;
 using PitakaApp.Api.Data;
+using PitakaApp.Api.Models;
 using PitakaApp.Api.Tests.Factories;
 using PitakaApp.Api.Tests.Fixtures;
 
@@ -304,6 +304,9 @@ public class AuthControllerTest : IDisposable
 
         var reset = await _client.PostAsJsonAsync("/api/auth/reset-password", new { token, password = newPassword });
         Assert.Equal(HttpStatusCode.NoContent, reset.StatusCode);
+        // No session handed back — the body is empty and no auth cookie is set.
+        Assert.Empty(await reset.Content.ReadAsByteArrayAsync());
+        Assert.DoesNotContain(reset.Headers, h => h.Key.Equals("Set-Cookie", StringComparison.OrdinalIgnoreCase));
 
         var withNew = await _client.PostAsJsonAsync("/api/auth/login", new { email, password = newPassword });
         Assert.Equal(HttpStatusCode.OK, withNew.StatusCode);
@@ -415,7 +418,7 @@ public class AuthControllerTest : IDisposable
         // assertion can express, and it is the entire reason the store exists — the plaintext
         // token is in the email and never in the database.
         Assert.NotEqual(emailedToken, stored.TokenHash);
-        Assert.Equal(RequestPasswordReset.HashToken(emailedToken), stored.TokenHash);
+        Assert.Equal(PasswordResetToken.Hash(emailedToken), stored.TokenHash);
     }
 
     private string TokenDeliveredTo(string email)
