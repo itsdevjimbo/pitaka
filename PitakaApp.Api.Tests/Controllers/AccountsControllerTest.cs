@@ -613,5 +613,47 @@ public class AccountsControllerTest : IDisposable
         Assert.Equal(destination.Id, received.TransferToAccountId);
     }
 
+    [Fact]
+    public async Task GetTransactions_IncludesTransfersSentFromTheAccount()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var source = await AccountFactory.CreateAsync(_context, user.Id);
+        var destination = await AccountFactory.CreateAsync(_context, user.Id);
+
+        var transfer = await TransactionFactory.CreateAsync(
+            _context, user.Id, source.Id, TransactionType.Transfer, amount: 500, transferToAccountId: destination.Id
+        );
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/accounts/" + source.Id + "/transactions");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<List<TransactionResource>>(TestJsonOptions.Default);
+        var sent = Assert.Single(body!);
+        Assert.Equal(transfer.Id, sent.Id);
+    }
+
+    [Fact]
+    public async Task GetTransactions_ExcludesTransfersThatDoNotTouchTheAccount()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var source = await AccountFactory.CreateAsync(_context, user.Id);
+        var destination = await AccountFactory.CreateAsync(_context, user.Id);
+        var bystander = await AccountFactory.CreateAsync(_context, user.Id);
+
+        await TransactionFactory.CreateAsync(
+            _context, user.Id, source.Id, TransactionType.Transfer, amount: 500, transferToAccountId: destination.Id
+        );
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/accounts/" + bystander.Id + "/transactions");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<List<TransactionResource>>(TestJsonOptions.Default);
+        Assert.Empty(body!);
+    }
+
     public void Dispose() => _scope.Dispose();
 }
