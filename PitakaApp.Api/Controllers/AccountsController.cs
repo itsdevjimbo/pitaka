@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using PitakaApp.Api.Filters;
 using PitakaApp.Api.Requests;
 using PitakaApp.Api.Resources;
@@ -83,15 +82,8 @@ public class AccountsController : ControllerBase
             return Problem(detail: "An account with this name already exists.", statusCode: StatusCodes.Status409Conflict);
         }
         
-        try
-        {
-            await _accountService.UpdateAsync(account, request.ToInput());
-            return Ok(AccountResource.FromModel(account));
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            return Problem(detail: "This account was updated by another request. Please try again.", statusCode: StatusCodes.Status409Conflict);
-        }
+        await _accountService.UpdateAsync(account, request.ToInput());
+        return Ok(AccountResource.FromModel(account));
     }
 
     [HttpPatch("{id}/status")]
@@ -105,15 +97,8 @@ public class AccountsController : ControllerBase
             return NotFound();
         }
 
-        try
-        {
-            await _accountService.PatchActiveStatus(account, request.ToInput());
-            return Ok(AccountResource.FromModel(account));
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            return Problem(detail: "This account was updated by another request. Please try again.", statusCode: StatusCodes.Status409Conflict);
-        }
+        await _accountService.PatchActiveStatus(account, request.ToInput());
+        return Ok(AccountResource.FromModel(account));
     }
 
     [HttpDelete("{id}")] 
@@ -137,15 +122,8 @@ public class AccountsController : ControllerBase
             return Problem(detail: "This account contains funds allocated toward a specific goal.", statusCode: StatusCodes.Status409Conflict);
         }
 
-        try
-        {
-            await _accountService.DeleteAsync(account);
-            return NoContent();
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            return Problem(detail: "This account was updated by another request. Please try again.", statusCode: StatusCodes.Status409Conflict);
-        }
+        await _accountService.DeleteAsync(account);
+        return NoContent();
     }
     
     [HttpGet("{id}/transactions")]
