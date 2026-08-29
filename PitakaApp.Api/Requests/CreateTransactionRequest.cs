@@ -29,7 +29,14 @@ public record CreateTransactionRequest (
 {
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
-
+        if (Type == TransactionType.Transfer && TransferToAccountId == AccountId)
+        {
+            yield return new ValidationResult(
+                "A transfer's destination must be a different account from its source.",
+                [nameof(TransferToAccountId)]
+            );
+        }
+        
         if (Type == TransactionType.Transfer && TransferToAccountId == null)
         {
             yield return new ValidationResult(
@@ -43,6 +50,13 @@ public record CreateTransactionRequest (
             yield return new ValidationResult(
                 "TransferToAccountId must not be set unless Type is Transfer.",
                 [nameof(TransferToAccountId)]
+            );
+        }
+        if (Type == TransactionType.Transfer && CategoryId != null)
+        {
+            yield return new ValidationResult(
+                "A transfer cannot be assigned a category.",
+                [nameof(CategoryId)]
             );
         }
     }

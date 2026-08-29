@@ -990,8 +990,11 @@ public class TransactionsControllerTest : IDisposable
         var response = await _client.PostAsJsonAsync("/api/transactions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
-        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
-        Assert.Equal("A transfer's destination must be a different account from its source.", problem!.Detail);
+        var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>();
+        Assert.Contains("TransferToAccountId", problem!.Errors.Keys);
+        Assert.Contains(
+            "A transfer's destination must be a different account from its source.",
+            problem!.Errors["TransferToAccountId"]);
 
         var unchanged = await _context.Accounts.AsNoTracking().FirstAsync(a => a.Id == account.Id);
         Assert.Equal(5000, unchanged.CurrentBalance);
@@ -1046,8 +1049,9 @@ public class TransactionsControllerTest : IDisposable
         var response = await _client.PostAsJsonAsync("/api/transactions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
-        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
-        Assert.Equal("A transfer cannot be assigned a category.", problem!.Detail);
+        var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>();
+        Assert.Contains("CategoryId", problem!.Errors.Keys);
+        Assert.Contains("A transfer cannot be assigned a category.", problem!.Errors["CategoryId"]);
         Assert.False(await _context.Transactions.AsNoTracking().AnyAsync(t => t.AccountId == source.Id));
     }
 
@@ -1127,8 +1131,9 @@ public class TransactionsControllerTest : IDisposable
             "/api/transactions/" + transfer.Id, new { CategoryId = category.Id });
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
-        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
-        Assert.Equal("A transfer cannot be assigned a category.", problem!.Detail);
+        var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>();
+        Assert.Contains("CategoryId", problem!.Errors.Keys);
+        Assert.Contains("A transfer cannot be assigned a category.", problem!.Errors["CategoryId"]);
     }
 
     [Fact]

@@ -65,20 +65,10 @@ public class TransactionsController : ControllerBase
         {
             return BadRequest();
         }
-        
-        if (request.Type == Enums.TransactionType.Transfer && request.CategoryId != null)
-        {
-            return Problem(detail: "A transfer cannot be assigned a category.", statusCode: StatusCodes.Status400BadRequest);
-        }
 
         if (request.CategoryId is int categoryId  && !await _verifyCategoryExistence.VerifyAsync(user, categoryId))
         {
             return BadRequest();
-        }
-
-        if (request.Type == Enums.TransactionType.Transfer && request.TransferToAccountId == request.AccountId)
-        {
-            return Problem(detail: "A transfer's destination must be a different account from its source.", statusCode: StatusCodes.Status400BadRequest);
         }
 
         if (request.Type == Enums.TransactionType.Transfer && !await _transactionService.IsValidTransferTransaction(user, request.TransferToAccountId))
@@ -135,7 +125,8 @@ public class TransactionsController : ControllerBase
 
         if (transaction.Type == Enums.TransactionType.Transfer && request.CategoryId != null)
         {
-            return Problem(detail: "A transfer cannot be assigned a category.", statusCode: StatusCodes.Status400BadRequest);
+            ModelState.AddModelError(nameof(request.CategoryId), "A transfer cannot be assigned a category.");
+            return ValidationProblem(ModelState);
         }
 
         if (request.CategoryId is int categoryId  && !await _verifyCategoryExistence.VerifyAsync(user, categoryId))
