@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using PitakaApp.Api.Actions;
 using PitakaApp.Api.Filters;
 using PitakaApp.Api.Models;
@@ -87,16 +86,8 @@ public class TransactionsController : ControllerBase
             return BadRequest();
         }
 
-        try
-        {
-            var transaction = await _transactionService.CreateAsync(account, request.ToInput(), tags);
-            return StatusCode(StatusCodes.Status201Created, TransactionResource.FromModel(transaction));
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            return Problem(detail: "This account was updated by another request. Please try again.", statusCode: StatusCodes.Status409Conflict);
-        }
-
+        var transaction = await _transactionService.CreateAsync(account, request.ToInput(), tags);
+        return StatusCode(StatusCodes.Status201Created, TransactionResource.FromModel(transaction));
     }
 
     [HttpGet("{id}")]
@@ -168,14 +159,7 @@ public class TransactionsController : ControllerBase
             return Forbid();
         }
 
-        try
-        {
-            await _transactionService.DeleteAsync(transaction);
-            return NoContent();
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            return Problem(detail: "This account was updated by another request. Please try again.", statusCode: StatusCodes.Status409Conflict);
-        }
+        await _transactionService.DeleteAsync(transaction);
+        return NoContent();
     }
 }

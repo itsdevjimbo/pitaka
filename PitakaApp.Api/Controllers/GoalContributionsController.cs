@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using PitakaApp.Api.Filters;
 using PitakaApp.Api.Requests;
 using PitakaApp.Api.Resources;
@@ -81,15 +80,8 @@ public class GoalContributionsController : ControllerBase
             return Problem(detail: "Contributions cannot exceed the account's balance", statusCode: StatusCodes.Status400BadRequest);
         }
 
-        try
-        {
-            var goalContribution = await _goalContributionService.CreateAsync(goal, account, request.ToInput());
-            return StatusCode(StatusCodes.Status201Created, GoalContributionResource.FromModel(goalContribution));
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            return Problem(detail: "This account was updated by another request. Please try again.", statusCode: StatusCodes.Status409Conflict);
-        }
+        var goalContribution = await _goalContributionService.CreateAsync(goal, account, request.ToInput());
+        return StatusCode(StatusCodes.Status201Created, GoalContributionResource.FromModel(goalContribution));
     }
     
     [HttpGet("{id}")]
