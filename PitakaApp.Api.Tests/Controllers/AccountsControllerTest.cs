@@ -590,5 +590,28 @@ public class AccountsControllerTest : IDisposable
         Assert.Equal(3, body!.Count);
     }
 
+    [Fact]
+    public async Task GetTransactions_IncludesTransfersReceivedByTheAccount()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var source = await AccountFactory.CreateAsync(_context, user.Id);
+        var destination = await AccountFactory.CreateAsync(_context, user.Id);
+
+        var transfer = await TransactionFactory.CreateAsync(
+            _context, user.Id, source.Id, TransactionType.Transfer, amount: 500, transferToAccountId: destination.Id
+        );
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/accounts/" + destination.Id + "/transactions");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<List<TransactionResource>>(TestJsonOptions.Default);
+        var received = Assert.Single(body!);
+        Assert.Equal(transfer.Id, received.Id);
+        Assert.Equal(source.Id, received.AccountId);
+        Assert.Equal(destination.Id, received.TransferToAccountId);
+    }
+
     public void Dispose() => _scope.Dispose();
 }

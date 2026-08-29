@@ -34,7 +34,7 @@ public class TransactionService
         await _context.Transactions
             .AsNoTracking()
             .Include(t => t.Tags)
-            .Where(a => a.AccountId == account.Id)
+            .Where(t => t.AccountId == account.Id || t.TransferToAccountId == account.Id)
             .OrderByDescending(t => t.TransactionDate)
             .ThenByDescending(t => t.Id)
             .ToListAsync();
