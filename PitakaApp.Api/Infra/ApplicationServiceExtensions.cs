@@ -15,6 +15,8 @@ public static class ApplicationServiceExtensions
         services.AddScoped<GenerateJwtToken>();
         services.AddScoped<GetCurrentUser>();
         services.AddScoped<CurrentUserAccessor>();
+        services.AddScoped<RequestPasswordReset>();
+        services.AddScoped<ResetPassword>();
 
         // Category
         services.AddScoped<CategoryService>();

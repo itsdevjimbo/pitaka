@@ -5,7 +5,9 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using PitakaApp.Api.Data;
+using PitakaApp.Api.Services;
 
 namespace PitakaApp.Api.Tests.Fixtures;
 
@@ -26,6 +28,10 @@ public class PitakaWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
     // needing the developer's local User Secrets file, which a CI runner never has.
     internal const string TestJwtKey = "test-only-jwt-signing-key-not-for-real-use-0000";
 
+    // The recording sender substituted for SmtpEmailSender below. A single instance for
+    // the whole collection, so it accumulates — tests filter it by recipient address.
+    public readonly RecordingEmailSender EmailSender = new();
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.ConfigureAppConfiguration((_, config) =>
@@ -42,6 +48,9 @@ public class PitakaWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
         {
             services.AddAuthentication(defaultScheme: TestAuthHandler.SchemeName)
                 .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestAuthHandler.SchemeName, options => { });
+
+            services.RemoveAll<IEmailSender>();
+            services.AddSingleton<IEmailSender>(EmailSender);
         });
     }
 
