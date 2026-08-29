@@ -129,6 +129,110 @@ public class AccountsControllerTest : IDisposable
     }
 
     [Fact]
+    public async Task Create_WithInitialBalance_ReturnsItInResponse()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(user);
+
+        var request = new
+        {
+            Name = "Savings account",
+            Type = AccountType.Bank,
+            InitialBalance = 5000,
+        };
+
+        var response = await _client.PostAsJsonAsync("/api/accounts", request);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<AccountResource>(TestJsonOptions.Default);
+        Assert.Equal(5000, body!.InitialBalance);
+    }
+
+    [Fact]
+    public async Task Create_WithoutInitialBalance_DefaultsToZero()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(user);
+
+        var request = new
+        {
+            Name = "Wallet",
+            Type = AccountType.Cash,
+        };
+
+        var response = await _client.PostAsJsonAsync("/api/accounts", request);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<AccountResource>(TestJsonOptions.Default);
+        Assert.Equal(0, body!.InitialBalance);
+        Assert.Equal(0, body.CurrentBalance);
+    }
+
+    [Fact]
+    public async Task Create_WithNegativeInitialBalance_IsAccepted()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(user);
+
+        var request = new
+        {
+            Name = "Rewards card",
+            Type = AccountType.CreditCard,
+            InitialBalance = -1200,
+        };
+
+        var response = await _client.PostAsJsonAsync("/api/accounts", request);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<AccountResource>(TestJsonOptions.Default);
+        Assert.Equal(-1200, body!.InitialBalance);
+    }
+
+    [Fact]
+    public async Task Show_ReturnsInitialBalanceDistinctFromCurrentBalance()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 5000);
+
+        account.Decrease(1500);
+        await _context.SaveChangesAsync();
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/accounts/" + account.Id);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<AccountResource>(TestJsonOptions.Default);
+        Assert.Equal(5000, body!.InitialBalance);
+        Assert.Equal(3500, body.CurrentBalance);
+    }
+
+    [Fact]
+    public async Task Update_WithInitialBalanceInBody_DoesNotChangeIt()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id, "Allowance account", initialBalance: 5000);
+
+        _client.ActAsUser(user);
+
+        var request = new
+        {
+            Name = "Savings account",
+            InitialBalance = 999,
+        };
+
+        var response = await _client.PutAsJsonAsync("/api/accounts/" + account.Id, request);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<AccountResource>(TestJsonOptions.Default);
+        Assert.Equal("Savings account", body!.Name);
+        Assert.Equal(5000, body.InitialBalance);
+
+        var stored = await _context.Accounts.AsNoTracking().SingleAsync(a => a.Id == account.Id);
+        Assert.Equal(5000, stored.InitialBalance);
+    }
+
+    [Fact]
     public async Task Show_InvalidId_ReturnsNotFound()
     {
         var user = await UserFactory.CreateAsync(_context);
