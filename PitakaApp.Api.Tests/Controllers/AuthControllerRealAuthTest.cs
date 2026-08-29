@@ -57,6 +57,36 @@ public class AuthControllerRealAuthTest : IDisposable
     }
 
     [Fact]
+    public async Task Me_WithRealJwtFromRegister_ReturnsOk()
+    {
+        // "Register returns a token" only means something if it returns a *working* one:
+        // same signature, issuer, audience and NameIdentifier claim as a login token, and
+        // accepted by GET /api/auth/me with no POST /login in between.
+        var email = _faker.Internet.Email();
+
+        var registerResponse = await _client.PostAsJsonAsync("/api/auth/register", new
+        {
+            name = _faker.Person.FullName,
+            email,
+            password = "TestPass123!",
+        });
+        Assert.Equal(HttpStatusCode.Created, registerResponse.StatusCode);
+
+        var registerBody = await registerResponse.Content.ReadFromJsonAsync<LoginResponse>();
+        Assert.NotNull(registerBody);
+
+        var request = new HttpRequestMessage(HttpMethod.Get, "/api/auth/me");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", registerBody!.Token);
+
+        var response = await _client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<UserResponse>();
+        Assert.Equal(email, body!.Email);
+    }
+
+    [Fact]
     public async Task Me_WithTamperedToken_ReturnsUnauthorized()
     {
         var email = _faker.Internet.Email();

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PitakaApp.Api.Actions.Auth;
+using PitakaApp.Api.Requests;
 
 namespace PitakaApp.Api.Controllers;
 
@@ -30,10 +31,10 @@ public class AuthController : ControllerBase
     [HttpPost("login")]
     public async Task<IActionResult> Login(LoginRequest request)
     {
-        var user = await _loginUser.ExecuteAsync(request.Email, request.Password);
+        var user = await _loginUser.ExecuteAsync(request.ToInput());
         if (user == null)
         {
-            return Unauthorized("Invalid email or password.");
+            return Problem(detail: "Invalid email or password.", statusCode: StatusCodes.Status401Unauthorized);
         }
 
         var token = _generateJwtToken.Execute(user);
@@ -45,14 +46,19 @@ public class AuthController : ControllerBase
     [HttpPost("register")]
     public async Task<IActionResult> Register(RegisterRequest request)
     {
-        var user = await _registerUser.ExecuteAsync(request.Name, request.Email, request.Password);
+        var user = await _registerUser.ExecuteAsync(request.ToInput());
 
         if (user == null)
         {
             return Problem(detail: "A user with this email already exists.", statusCode: StatusCodes.Status409Conflict);
         }
 
-        return Ok(new UserResponse(user.Id, user.Name, user.Email));
+        var token = _generateJwtToken.Execute(user);
+        var userResponse = new UserResponse(user.Id, user.Name, user.Email);
+
+        // 201 with no Location header — matches AccountsController.Create. There is no
+        // canonical GET /users/{id} to point at; GET /api/auth/me is derived from the token.
+        return StatusCode(StatusCodes.Status201Created, new LoginResponse(token, userResponse));
     }
 
     [Authorize]
@@ -69,9 +75,6 @@ public class AuthController : ControllerBase
         return Ok(new UserResponse(user.Id, user.Name, user.Email));
     }
 }
-
-public record LoginRequest(string Email, string Password);
-public record RegisterRequest(string Name, string Email, string Password);
 
 public record UserResponse(int Id, string Name, string Email);
 public record LoginResponse(string Token, UserResponse User);
