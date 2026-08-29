@@ -18,6 +18,7 @@ public class AccountService
         await _context.Accounts
             .AsNoTracking()
             .Where(a => a.UserId == user.Id)
+            .OrderBy(a => a.Name)
             .ToListAsync();
 
     public async Task<Account?> GetByIdForUser(User user, int id) =>

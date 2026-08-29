@@ -55,6 +55,93 @@ public class TransactionsControllerTest : IDisposable
     }
 
     [Fact]
+    public async Task Get_ReturnsNewestFirstByTransactionDate()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: new DateTime(2026, 4, 2));
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: new DateTime(2026, 9, 15));
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: new DateTime(2026, 2, 20));
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/transactions");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<List<TransactionResource>>(TestJsonOptions.Default);
+        Assert.Equal(
+            new[] { new DateTime(2026, 9, 15), new DateTime(2026, 4, 2), new DateTime(2026, 2, 20) },
+            body!.Select(t => t.TransactionDate.Date));
+    }
+
+    [Fact]
+    public async Task Get_BackDatedTransaction_SortsByItsDateNotWhenItWasCreated()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+
+        var later = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: new DateTime(2026, 6, 3));
+        var earlier = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: new DateTime(2026, 5, 31));
+        // Entered last, but dated between the two above — it must not land at the bottom.
+        var backDated = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: new DateTime(2026, 6, 1));
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/transactions");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<List<TransactionResource>>(TestJsonOptions.Default);
+        Assert.Equal(new[] { later.Id, backDated.Id, earlier.Id }, body!.Select(t => t.Id));
+    }
+
+    [Fact]
+    public async Task Get_TransactionsSharingADate_OrderedByIdDescending()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+
+        var sameDate = new DateTime(2026, 7, 7);
+        var first = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: sameDate);
+        var second = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: sameDate);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/transactions");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<List<TransactionResource>>(TestJsonOptions.Default);
+        Assert.Equal(new[] { second.Id, first.Id }, body!.Select(t => t.Id));
+    }
+
+    [Fact]
+    public async Task GetForAccount_CarriesTheSameNewestFirstOrderWithIdTiebreak()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var otherAccount = await AccountFactory.CreateAsync(_context, user.Id);
+
+        // Noise on another account — must not appear in the scoped list.
+        await TransactionFactory.CreateAsync(_context, user.Id, otherAccount.Id, transactionDate: new DateTime(2026, 12, 1));
+
+        var sharedDate = new DateTime(2026, 8, 8);
+        var middle = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: new DateTime(2026, 6, 15));
+        var newestLowId = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: sharedDate);
+        var oldest = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: new DateTime(2026, 1, 20));
+        var newestHighId = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: sharedDate);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/accounts/" + account.Id + "/transactions");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<List<TransactionResource>>(TestJsonOptions.Default);
+        Assert.Equal(
+            new[] { newestHighId.Id, newestLowId.Id, middle.Id, oldest.Id },
+            body!.Select(t => t.Id));
+    }
+
+    [Fact]
     public async Task Create_WithoutLoggedInUser_ReturnsUnauthorized()
     {
         var user = await UserFactory.CreateAsync(_context);

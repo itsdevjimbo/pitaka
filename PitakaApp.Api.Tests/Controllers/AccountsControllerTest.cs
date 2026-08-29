@@ -55,6 +55,43 @@ public class AccountsControllerTest : IDisposable
     }
 
     [Fact]
+    public async Task Get_ReturnsAccountsOrderedByNameAscending()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+
+        await AccountFactory.CreateAsync(_context, user.Id, "Zephyr");
+        await AccountFactory.CreateAsync(_context, user.Id, "Apricot");
+        await AccountFactory.CreateAsync(_context, user.Id, "Mango");
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/accounts");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<List<AccountResource>>(TestJsonOptions.Default);
+        Assert.Equal(new[] { "Apricot", "Mango", "Zephyr" }, body!.Select(a => a.Name));
+    }
+
+    [Fact]
+    public async Task Get_InactiveAccountSortsAmongActiveAccountsByName()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+
+        await AccountFactory.CreateAsync(_context, user.Id, "Charlie");
+        await AccountFactory.CreateAsync(_context, user.Id, "Bravo", isActive: false);
+        await AccountFactory.CreateAsync(_context, user.Id, "Alpha");
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/accounts");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<List<AccountResource>>(TestJsonOptions.Default);
+        Assert.Equal(new[] { "Alpha", "Bravo", "Charlie" }, body!.Select(a => a.Name));
+        Assert.False(body!.Single(a => a.Name == "Bravo").IsActive);
+    }
+
+    [Fact]
     public async Task Create_ValidRequest_ReturnsCreated()
     {
 
