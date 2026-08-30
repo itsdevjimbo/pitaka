@@ -65,7 +65,7 @@ public class TransactionsController : ControllerBase
         {
             return BadRequest();
         }
-        
+
         if (request.CategoryId is int categoryId  && !await _verifyCategoryExistence.VerifyAsync(user, categoryId))
         {
             return BadRequest();
@@ -122,7 +122,13 @@ public class TransactionsController : ControllerBase
         {
             return Forbid();
         }
-        
+
+        if (transaction.Type == Enums.TransactionType.Transfer && request.CategoryId != null)
+        {
+            ModelState.AddModelError(nameof(request.CategoryId), "A transfer cannot be assigned a category.");
+            return ValidationProblem(ModelState);
+        }
+
         if (request.CategoryId is int categoryId  && !await _verifyCategoryExistence.VerifyAsync(user, categoryId))
         {
             return BadRequest();

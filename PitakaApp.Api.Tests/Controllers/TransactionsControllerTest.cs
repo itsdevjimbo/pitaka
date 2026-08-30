@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using PitakaApp.Api.Data;
@@ -968,6 +969,194 @@ public class TransactionsControllerTest : IDisposable
         var body = await response.Content.ReadFromJsonAsync<TransactionResource>(TestJsonOptions.Default);
         Assert.Single(body!.Tags);
         Assert.Contains(body!.Tags, tagResource => tagResource.Id == tag.Id);
+    }
+
+    [Fact]
+    public async Task Create_TransferToSourceAccount_ReturnsBadRequestWithReason_AndNothingMoves()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 5000);
+
+        _client.ActAsUser(user);
+
+        var request = new
+        {
+            AccountId = account.Id,
+            Type = TransactionType.Transfer,
+            Amount = 1500,
+            TransferToAccountId = account.Id
+        };
+
+        var response = await _client.PostAsJsonAsync("/api/transactions", request);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>();
+        Assert.Contains("TransferToAccountId", problem!.Errors.Keys);
+        Assert.Contains(
+            "A transfer's destination must be a different account from its source.",
+            problem!.Errors["TransferToAccountId"]);
+
+        var unchanged = await _context.Accounts.AsNoTracking().FirstAsync(a => a.Id == account.Id);
+        Assert.Equal(5000, unchanged.CurrentBalance);
+        Assert.False(await _context.Transactions.AsNoTracking().AnyAsync(t => t.AccountId == account.Id));
+    }
+
+    [Fact]
+    public async Task Create_TransferToDifferentOwnedActiveAccount_Succeeds_AndMovesBothBalances()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var source = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 3000);
+        var destination = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 1000);
+
+        _client.ActAsUser(user);
+
+        var request = new
+        {
+            AccountId = source.Id,
+            Type = TransactionType.Transfer,
+            Amount = 1200,
+            TransferToAccountId = destination.Id
+        };
+
+        var response = await _client.PostAsJsonAsync("/api/transactions", request);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var updatedSource = await _context.Accounts.AsNoTracking().FirstAsync(a => a.Id == source.Id);
+        var updatedDestination = await _context.Accounts.AsNoTracking().FirstAsync(a => a.Id == destination.Id);
+        Assert.Equal(1800, updatedSource.CurrentBalance);
+        Assert.Equal(2200, updatedDestination.CurrentBalance);
+    }
+
+    [Fact]
+    public async Task Create_TransferCarryingCategory_ReturnsBadRequestWithReasonNamingCategory()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var source = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 3000);
+        var destination = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 1000);
+        var category = await CategoryFactory.CreateAsync(_context, user.Id);
+
+        _client.ActAsUser(user);
+
+        var request = new
+        {
+            AccountId = source.Id,
+            Type = TransactionType.Transfer,
+            Amount = 1000,
+            TransferToAccountId = destination.Id,
+            CategoryId = category.Id
+        };
+
+        var response = await _client.PostAsJsonAsync("/api/transactions", request);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>();
+        Assert.Contains("CategoryId", problem!.Errors.Keys);
+        Assert.Contains("A transfer cannot be assigned a category.", problem!.Errors["CategoryId"]);
+        Assert.False(await _context.Transactions.AsNoTracking().AnyAsync(t => t.AccountId == source.Id));
+    }
+
+    [Fact]
+    public async Task Create_IncomeWithOwnedCategory_ReturnsCreated()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var category = await CategoryFactory.CreateAsync(_context, user.Id);
+
+        _client.ActAsUser(user);
+
+        var request = new
+        {
+            AccountId = account.Id,
+            Type = TransactionType.Income,
+            Amount = 5000,
+            CategoryId = category.Id
+        };
+
+        var response = await _client.PostAsJsonAsync("/api/transactions", request);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<TransactionResource>(TestJsonOptions.Default);
+        Assert.Equal(category.Id, body!.CategoryId);
+    }
+
+    [Fact]
+    public async Task Create_TransferDestinationNotOwned_IsIndistinguishableFromNonExistentDestination()
+    {
+        var userA = await UserFactory.CreateAsync(_context);
+        var userB = await UserFactory.CreateAsync(_context);
+        var accountA = await AccountFactory.CreateAsync(_context, userA.Id, initialBalance: 5000);
+        var accountB = await AccountFactory.CreateAsync(_context, userB.Id, initialBalance: 3000);
+
+        _client.ActAsUser(userA);
+
+        var notOwned = await _client.PostAsJsonAsync("/api/transactions", new
+        {
+            AccountId = accountA.Id,
+            Type = TransactionType.Transfer,
+            Amount = 1500,
+            TransferToAccountId = accountB.Id
+        });
+
+        var nonExistent = await _client.PostAsJsonAsync("/api/transactions", new
+        {
+            AccountId = accountA.Id,
+            Type = TransactionType.Transfer,
+            Amount = 1500,
+            TransferToAccountId = 99999
+        });
+
+        Assert.Equal(nonExistent.StatusCode, notOwned.StatusCode);
+
+        var notOwnedProblem = await notOwned.Content.ReadFromJsonAsync<ProblemDetails>();
+        var nonExistentProblem = await nonExistent.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal(nonExistentProblem!.Title, notOwnedProblem!.Title);
+        Assert.Equal(nonExistentProblem!.Detail, notOwnedProblem!.Detail);
+    }
+
+    [Fact]
+    public async Task Update_AttachingCategoryToTransfer_ReturnsBadRequestWithReasonNamingCategory()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var source = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 3000);
+        var destination = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 1000);
+        var category = await CategoryFactory.CreateAsync(_context, user.Id);
+        var transfer = await TransactionFactory.CreateAsync(
+            _context, user.Id, source.Id,
+            type: TransactionType.Transfer,
+            transferToAccountId: destination.Id);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.PutAsJsonAsync(
+            "/api/transactions/" + transfer.Id, new { CategoryId = category.Id });
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>();
+        Assert.Contains("CategoryId", problem!.Errors.Keys);
+        Assert.Contains("A transfer cannot be assigned a category.", problem!.Errors["CategoryId"]);
+    }
+
+    [Fact]
+    public async Task Update_TransferDateAndDescription_WithoutCategory_ReturnsOk()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var source = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 3000);
+        var destination = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 1000);
+        var transfer = await TransactionFactory.CreateAsync(
+            _context, user.Id, source.Id,
+            type: TransactionType.Transfer,
+            transferToAccountId: destination.Id);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.PutAsJsonAsync(
+            "/api/transactions/" + transfer.Id,
+            new { Description = "Moved to savings", TransactionDate = "2026-05-01T00:00:00Z" });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<TransactionResource>(TestJsonOptions.Default);
+        Assert.Equal("Moved to savings", body!.Description);
+        Assert.Equal(new DateTime(2026, 5, 1), body!.TransactionDate.Date);
     }
 
     public static IEnumerable<object?[]> InvalidAmounts()
