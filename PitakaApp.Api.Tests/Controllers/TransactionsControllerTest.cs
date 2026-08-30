@@ -175,6 +175,9 @@ public class TransactionsControllerTest : IDisposable
 
         var response = await _client.PostAsJsonAsync("/api/transactions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal("Account does not exist", problem!.Detail);
     }
 
     [Fact]
@@ -185,7 +188,7 @@ public class TransactionsControllerTest : IDisposable
         var account = await AccountFactory.CreateAsync(_context, userB.Id);
 
         _client.ActAsUser(userA);
-        
+
         var request = new
         {
             AccountId = account.Id,
@@ -195,6 +198,10 @@ public class TransactionsControllerTest : IDisposable
 
         var response = await _client.PostAsJsonAsync("/api/transactions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        // Ownership must stay indistinguishable from absence.
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal("Account does not exist", problem!.Detail);
     }
 
     [Fact]
@@ -217,6 +224,10 @@ public class TransactionsControllerTest : IDisposable
 
         var response = await _client.PostAsJsonAsync("/api/transactions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        // Ownership of the destination must stay indistinguishable from absence.
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal("Transfer destination is not a valid account", problem!.Detail);
     }
 
     [Fact]
@@ -237,6 +248,9 @@ public class TransactionsControllerTest : IDisposable
 
         var response = await _client.PostAsJsonAsync("/api/transactions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal("Category does not exist", problem!.Detail);
     }
 
     [Fact]
@@ -249,7 +263,7 @@ public class TransactionsControllerTest : IDisposable
         var category = await CategoryFactory.CreateAsync(_context, userB.Id);
 
         _client.ActAsUser(userA);
-        
+
         var request = new
         {
             AccountId = account.Id,
@@ -260,6 +274,10 @@ public class TransactionsControllerTest : IDisposable
 
         var response = await _client.PostAsJsonAsync("/api/transactions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        // Ownership must stay indistinguishable from absence.
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal("Category does not exist", problem!.Detail);
     }
 
     [Fact]
@@ -269,7 +287,7 @@ public class TransactionsControllerTest : IDisposable
         var account = await AccountFactory.CreateAsync(_context, user.Id);
 
         _client.ActAsUser(user);
-        
+
         var request = new
         {
             AccountId = account.Id,
@@ -280,6 +298,9 @@ public class TransactionsControllerTest : IDisposable
 
         var response = await _client.PostAsJsonAsync("/api/transactions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal("Transfer destination is not a valid account", problem!.Detail);
     }
     
     [Fact]
@@ -299,8 +320,11 @@ public class TransactionsControllerTest : IDisposable
 
         var response = await _client.PostAsJsonAsync("/api/transactions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal("Account is inactive", problem!.Detail);
     }
-    
+
     [Fact]
     public async Task Create_TransferWithInActiveAccount_ReturnsBadRequest()
     {
@@ -320,6 +344,10 @@ public class TransactionsControllerTest : IDisposable
 
         var response = await _client.PostAsJsonAsync("/api/transactions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        // An inactive destination folds into the same reason as absence.
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal("Transfer destination is not a valid account", problem!.Detail);
     }
 
     [Fact]
@@ -523,9 +551,12 @@ public class TransactionsControllerTest : IDisposable
         {
             CategoryId = 9999
         };
-        
+
         var response = await _client.PutAsJsonAsync("/api/transactions/" + transaction.Id, request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal("Category does not exist", problem!.Detail);
     }
 
     [Fact]
@@ -545,9 +576,13 @@ public class TransactionsControllerTest : IDisposable
             CategoryId = category.Id,
             Amount = 5000
         };
-        
+
         var response = await _client.PutAsJsonAsync("/api/transactions/" + transaction.Id, request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        // Ownership must stay indistinguishable from absence.
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal("Category does not exist", problem!.Detail);
     }
 
     [Fact]
@@ -789,6 +824,9 @@ public class TransactionsControllerTest : IDisposable
 
         var response = await _client.PostAsJsonAsync("/api/transactions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal("One or more tags do not exist", problem!.Detail);
     }
 
     [Fact]
@@ -812,6 +850,10 @@ public class TransactionsControllerTest : IDisposable
 
         var response = await _client.PostAsJsonAsync("/api/transactions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        // A tag that isn't the caller's folds into the same reason as absence.
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal("One or more tags do not exist", problem!.Detail);
     }
 
     [Fact]
@@ -873,6 +915,9 @@ public class TransactionsControllerTest : IDisposable
         
         var response = await _client.PutAsJsonAsync("/api/transactions/" + transaction.Id, new { TagIds = new int[] { 9999, 9998 } });
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal("One or more tags do not exist", problem!.Detail);
     }
 
     [Fact]
@@ -889,6 +934,10 @@ public class TransactionsControllerTest : IDisposable
         
         var response = await _client.PutAsJsonAsync("/api/transactions/" + transaction.Id, new { TagIds = new int[] { tagA.Id, tagB.Id }});
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        // A tag that isn't the caller's folds into the same reason as absence.
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal("One or more tags do not exist", problem!.Detail);
     }
 
     [Fact]
@@ -1105,6 +1154,73 @@ public class TransactionsControllerTest : IDisposable
             TransferToAccountId = 99999
         });
 
+        Assert.Equal(nonExistent.StatusCode, notOwned.StatusCode);
+
+        var notOwnedProblem = await notOwned.Content.ReadFromJsonAsync<ProblemDetails>();
+        var nonExistentProblem = await nonExistent.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal(nonExistentProblem!.Title, notOwnedProblem!.Title);
+        Assert.Equal(nonExistentProblem!.Detail, notOwnedProblem!.Detail);
+    }
+
+    [Fact]
+    public async Task Create_AccountNotOwned_IsIndistinguishableFromNonExistentAccount()
+    {
+        var userA = await UserFactory.CreateAsync(_context);
+        var userB = await UserFactory.CreateAsync(_context);
+        var otherAccount = await AccountFactory.CreateAsync(_context, userB.Id);
+
+        _client.ActAsUser(userA);
+
+        var notOwned = await _client.PostAsJsonAsync("/api/transactions", new
+        {
+            AccountId = otherAccount.Id,
+            Type = TransactionType.Income,
+            Amount = 5000
+        });
+
+        var nonExistent = await _client.PostAsJsonAsync("/api/transactions", new
+        {
+            AccountId = 99999,
+            Type = TransactionType.Income,
+            Amount = 5000
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, notOwned.StatusCode);
+        Assert.Equal(nonExistent.StatusCode, notOwned.StatusCode);
+
+        var notOwnedProblem = await notOwned.Content.ReadFromJsonAsync<ProblemDetails>();
+        var nonExistentProblem = await nonExistent.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal(nonExistentProblem!.Title, notOwnedProblem!.Title);
+        Assert.Equal(nonExistentProblem!.Detail, notOwnedProblem!.Detail);
+    }
+
+    [Fact]
+    public async Task Create_CategoryNotOwned_IsIndistinguishableFromNonExistentCategory()
+    {
+        var userA = await UserFactory.CreateAsync(_context);
+        var userB = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, userA.Id);
+        var otherCategory = await CategoryFactory.CreateAsync(_context, userB.Id);
+
+        _client.ActAsUser(userA);
+
+        var notOwned = await _client.PostAsJsonAsync("/api/transactions", new
+        {
+            AccountId = account.Id,
+            Type = TransactionType.Income,
+            Amount = 5000,
+            CategoryId = otherCategory.Id
+        });
+
+        var nonExistent = await _client.PostAsJsonAsync("/api/transactions", new
+        {
+            AccountId = account.Id,
+            Type = TransactionType.Income,
+            Amount = 5000,
+            CategoryId = 99999
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, notOwned.StatusCode);
         Assert.Equal(nonExistent.StatusCode, notOwned.StatusCode);
 
         var notOwnedProblem = await notOwned.Content.ReadFromJsonAsync<ProblemDetails>();
