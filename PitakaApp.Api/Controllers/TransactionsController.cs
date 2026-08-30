@@ -58,22 +58,22 @@ public class TransactionsController : ControllerBase
         
         if (account == null)
         {
-            return BadRequest();
+            return Problem(detail: "Account does not exist", statusCode: StatusCodes.Status400BadRequest);
         }
 
         if (!account.IsActive)
         {
-            return BadRequest();
+            return Problem(detail: "Account is inactive", statusCode: StatusCodes.Status400BadRequest);
         }
 
         if (request.CategoryId is int categoryId  && !await _verifyCategoryExistence.VerifyAsync(user, categoryId))
         {
-            return BadRequest();
+            return Problem(detail: "Category does not exist", statusCode: StatusCodes.Status400BadRequest);
         }
 
         if (request.Type == Enums.TransactionType.Transfer && !await _transactionService.IsValidTransferTransaction(user, request.TransferToAccountId))
         {
-            return BadRequest();
+            return Problem(detail: "Transfer destination is not a valid account", statusCode: StatusCodes.Status400BadRequest);
         }
 
         if (distinctTagIds != null)
@@ -83,7 +83,7 @@ public class TransactionsController : ControllerBase
 
         if (tags?.Count != distinctTagIds?.Length)
         {
-            return BadRequest();
+            return Problem(detail: "One or more tags do not exist", statusCode: StatusCodes.Status400BadRequest);
         }
 
         var transaction = await _transactionService.CreateAsync(account, request.ToInput(), tags);
@@ -131,7 +131,7 @@ public class TransactionsController : ControllerBase
 
         if (request.CategoryId is int categoryId  && !await _verifyCategoryExistence.VerifyAsync(user, categoryId))
         {
-            return BadRequest();
+            return Problem(detail: "Category does not exist", statusCode: StatusCodes.Status400BadRequest);
         }
 
         if (distinctTagIds != null)
@@ -141,7 +141,7 @@ public class TransactionsController : ControllerBase
 
         if (tags?.Count != distinctTagIds?.Length)
         {
-            return BadRequest();
+            return Problem(detail: "One or more tags do not exist", statusCode: StatusCodes.Status400BadRequest);
         }
 
 
