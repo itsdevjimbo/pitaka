@@ -16,22 +16,19 @@ public class BudgetsController : ControllerBase
 {
     private readonly BudgetService _budgetService;
     private readonly VerifyCategoryExistence _verifyCategoryExistence;
-    private readonly GetBudgetCycle _getBudgetCycle;
-    private readonly GetBudgetAmountSpent _getBudgetAmountSpent;
+    private readonly GetBudgetWithSpend _getBudgetWithSpend;
     private readonly CurrentUserAccessor _currentUserAccessor;
 
     public BudgetsController(
         BudgetService budgetService,
         VerifyCategoryExistence verifyCategoryExistence,
-        GetBudgetCycle getBudgetCycle,
-        GetBudgetAmountSpent getBudgetAmountSpent,
+        GetBudgetWithSpend getBudgetWithSpend,
         CurrentUserAccessor currentUserAccessor
     )
     {
         _budgetService = budgetService;
         _verifyCategoryExistence = verifyCategoryExistence;
-        _getBudgetCycle = getBudgetCycle;
-        _getBudgetAmountSpent = getBudgetAmountSpent;
+        _getBudgetWithSpend = getBudgetWithSpend;
         _currentUserAccessor = currentUserAccessor;
     }
 
@@ -41,7 +38,17 @@ public class BudgetsController : ControllerBase
         var user = _currentUserAccessor.User!;
         var budgets = await _budgetService.GetAllForUser(user);
 
-        return Ok(BudgetResource.Collection(budgets));
+        // Per-Budget aggregate: each Budget has its own window and category, so the sum stops
+        // being one uniform Where. GetBudgetWithSpend enriches one Budget and is the same
+        // collaborator Show uses, so AmountSpent is identical read from either endpoint. Round
+        // trips are bounded by the number of Budgets; each sum runs in the database.
+        var resources = new List<BudgetWithSpendResource>(budgets.Count);
+        foreach (var budget in budgets)
+        {
+            resources.Add(await _getBudgetWithSpend.ForBudgetAsync(budget));
+        }
+
+        return Ok(resources);
     }
     
     [HttpPost]
@@ -75,10 +82,7 @@ public class BudgetsController : ControllerBase
             return NotFound();
         }
 
-        var (cycleStart, cycleEnd) = _getBudgetCycle.ForBudget(budget);
-        var amountSpent = await _getBudgetAmountSpent.GetAsync(budget, cycleStart, cycleEnd);
-
-        return Ok(BudgetWithSpendResource.FromModel(budget, amountSpent, cycleStart, cycleEnd));
+        return Ok(await _getBudgetWithSpend.ForBudgetAsync(budget));
     }
 
     [HttpPut("{id}")]
