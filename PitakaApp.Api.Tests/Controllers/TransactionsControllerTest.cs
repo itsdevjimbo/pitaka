@@ -51,8 +51,9 @@ public class TransactionsControllerTest : IDisposable
         var response = await _client.GetAsync("/api/transactions");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<List<TransactionResource>>(TestJsonOptions.Default);
-        Assert.Equal(3, body!.Count);
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+        Assert.Equal(3, body!.Data.Count);
+        Assert.Equal(3, body!.TotalCount);
     }
 
     [Fact]
@@ -70,10 +71,10 @@ public class TransactionsControllerTest : IDisposable
         var response = await _client.GetAsync("/api/transactions");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<List<TransactionResource>>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
         Assert.Equal(
             new[] { new DateTime(2026, 9, 15), new DateTime(2026, 4, 2), new DateTime(2026, 2, 20) },
-            body!.Select(t => t.TransactionDate.Date));
+            body!.Data.Select(t => t.TransactionDate.Date));
     }
 
     [Fact]
@@ -92,8 +93,8 @@ public class TransactionsControllerTest : IDisposable
         var response = await _client.GetAsync("/api/transactions");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<List<TransactionResource>>(TestJsonOptions.Default);
-        Assert.Equal(new[] { later.Id, backDated.Id, earlier.Id }, body!.Select(t => t.Id));
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+        Assert.Equal(new[] { later.Id, backDated.Id, earlier.Id }, body!.Data.Select(t => t.Id));
     }
 
     [Fact]
@@ -111,8 +112,8 @@ public class TransactionsControllerTest : IDisposable
         var response = await _client.GetAsync("/api/transactions");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<List<TransactionResource>>(TestJsonOptions.Default);
-        Assert.Equal(new[] { second.Id, first.Id }, body!.Select(t => t.Id));
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+        Assert.Equal(new[] { second.Id, first.Id }, body!.Data.Select(t => t.Id));
     }
 
     [Fact]
@@ -143,11 +144,367 @@ public class TransactionsControllerTest : IDisposable
     }
 
     [Fact]
+    public async Task Get_WrapsTheListInAPageEnvelope_WithDefaultPageAndSize()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+
+        for (var i = 0; i < 3; i++)
+        {
+            await TransactionFactory.CreateAsync(_context, user.Id, account.Id);
+        }
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/transactions");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+        Assert.Equal(1, body!.Page);
+        Assert.Equal(50, body!.PageSize);
+        Assert.Equal(3, body!.TotalCount);
+        Assert.Equal(3, body!.Data.Count);
+    }
+
+    [Fact]
+    public async Task Get_TotalCountIsTheWholeMatchingSet_EvenWhenItExceedsOnePage()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+
+        for (var i = 0; i < 4; i++)
+        {
+            await TransactionFactory.CreateAsync(_context, user.Id, account.Id);
+        }
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/transactions?pageSize=2");
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+
+        Assert.Equal(2, body!.Data.Count);
+        Assert.Equal(4, body!.TotalCount);
+    }
+
+    [Fact]
+    public async Task Get_PagingPreservesNewestFirstOrder_WithTheIdTiebreakDecidingAcrossThePageBoundary()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+
+        var shared = new DateTime(2026, 4, 1);
+        // Seeded oldest-first so insertion order is the opposite of the expected order.
+        // midA and midB share a date, so only the Id tiebreak orders them — and with
+        // pageSize 2 they straddle the page-1/page-2 boundary.
+        var oldest = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: new DateTime(2026, 1, 1));
+        var older = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: new DateTime(2026, 2, 1));
+        var midA = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: shared);
+        var midB = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: shared);
+        var newest = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: new DateTime(2026, 5, 1));
+
+        _client.ActAsUser(user);
+
+        var page1 = await (await _client.GetAsync("/api/transactions?page=1&pageSize=2"))
+            .Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+        var page2 = await (await _client.GetAsync("/api/transactions?page=2&pageSize=2"))
+            .Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+        var page3 = await (await _client.GetAsync("/api/transactions?page=3&pageSize=2"))
+            .Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+
+        // Full order: newest, midB (higher Id), midA, older, oldest.
+        Assert.Equal(new[] { newest.Id, midB.Id }, page1!.Data.Select(t => t.Id));
+        Assert.Equal(new[] { midA.Id, older.Id }, page2!.Data.Select(t => t.Id));
+        Assert.Equal(new[] { oldest.Id }, page3!.Data.Select(t => t.Id));
+        Assert.All(new[] { page1, page2, page3 }, p => Assert.Equal(5, p!.TotalCount));
+    }
+
+    [Fact]
+    public async Task Get_WithNoQueryString_CapsDataAtTheDefaultPageSize_WhileTotalCountReportsTheWholeSet()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+
+        for (var i = 0; i < 51; i++)
+        {
+            await TransactionFactory.CreateAsync(_context, user.Id, account.Id);
+        }
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/transactions");
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+
+        Assert.Equal(50, body!.Data.Count);
+        Assert.Equal(50, body!.PageSize);
+        Assert.Equal(51, body!.TotalCount);
+    }
+
+    [Fact]
+    public async Task Get_WithAPageNumberLargeEnoughToOverflowTheOffset_ReturnsEmptyData_NotAnError()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/transactions?page=2000000000&pageSize=200");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+        Assert.Empty(body!.Data);
+        Assert.Equal(1, body!.TotalCount);
+    }
+
+    [Fact]
+    public async Task Get_PagePastTheEnd_ReturnsEmptyDataWithARealTotalCount()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/transactions?page=5&pageSize=10");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+        Assert.Empty(body!.Data);
+        Assert.Equal(1, body!.TotalCount);
+    }
+
+    [Fact]
+    public async Task Get_FilterByAccountId_IncludesTransfersArrivingByTransferToAccountId_Once()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var wanted = await AccountFactory.CreateAsync(_context, user.Id);
+        var other = await AccountFactory.CreateAsync(_context, user.Id);
+
+        var onAccount = await TransactionFactory.CreateAsync(_context, user.Id, wanted.Id);
+        var transferIn = await TransactionFactory.CreateAsync(
+            _context, user.Id, other.Id, type: TransactionType.Transfer, transferToAccountId: wanted.Id);
+        // Noise: entirely on the other account.
+        await TransactionFactory.CreateAsync(_context, user.Id, other.Id);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/transactions?accountId=" + wanted.Id);
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+
+        Assert.Equal(new[] { transferIn.Id, onAccount.Id }.OrderByDescending(x => x),
+            body!.Data.Select(t => t.Id).OrderByDescending(x => x));
+        Assert.Equal(2, body!.TotalCount);
+        Assert.Single(body!.Data, t => t.Id == transferIn.Id);
+    }
+
+    [Fact]
+    public async Task Get_FilterByCategoryId_ExcludesTransactionsWithoutThatCategory_IncludingTransfers()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var other = await AccountFactory.CreateAsync(_context, user.Id);
+        var category = await CategoryFactory.CreateAsync(_context, user.Id);
+
+        var matched = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, categoryId: category.Id);
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id);
+        await TransactionFactory.CreateAsync(
+            _context, user.Id, account.Id, type: TransactionType.Transfer, transferToAccountId: other.Id);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/transactions?categoryId=" + category.Id);
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+
+        Assert.Equal(new[] { matched.Id }, body!.Data.Select(t => t.Id));
+        Assert.Equal(1, body!.TotalCount);
+    }
+
+    [Fact]
+    public async Task Get_FilterByType_ReturnsOnlyThatDirection()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+
+        var expense = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, type: TransactionType.Expense);
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, type: TransactionType.Income);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/transactions?type=Expense");
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+
+        Assert.Equal(new[] { expense.Id }, body!.Data.Select(t => t.Id));
+        Assert.Equal(1, body!.TotalCount);
+    }
+
+    [Fact]
+    public async Task Get_FilterByTypeTransfer_ReturnsOnlyTransfers()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var other = await AccountFactory.CreateAsync(_context, user.Id);
+
+        var transfer = await TransactionFactory.CreateAsync(
+            _context, user.Id, account.Id, type: TransactionType.Transfer, transferToAccountId: other.Id);
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, type: TransactionType.Income);
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, type: TransactionType.Expense);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/transactions?type=Transfer");
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+
+        Assert.Equal(new[] { transfer.Id }, body!.Data.Select(t => t.Id));
+        Assert.Equal(1, body!.TotalCount);
+    }
+
+    [Fact]
+    public async Task Get_FilterByFrom_IsInclusiveOfARowExactlyAtThatInstant()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+
+        var before = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: new DateTime(2026, 4, 30));
+        var atBoundary = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: new DateTime(2026, 5, 1));
+        var after = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: new DateTime(2026, 5, 2));
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/transactions?from=2026-05-01T00:00:00");
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+
+        Assert.Equal(new[] { after.Id, atBoundary.Id }, body!.Data.Select(t => t.Id));
+        Assert.Equal(2, body!.TotalCount);
+    }
+
+    [Fact]
+    public async Task Get_FilterByTo_IsExclusiveOfARowExactlyAtThatInstant()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+
+        var before = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: new DateTime(2026, 5, 31));
+        var atBoundary = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: new DateTime(2026, 6, 1));
+        var after = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: new DateTime(2026, 6, 2));
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/transactions?to=2026-06-01T00:00:00");
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+
+        Assert.Equal(new[] { before.Id }, body!.Data.Select(t => t.Id));
+        Assert.Equal(1, body!.TotalCount);
+    }
+
+    [Fact]
+    public async Task Get_FilterByFromAndTo_ReturnsTheHalfOpenInterval()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: new DateTime(2026, 4, 15));
+        var inMay1 = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: new DateTime(2026, 5, 1));
+        var inMay2 = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: new DateTime(2026, 5, 20));
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: new DateTime(2026, 6, 1));
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/transactions?from=2026-05-01T00:00:00&to=2026-06-01T00:00:00");
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+
+        Assert.Equal(new[] { inMay2.Id, inMay1.Id }, body!.Data.Select(t => t.Id));
+        Assert.Equal(2, body!.TotalCount);
+    }
+
+    [Fact]
+    public async Task Get_FiltersCombine_AccountIdAndType_AreBothApplied()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var other = await AccountFactory.CreateAsync(_context, user.Id);
+
+        var wanted = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, type: TransactionType.Expense);
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, type: TransactionType.Income); // wrong type
+        await TransactionFactory.CreateAsync(_context, user.Id, other.Id, type: TransactionType.Expense);  // wrong account
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/transactions?accountId=" + account.Id + "&type=Expense");
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+
+        Assert.Equal(new[] { wanted.Id }, body!.Data.Select(t => t.Id));
+        Assert.Equal(1, body!.TotalCount);
+    }
+
+    [Fact]
+    public async Task Get_FilterAndPagingTogether_TotalCountIsTheFilteredCount_NotTheWholeHistory()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+
+        for (var i = 0; i < 3; i++)
+        {
+            await TransactionFactory.CreateAsync(_context, user.Id, account.Id, type: TransactionType.Expense);
+        }
+        for (var i = 0; i < 5; i++)
+        {
+            await TransactionFactory.CreateAsync(_context, user.Id, account.Id, type: TransactionType.Income);
+        }
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/transactions?type=Expense&pageSize=2");
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+
+        Assert.Equal(2, body!.Data.Count);
+        Assert.Equal(3, body!.TotalCount);
+    }
+
+    [Fact]
+    public async Task Get_FilterByAnotherUsersAccountId_ReturnsEmptyPage_NotError()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id);
+
+        var stranger = await UserFactory.CreateAsync(_context);
+        var strangerAccount = await AccountFactory.CreateAsync(_context, stranger.Id);
+        await TransactionFactory.CreateAsync(_context, stranger.Id, strangerAccount.Id);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/transactions?accountId=" + strangerAccount.Id);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+        Assert.Empty(body!.Data);
+        Assert.Equal(0, body!.TotalCount);
+    }
+
+    [Theory]
+    [InlineData("page=0")]
+    [InlineData("pageSize=0")]
+    [InlineData("pageSize=201")]
+    [InlineData("from=2026-06-01T00:00:00&to=2026-05-01T00:00:00")]
+    [InlineData("from=2026-05-01T00:00:00&to=2026-05-01T00:00:00")]
+    [InlineData("type=nonsense")]
+    public async Task Get_WithInvalidQueryParameters_ReturnsBadRequest(string query)
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/transactions?" + query);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Create_WithoutLoggedInUser_ReturnsUnauthorized()
     {
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
-        
+
         var request = new
         {
             AccountId = account.Id,

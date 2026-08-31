@@ -39,12 +39,13 @@ public class TransactionsController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> Get()
+    public async Task<IActionResult> Get([FromQuery] TransactionQueryRequest request)
     {
         var user = _currentUserAccessor.User!;
-        var transactions = await _transactionService.GetAllForUser(user);
+        var query = request.ToInput();
+        var (items, totalCount) = await _transactionService.GetPageForUser(user, query);
 
-        return Ok(TransactionResource.Collection(transactions));
+        return Ok(TransactionPageResource.From(items, query.Page, query.PageSize, totalCount));
     }
 
     [HttpPost]
