@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using PitakaApp.Api.Actions;
 using PitakaApp.Api.Data;
+using PitakaApp.Api.Enums;
 using PitakaApp.Api.Inputs;
 using PitakaApp.Api.Models;
 
@@ -21,14 +22,55 @@ public class TransactionService
         _updateAccountBalance = updateAccountBalance;
     }
     
-    public async Task<List<Transaction>> GetAllForUser(User user) =>
-        await _context.Transactions
+    public async Task<(IReadOnlyList<Transaction> Items, int TotalCount)> GetPageForUser(
+        User user, TransactionQueryInput query)
+    {
+        var filtered = _context.Transactions
             .AsNoTracking()
+            .Where(t => t.UserId == user.Id);
+
+        if (query.AccountId is int accountId)
+        {
+            filtered = filtered.Where(t => t.AccountId == accountId || t.TransferToAccountId == accountId);
+        }
+
+        if (query.CategoryId is int categoryId)
+        {
+            filtered = filtered.Where(t => t.CategoryId == categoryId);
+        }
+
+        if (query.Type is TransactionType type)
+        {
+            filtered = filtered.Where(t => t.Type == type);
+        }
+
+        if (query.From is DateTime from)
+        {
+            filtered = filtered.Where(t => t.TransactionDate >= from);
+        }
+
+        if (query.To is DateTime to)
+        {
+            filtered = filtered.Where(t => t.TransactionDate < to);
+        }
+
+        var totalCount = await filtered.CountAsync();
+
+        // [Range(1, int.MaxValue)] lets Page be large enough that (Page - 1) * PageSize
+        // overflows int; compute the offset in long and clamp so an absurd page number
+        // yields an empty page rather than a negative Skip and a database error.
+        var skip = (int)Math.Min((long)(query.Page - 1) * query.PageSize, int.MaxValue);
+
+        var items = await filtered
             .Include(t => t.Tags)
-            .Where(a => a.UserId == user.Id)
             .OrderByDescending(t => t.TransactionDate)
             .ThenByDescending(t => t.Id)
+            .Skip(skip)
+            .Take(query.PageSize)
             .ToListAsync();
+
+        return (items, totalCount);
+    }
 
     public async Task<List<Transaction>> GetAllForAccount(Account account) =>
         await _context.Transactions
