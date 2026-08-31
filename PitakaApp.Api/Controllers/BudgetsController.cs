@@ -16,16 +16,22 @@ public class BudgetsController : ControllerBase
 {
     private readonly BudgetService _budgetService;
     private readonly VerifyCategoryExistence _verifyCategoryExistence;
+    private readonly GetBudgetCycle _getBudgetCycle;
+    private readonly GetBudgetAmountSpent _getBudgetAmountSpent;
     private readonly CurrentUserAccessor _currentUserAccessor;
 
     public BudgetsController(
         BudgetService budgetService,
         VerifyCategoryExistence verifyCategoryExistence,
+        GetBudgetCycle getBudgetCycle,
+        GetBudgetAmountSpent getBudgetAmountSpent,
         CurrentUserAccessor currentUserAccessor
     )
     {
         _budgetService = budgetService;
         _verifyCategoryExistence = verifyCategoryExistence;
+        _getBudgetCycle = getBudgetCycle;
+        _getBudgetAmountSpent = getBudgetAmountSpent;
         _currentUserAccessor = currentUserAccessor;
     }
 
@@ -69,7 +75,10 @@ public class BudgetsController : ControllerBase
             return NotFound();
         }
 
-        return Ok(BudgetResource.FromModel(budget));
+        var (cycleStart, cycleEnd) = _getBudgetCycle.ForBudget(budget);
+        var amountSpent = await _getBudgetAmountSpent.GetAsync(budget, cycleStart, cycleEnd);
+
+        return Ok(BudgetWithSpendResource.FromModel(budget, amountSpent, cycleStart, cycleEnd));
     }
 
     [HttpPut("{id}")]

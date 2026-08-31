@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using Microsoft.Extensions.DependencyInjection;
 using PitakaApp.Api.Data;
 using PitakaApp.Api.Enums;
+using PitakaApp.Api.Models;
 using PitakaApp.Api.Resources;
 using PitakaApp.Api.Tests.Factories;
 using PitakaApp.Api.Tests.Fixtures;
@@ -257,6 +258,222 @@ public class BudgetsControllerTest : IDisposable
         Assert.Null(body!.EndDate);
         Assert.Null(body!.Description);
         Assert.Null(body!.CategoryId);
+    }
+
+    // --- AmountSpent + cycle (see .scratch/budget-cycle-spend/spec.md) ---
+
+    private static DateOnly UtcToday => DateOnly.FromDateTime(DateTime.UtcNow);
+    private static DateTime UtcMidnightToday => DateTime.UtcNow.Date;
+
+    private async Task<BudgetWithSpendResource> ShowBudget(User user, int budgetId)
+    {
+        _client.ActAsUser(user);
+        var response = await _client.GetAsync("/api/budgets/" + budgetId);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return (await response.Content.ReadFromJsonAsync<BudgetWithSpendResource>(TestJsonOptions.Default))!;
+    }
+
+    [Fact]
+    public async Task Show_DailyBudget_ReturnsAmountSpentAndTodayCycle()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var budget = await BudgetFactory.CreateAsync(
+            _context, user.Id, period: BudgetPeriod.Daily, amountLimit: 5000,
+            startDate: UtcToday.AddDays(-7));
+
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, TransactionType.Expense, amount: 100, transactionDate: DateTime.UtcNow);
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, TransactionType.Expense, amount: 50, transactionDate: DateTime.UtcNow);
+        // Non-counting: an expense outside the window.
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, TransactionType.Expense, amount: 999, transactionDate: UtcMidnightToday.AddDays(-1));
+
+        var body = await ShowBudget(user, budget.Id);
+
+        Assert.Equal(150m, body.AmountSpent);
+        Assert.Equal(UtcToday, body.CycleStart);
+        Assert.Equal(UtcToday, body.CycleEnd);
+        Assert.Equal(5000m, body.AmountLimit);
+    }
+
+    [Fact]
+    public async Task Show_AmountSpent_ExcludesIncomeTransferOtherCategoryAndOutOfWindow()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var groceries = await CategoryFactory.CreateAsync(_context, user.Id, type: CategoryType.Expense);
+        var transport = await CategoryFactory.CreateAsync(_context, user.Id, type: CategoryType.Expense);
+        var budget = await BudgetFactory.CreateAsync(
+            _context, user.Id, period: BudgetPeriod.Daily, categoryId: groceries.Id,
+            startDate: UtcToday.AddDays(-7));
+
+        // Counts.
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, TransactionType.Expense, amount: 100, categoryId: groceries.Id, transactionDate: DateTime.UtcNow);
+        // Excluded.
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, TransactionType.Income, amount: 200, categoryId: groceries.Id, transactionDate: DateTime.UtcNow);
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, TransactionType.Transfer, amount: 300, transactionDate: DateTime.UtcNow);
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, TransactionType.Expense, amount: 400, categoryId: transport.Id, transactionDate: DateTime.UtcNow);
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, TransactionType.Expense, amount: 500, categoryId: groceries.Id, transactionDate: UtcMidnightToday.AddDays(-1));
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, TransactionType.Expense, amount: 600, categoryId: groceries.Id, transactionDate: UtcMidnightToday.AddDays(1));
+
+        var body = await ShowBudget(user, budget.Id);
+
+        Assert.Equal(100m, body.AmountSpent);
+    }
+
+    [Fact]
+    public async Task Show_AmountSpent_IncludesWindowBoundariesAndRecurringGenerated()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var recurring = await RecurringTransactionFactory.CreateAsync(_context, user.Id, account.Id);
+        var budget = await BudgetFactory.CreateAsync(
+            _context, user.Id, period: BudgetPeriod.Daily, startDate: UtcToday.AddDays(-7));
+
+        // Exactly on CycleStart (midnight) and the last instant of CycleEnd both count.
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, TransactionType.Expense, amount: 100, transactionDate: UtcMidnightToday);
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, TransactionType.Expense, amount: 50, transactionDate: UtcMidnightToday.AddDays(1).AddSeconds(-1));
+        // Generated by a RecurringTransaction — ordinary for this sum.
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, TransactionType.Expense, amount: 25, transactionDate: DateTime.UtcNow, recurringTransactionId: recurring.Id);
+        // Non-counting: one day before CycleStart, one day after CycleEnd.
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, TransactionType.Expense, amount: 999, transactionDate: UtcMidnightToday.AddDays(-1));
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, TransactionType.Expense, amount: 999, transactionDate: UtcMidnightToday.AddDays(1));
+
+        var body = await ShowBudget(user, budget.Id);
+
+        Assert.Equal(175m, body.AmountSpent);
+    }
+
+    [Fact]
+    public async Task Show_NullCategoryBudget_CountsEveryExpenseInWindowIncludingUncategorised()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var a = await CategoryFactory.CreateAsync(_context, user.Id, type: CategoryType.Expense);
+        var b = await CategoryFactory.CreateAsync(_context, user.Id, type: CategoryType.Expense);
+        var budget = await BudgetFactory.CreateAsync(
+            _context, user.Id, period: BudgetPeriod.Daily, categoryId: null,
+            startDate: UtcToday.AddDays(-7));
+
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, TransactionType.Expense, amount: 100, categoryId: a.Id, transactionDate: DateTime.UtcNow);
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, TransactionType.Expense, amount: 30, categoryId: b.Id, transactionDate: DateTime.UtcNow);
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, TransactionType.Expense, amount: 20, categoryId: null, transactionDate: DateTime.UtcNow);
+        // Non-counting.
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, TransactionType.Income, amount: 999, categoryId: a.Id, transactionDate: DateTime.UtcNow);
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, TransactionType.Expense, amount: 999, categoryId: null, transactionDate: UtcMidnightToday.AddDays(-1));
+
+        var body = await ShowBudget(user, budget.Id);
+
+        Assert.Equal(150m, body.AmountSpent);
+    }
+
+    [Fact]
+    public async Task Show_BudgetOnParentCategory_DoesNotCountChildCategoryExpense()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var parent = await CategoryFactory.CreateAsync(_context, user.Id, type: CategoryType.Expense);
+        var child = CategoryFactory.Make(user.Id, type: CategoryType.Expense);
+        child.ParentId = parent.Id;
+        _context.Categories.Add(child);
+        await _context.SaveChangesAsync();
+
+        var budget = await BudgetFactory.CreateAsync(
+            _context, user.Id, period: BudgetPeriod.Daily, categoryId: parent.Id,
+            startDate: UtcToday.AddDays(-7));
+
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, TransactionType.Expense, amount: 100, categoryId: parent.Id, transactionDate: DateTime.UtcNow);
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, TransactionType.Expense, amount: 40, categoryId: child.Id, transactionDate: DateTime.UtcNow);
+
+        var body = await ShowBudget(user, budget.Id);
+
+        Assert.Equal(100m, body.AmountSpent);
+    }
+
+    [Fact]
+    public async Task Show_AmountSpent_IgnoresAnotherUsersExpenseInTheSameWindow()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var other = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var otherAccount = await AccountFactory.CreateAsync(_context, other.Id);
+        var budget = await BudgetFactory.CreateAsync(
+            _context, user.Id, period: BudgetPeriod.Daily, startDate: UtcToday.AddDays(-7));
+
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, TransactionType.Expense, amount: 100, transactionDate: DateTime.UtcNow);
+        await TransactionFactory.CreateAsync(_context, other.Id, otherAccount.Id, TransactionType.Expense, amount: 999, transactionDate: DateTime.UtcNow);
+
+        var body = await ShowBudget(user, budget.Id);
+
+        Assert.Equal(100m, body.AmountSpent);
+    }
+
+    [Fact]
+    public async Task Show_NoTransactionsInCycle_AmountSpentIsZero()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var budget = await BudgetFactory.CreateAsync(
+            _context, user.Id, period: BudgetPeriod.Daily, startDate: UtcToday.AddDays(-7));
+
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, TransactionType.Expense, amount: 999, transactionDate: UtcMidnightToday.AddDays(-2));
+
+        var body = await ShowBudget(user, budget.Id);
+
+        Assert.Equal(0m, body.AmountSpent);
+    }
+
+    [Fact]
+    public async Task Show_FutureStartDate_DescribesFirstCycleWithZeroSpend()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        await AccountFactory.CreateAsync(_context, user.Id);
+        var firstOfNextMonth = new DateOnly(UtcToday.Year, UtcToday.Month, 1).AddMonths(2);
+        var budget = await BudgetFactory.CreateAsync(
+            _context, user.Id, period: BudgetPeriod.Monthly, startDate: firstOfNextMonth);
+
+        var body = await ShowBudget(user, budget.Id);
+
+        Assert.Equal(firstOfNextMonth, body.CycleStart);
+        Assert.Equal(firstOfNextMonth.AddMonths(1).AddDays(-1), body.CycleEnd);
+        Assert.Equal(0m, body.AmountSpent);
+    }
+
+    [Fact]
+    public async Task Show_PastEndDate_ReturnsFinalCycleAndItsTotal()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var start = new DateOnly(UtcToday.Year, UtcToday.Month, 1).AddMonths(-6);
+        var end = new DateOnly(UtcToday.Year, UtcToday.Month, 15).AddMonths(-2);
+        var budget = await BudgetFactory.CreateAsync(
+            _context, user.Id, period: BudgetPeriod.Monthly, startDate: start, endDate: end, amountLimit: 5000);
+
+        var insideFinalCycle = new DateOnly(end.Year, end.Month, 10).ToDateTime(TimeOnly.MinValue);
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, TransactionType.Expense, amount: 100, transactionDate: insideFinalCycle);
+        // Today's expense is outside the final (past) cycle.
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, TransactionType.Expense, amount: 999, transactionDate: DateTime.UtcNow);
+
+        var body = await ShowBudget(user, budget.Id);
+
+        Assert.Equal(new DateOnly(end.Year, end.Month, 1), body.CycleStart);
+        Assert.Equal(end, body.CycleEnd);
+        Assert.Equal(100m, body.AmountSpent);
+        Assert.Equal(5000m, body.AmountLimit);
+    }
+
+    [Fact]
+    public async Task Show_ShortFirstCycle_DoesNotProRateAmountLimit()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        await AccountFactory.CreateAsync(_context, user.Id);
+        var seventeenth = new DateOnly(UtcToday.Year, UtcToday.Month, 17);
+        var budget = await BudgetFactory.CreateAsync(
+            _context, user.Id, period: BudgetPeriod.Monthly, startDate: seventeenth, amountLimit: 5000);
+
+        var body = await ShowBudget(user, budget.Id);
+
+        Assert.Equal(seventeenth, body.CycleStart);
+        Assert.Equal(5000m, body.AmountLimit);
     }
 
     [Fact]
