@@ -33,6 +33,7 @@ public static class ApplicationServiceExtensions
         services.AddScoped<BudgetService>();
         services.AddScoped<GetBudgetCycle>();
         services.AddScoped<GetBudgetAmountSpent>();
+        services.AddScoped<GetBudgetWithSpend>();
         
         // Goal
         services.AddScoped<GoalService>();
