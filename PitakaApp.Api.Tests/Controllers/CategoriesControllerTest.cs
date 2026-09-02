@@ -469,6 +469,60 @@ public class CategoriesControllerTest : IDisposable
         var response = await _client.DeleteAsync("api/categories/" + seededCategory.Id);
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
     }
-    
+
+    [Fact]
+    public async Task Delete_WithTransactionFiledUnderIt_ReturnsConflict()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(user);
+
+        var category = await CategoryFactory.CreateAsync(_context, user.Id);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, categoryId: category.Id);
+
+        var response = await _client.DeleteAsync("api/categories/" + category.Id);
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Delete_WithBudgetNarrowedToIt_ReturnsConflict()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(user);
+
+        var category = await CategoryFactory.CreateAsync(_context, user.Id);
+        await BudgetFactory.CreateAsync(_context, user.Id, categoryId: category.Id);
+
+        var response = await _client.DeleteAsync("api/categories/" + category.Id);
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Delete_WithRecurringTransactionCarryingIt_ReturnsConflict()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(user);
+
+        var category = await CategoryFactory.CreateAsync(_context, user.Id);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        await RecurringTransactionFactory.CreateAsync(_context, user.Id, account.Id, categoryId: category.Id);
+
+        var response = await _client.DeleteAsync("api/categories/" + category.Id);
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Delete_WithChildCategory_ReturnsConflict()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(user);
+
+        var parent = await CategoryFactory.CreateAsync(_context, user.Id);
+        await CategoryFactory.CreateAsync(_context, user.Id, parentId: parent.Id);
+
+        var response = await _client.DeleteAsync("api/categories/" + parent.Id);
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
     public void Dispose() => _scope.Dispose();
 }
