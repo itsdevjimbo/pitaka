@@ -12,7 +12,7 @@ public class Category : TimestampedEntity
     [MaxLength(255)]
     public required string Name { get; set;}
 
-    public required CategoryType Type { get; set; }
+    public required CategoryType Type { get; init; }
 
     public string? Description { get; set; }
 

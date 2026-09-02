@@ -254,7 +254,6 @@ public class CategoriesControllerTest : IDisposable
         var request = new
         {
             Name = "Test category 3",
-            Type = CategoryType.Expense,
         };
 
         var response = await _client.PutAsJsonAsync("/api/categories/" + seededCategory.Id, request);
@@ -270,7 +269,6 @@ public class CategoriesControllerTest : IDisposable
         var request = new
         {
             Name = "Test category 3",
-            Type = CategoryType.Expense,
         };
 
         var response = await _client.PutAsJsonAsync("/api/categories/99999", request);
@@ -289,7 +287,6 @@ public class CategoriesControllerTest : IDisposable
         var request = new
         {
             Name = "Test category 3",
-            Type = CategoryType.Expense,
         };
 
         var response = await _client.PutAsJsonAsync("/api/categories/" + seededCategory.Id, request);
@@ -308,7 +305,6 @@ public class CategoriesControllerTest : IDisposable
         var request = new
         {
             Name = "Test category 3",
-            Type = CategoryType.Expense,
         };
 
         var response = await _client.PutAsJsonAsync("/api/categories/" + category.Id, request);
@@ -326,7 +322,6 @@ public class CategoriesControllerTest : IDisposable
         var request = new
         {
             Name = "Test category 3",
-            Type = CategoryType.Expense,
         };
 
         var response = await _client.PutAsJsonAsync("/api/categories/" + seededCategory.Id, request);
@@ -336,7 +331,46 @@ public class CategoriesControllerTest : IDisposable
         Assert.Equal("Test category 3", body!.Name);
     }
 
+    [Fact]
+    public async Task Update_WithStrayType_IgnoresItAndReturnsOk()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(user);
 
+        var seededCategory = await CategoryFactory.CreateAsync(_context, user.Id, type: CategoryType.Expense);
+
+        var request = new
+        {
+            Name = "Renamed",
+            Type = "Income",
+        };
+
+        var response = await _client.PutAsJsonAsync("/api/categories/" + seededCategory.Id, request);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<CategoryResource>(TestJsonOptions.Default);
+        Assert.Equal(CategoryType.Expense, body!.Type);
+    }
+
+    [Fact]
+    public async Task Update_OmittingType_LeavesStoredTypeUnchanged()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(user);
+
+        var seededCategory = await CategoryFactory.CreateAsync(_context, user.Id, type: CategoryType.Expense);
+
+        var request = new
+        {
+            Name = "Renamed",
+        };
+
+        var response = await _client.PutAsJsonAsync("/api/categories/" + seededCategory.Id, request);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<CategoryResource>(TestJsonOptions.Default);
+        Assert.Equal(CategoryType.Expense, body!.Type);
+    }
 
     [Fact]
     public async Task Update_DuplicateNameForUser_ReturnsConflict()
@@ -350,7 +384,6 @@ public class CategoriesControllerTest : IDisposable
         var request = new
         {
             Name = "Groceries",
-            Type = CategoryType.Expense,
         };
 
         var response = await _client.PutAsJsonAsync("/api/categories/" + seededCategory.Id, request);
@@ -368,7 +401,6 @@ public class CategoriesControllerTest : IDisposable
         var request = new
         {
             Name = "Groceries",
-            Type = CategoryType.Income,
         };
 
         var response = await _client.PutAsJsonAsync("/api/categories/" + seededCategory.Id, request);
@@ -386,7 +418,6 @@ public class CategoriesControllerTest : IDisposable
         var request = new
         {
             Name = "Groceries",
-            Type = CategoryType.Expense,
             ParentId = seededCategory.Id,
         };
 
