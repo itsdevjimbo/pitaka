@@ -8,8 +8,15 @@ public record TransactionQueryRequest(
     int? AccountId = null,
     int? CategoryId = null,
     TransactionType? Type = null,
-    DateTime? From = null,
-    DateTime? To = null,
+
+    // `from`/`to` are half-open calendar bounds that each carry their own zone. A
+    // DateTimeOffset holds both an instant and the wall-clock reading it was taken from —
+    // the two frames TransactionDate stores (CONTEXT.md, "Time"). A bare timestamp with no
+    // designator is a 400, enforced in ZoneBearingDateTimeOffsetModelBinder while the raw
+    // text still exists; two bounds with different offsets are a 400, enforced in Validate()
+    // below. See ADR 0005.
+    DateTimeOffset? From = null,
+    DateTimeOffset? To = null,
 
     [Range(1, int.MaxValue, ErrorMessage = "page must be 1 or greater.")]
     int? Page = null,
@@ -20,7 +27,26 @@ public record TransactionQueryRequest(
 {
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
-        if (From is DateTime from && To is DateTime to && from >= to)
+        if (From is not DateTimeOffset from || To is not DateTimeOffset to)
+        {
+            yield break;
+        }
+
+        // One range, one zone. Reject a mismatch here and stop: with the offsets equal the
+        // instants and the wall-clock readings sort the same way, so the inverted-range
+        // guard below stays correct as a single instant comparison with no second one
+        // beside it — and a caller who has not even settled on one zone does not also need
+        // to hear that their range is backwards. See ADR 0005.
+        if (from.Offset != to.Offset)
+        {
+            yield return new ValidationResult(
+                "from and to must name the same zone.",
+                [nameof(From)]
+            );
+            yield break;
+        }
+
+        if (from >= to)
         {
             yield return new ValidationResult(
                 "from must be strictly earlier than to.",

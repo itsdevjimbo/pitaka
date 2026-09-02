@@ -372,7 +372,7 @@ public class TransactionsControllerTest : IDisposable
 
         _client.ActAsUser(user);
 
-        var response = await _client.GetAsync("/api/transactions?from=2026-05-01T00:00:00");
+        var response = await _client.GetAsync("/api/transactions?from=2026-05-01T00:00:00Z");
         var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
 
         Assert.Equal(new[] { after.Id, atBoundary.Id }, body!.Data.Select(t => t.Id));
@@ -391,7 +391,7 @@ public class TransactionsControllerTest : IDisposable
 
         _client.ActAsUser(user);
 
-        var response = await _client.GetAsync("/api/transactions?to=2026-06-01T00:00:00");
+        var response = await _client.GetAsync("/api/transactions?to=2026-06-01T00:00:00Z");
         var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
 
         Assert.Equal(new[] { before.Id }, body!.Data.Select(t => t.Id));
@@ -411,7 +411,7 @@ public class TransactionsControllerTest : IDisposable
 
         _client.ActAsUser(user);
 
-        var response = await _client.GetAsync("/api/transactions?from=2026-05-01T00:00:00&to=2026-06-01T00:00:00");
+        var response = await _client.GetAsync("/api/transactions?from=2026-05-01T00:00:00Z&to=2026-06-01T00:00:00Z");
         var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
 
         Assert.Equal(new[] { inMay2.Id, inMay1.Id }, body!.Data.Select(t => t.Id));
@@ -487,9 +487,16 @@ public class TransactionsControllerTest : IDisposable
     [InlineData("page=0")]
     [InlineData("pageSize=0")]
     [InlineData("pageSize=201")]
-    [InlineData("from=2026-06-01T00:00:00&to=2026-05-01T00:00:00")]
-    [InlineData("from=2026-05-01T00:00:00&to=2026-05-01T00:00:00")]
+    [InlineData("from=2026-06-01T00:00:00Z&to=2026-05-01T00:00:00Z")]
+    [InlineData("from=2026-05-01T00:00:00Z&to=2026-05-01T00:00:00Z")]
     [InlineData("type=nonsense")]
+    // A bound with no zone designator: the server would otherwise read it in its own zone.
+    [InlineData("from=2026-09-01T00:00:00")]
+    [InlineData("to=2026-09-01T00:00:00")]
+    // A bound that is not a timestamp at all.
+    [InlineData("from=lunchtime")]
+    // Two bounds, two zones.
+    [InlineData("from=2026-09-01T00:00:00%2B08:00&to=2026-09-30T00:00:00-05:00")]
     public async Task Get_WithInvalidQueryParameters_ReturnsBadRequest(string query)
     {
         var user = await UserFactory.CreateAsync(_context);
@@ -497,6 +504,245 @@ public class TransactionsControllerTest : IDisposable
 
         var response = await _client.GetAsync("/api/transactions?" + query);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Get_FilterByFrom_WithoutAZoneDesignator_IsRejected_ForTheMissingDesignator()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/transactions?from=2026-09-01T00:00:00");
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>();
+        var messages = problem!.Errors.SelectMany(e => e.Value);
+        Assert.Contains(messages, m => m.Contains("zone designator", StringComparison.OrdinalIgnoreCase));
+    }
+
+    // The guard is a model binder wired up by one line in Program.cs. Detach it — delete the
+    // registration, or turn Insert(0, …) into Add(…) so the default binder wins — and a bare
+    // timestamp binds silently to the server's zone. This is the case that must stay a 400,
+    // so this test fails loudly if the guard is ever left doing nothing. (Issue 02, AC7.)
+    [Theory]
+    [InlineData("from=2026-09-01T00:00:00")]
+    [InlineData("to=2026-09-01T00:00:00")]
+    [InlineData("from=2026-09-01T00:00:00&to=2026-10-01T00:00:00")]
+    public async Task Get_FilterBoundWithoutADesignator_IsNeverBoundAsTheServersLocalTime(string query)
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/transactions?" + query);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Get_FilterByFrom_ThatIsNotATimestamp_IsRejected_ForNotBeingATimestamp_NotTheDesignator()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/transactions?from=lunchtime");
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>();
+        var messages = problem!.Errors.SelectMany(e => e.Value).ToList();
+        Assert.Contains(messages, m => m.Contains("ISO-8601 timestamp", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(messages, m => m.Contains("zone designator", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task Get_FilterRange_WithTwoDifferentOffsets_IsRejected()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync(
+            "/api/transactions?from=2026-09-01T00:00:00%2B08:00&to=2026-09-30T00:00:00-05:00");
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>();
+        var messages = problem!.Errors.SelectMany(e => e.Value);
+        Assert.Contains(messages, m => m.Contains("name the same zone", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task Get_FilterRange_WithTwoDifferentOffsetsAndAlsoInverted_ReportsOnlyTheZoneMismatch()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(user);
+
+        // Instants invert (05:00Z on 2 May is after 00:00Z on 1 May) and the offsets differ.
+        // Only the zone mismatch is worth saying: the range cannot be ordered until it is in
+        // one zone. See ADR 0005.
+        var response = await _client.GetAsync(
+            "/api/transactions?from=2026-05-02T00:00:00%2B08:00&to=2026-05-01T00:00:00-05:00");
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>();
+        var messages = problem!.Errors.SelectMany(e => e.Value).ToList();
+        Assert.Contains(messages, m => m.Contains("name the same zone", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(messages, m => m.Contains("strictly earlier", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task Get_FilterRange_Inverted_IsRejected_ForTheInversion_NotAMissingDesignator()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync(
+            "/api/transactions?from=2026-06-01T00:00:00Z&to=2026-05-01T00:00:00Z");
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>();
+        var messages = problem!.Errors.SelectMany(e => e.Value).ToList();
+        Assert.Contains(messages, m => m.Contains("strictly earlier", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(messages, m => m.Contains("zone designator", StringComparison.OrdinalIgnoreCase));
+    }
+
+    // --- from/to carry their own offset; each frame is filtered in its own terms (issue #72, ADR 0005) ---
+    //
+    // TransactionDate holds two frames: a recorded Transaction is a real UTC instant, a
+    // generated one is a wall-clock midnight with no offset. A DateTimeOffset bound carries
+    // both readings, so the recorded frame is compared against the bound's instant and the
+    // generated frame against its wall-clock. Every boundary case below runs at a positive
+    // and a negative offset: the recorded cases fail against an unshifted compare, the
+    // generated cases against one that treats every row as an instant.
+
+    [Fact]
+    public async Task Get_FilterRange_RecordedTransactionInLocalEarlyMorning_FallsInThatLocalDay_PositiveOffset()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+
+        // 02:00 on 1 Sep local (UTC+8) — belongs to local September, stored the previous day in UTC.
+        var earlyMorning = await TransactionFactory.CreateAsync(
+            _context, user.Id, account.Id,
+            transactionDate: new DateTime(2026, 8, 31, 18, 0, 0, DateTimeKind.Utc));
+        // 18:00 on 31 Aug local (UTC+8) — genuinely local August, must not be pulled in.
+        await TransactionFactory.CreateAsync(
+            _context, user.Id, account.Id,
+            transactionDate: new DateTime(2026, 8, 31, 10, 0, 0, DateTimeKind.Utc));
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync(
+            "/api/transactions?from=2026-09-01T00:00:00%2B08:00&to=2026-10-01T00:00:00%2B08:00");
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+
+        Assert.Equal(new[] { earlyMorning.Id }, body!.Data.Select(t => t.Id));
+        Assert.Equal(1, body!.TotalCount);
+    }
+
+    [Fact]
+    public async Task Get_FilterRange_RecordedTransactionInLocalLateEvening_FallsInThatLocalDay_NegativeOffset()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+
+        // 23:00 on 30 Sep local (UTC-5) — belongs to local September, stored the next day in UTC.
+        var lateEvening = await TransactionFactory.CreateAsync(
+            _context, user.Id, account.Id,
+            transactionDate: new DateTime(2026, 10, 1, 4, 0, 0, DateTimeKind.Utc));
+        // 01:00 on 1 Oct local (UTC-5) — genuinely local October, must not be pulled in.
+        await TransactionFactory.CreateAsync(
+            _context, user.Id, account.Id,
+            transactionDate: new DateTime(2026, 10, 1, 6, 0, 0, DateTimeKind.Utc));
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync(
+            "/api/transactions?from=2026-09-01T00:00:00-05:00&to=2026-10-01T00:00:00-05:00");
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+
+        Assert.Equal(new[] { lateEvening.Id }, body!.Data.Select(t => t.Id));
+        Assert.Equal(1, body!.TotalCount);
+    }
+
+    [Theory]
+    [InlineData("%2B08:00")]
+    [InlineData("-05:00")]
+    public async Task Get_FilterRange_GeneratedTransaction_FallsOnTheDayItIsDated_RegardlessOfOffset(string offset)
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var schedule = await RecurringTransactionFactory.CreateAsync(_context, user.Id, account.Id);
+
+        var datedSep1 = await TransactionFactory.CreateAsync(
+            _context, user.Id, account.Id,
+            transactionDate: new DateTime(2026, 9, 1),
+            recurringTransactionId: schedule.Id);
+        // Dated the last day of August and the first of October — neither may leak in.
+        await TransactionFactory.CreateAsync(
+            _context, user.Id, account.Id,
+            transactionDate: new DateTime(2026, 8, 31),
+            recurringTransactionId: schedule.Id);
+        await TransactionFactory.CreateAsync(
+            _context, user.Id, account.Id,
+            transactionDate: new DateTime(2026, 10, 1),
+            recurringTransactionId: schedule.Id);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync(
+            $"/api/transactions?from=2026-09-01T00:00:00{offset}&to=2026-10-01T00:00:00{offset}");
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+
+        Assert.Equal(new[] { datedSep1.Id }, body!.Data.Select(t => t.Id));
+        Assert.Equal(1, body!.TotalCount);
+    }
+
+    [Fact]
+    public async Task Get_FilterRange_RecordedAndGeneratedOnTheSameLocalDay_BothComeBack()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var schedule = await RecurringTransactionFactory.CreateAsync(_context, user.Id, account.Id);
+
+        // Recorded at 02:00 on 1 Sep local (UTC+8); stored 31 Aug 18:00 UTC.
+        var recorded = await TransactionFactory.CreateAsync(
+            _context, user.Id, account.Id,
+            transactionDate: new DateTime(2026, 8, 31, 18, 0, 0, DateTimeKind.Utc));
+        // Generated, dated 1 Sep, wall-clock midnight with no offset.
+        var generated = await TransactionFactory.CreateAsync(
+            _context, user.Id, account.Id,
+            transactionDate: new DateTime(2026, 9, 1),
+            recurringTransactionId: schedule.Id);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync(
+            "/api/transactions?from=2026-09-01T00:00:00%2B08:00&to=2026-10-01T00:00:00%2B08:00");
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+
+        Assert.Equal(
+            new[] { generated.Id, recorded.Id }.OrderByDescending(id => id),
+            body!.Data.Select(t => t.Id).OrderByDescending(id => id));
+        Assert.Equal(2, body!.TotalCount);
+    }
+
+    [Fact]
+    public async Task Get_FilterRange_WithUtcBounds_TreatsEveryRowAsAnInstant()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+
+        // 31 Aug 18:00 UTC. With a UTC bound the instant is 31 Aug, so a UTC-September filter excludes it.
+        await TransactionFactory.CreateAsync(
+            _context, user.Id, account.Id,
+            transactionDate: new DateTime(2026, 8, 31, 18, 0, 0, DateTimeKind.Utc));
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync(
+            "/api/transactions?from=2026-09-01T00:00:00Z&to=2026-10-01T00:00:00Z");
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+
+        Assert.Empty(body!.Data);
+        Assert.Equal(0, body!.TotalCount);
     }
 
     [Fact]

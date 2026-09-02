@@ -44,14 +44,29 @@ public class TransactionService
             filtered = filtered.Where(t => t.Type == type);
         }
 
-        if (query.From is DateTime from)
+        // `from`/`to` are half-open bounds that each carry their own zone (ADR 0005).
+        // TransactionDate holds two frames (CONTEXT.md, "Time"): a recorded Transaction is a
+        // real UTC instant, a generated one is a wall-clock day with no offset. A
+        // DateTimeOffset carries both readings, so each frame is compared in its own terms —
+        // the recorded row against the bound's instant, the generated row against the bound's
+        // wall-clock. Any future TransactionDate filter inherits this recorded-vs-generated
+        // split; it is not visible from the column type.
+        if (query.From is DateTimeOffset from)
         {
-            filtered = filtered.Where(t => t.TransactionDate >= from);
+            var fromInstant = from.UtcDateTime;
+            var fromWallClock = from.DateTime;
+            filtered = filtered.Where(t =>
+                (t.RecurringTransactionId == null && t.TransactionDate >= fromInstant)
+                || (t.RecurringTransactionId != null && t.TransactionDate >= fromWallClock));
         }
 
-        if (query.To is DateTime to)
+        if (query.To is DateTimeOffset to)
         {
-            filtered = filtered.Where(t => t.TransactionDate < to);
+            var toInstant = to.UtcDateTime;
+            var toWallClock = to.DateTime;
+            filtered = filtered.Where(t =>
+                (t.RecurringTransactionId == null && t.TransactionDate < toInstant)
+                || (t.RecurringTransactionId != null && t.TransactionDate < toWallClock));
         }
 
         var totalCount = await filtered.CountAsync();
