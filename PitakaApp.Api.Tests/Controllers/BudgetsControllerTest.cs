@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using PitakaApp.Api.Data;
 using PitakaApp.Api.Enums;
@@ -81,9 +82,12 @@ public class BudgetsControllerTest : IDisposable
             StartDate = DateOnly.FromDateTime(DateTime.Now),
             CategoryId = 99999
         };
-        
+
         var response = await _client.PostAsJsonAsync("/api/budgets", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal("Category does not exist", problem!.Detail);
     }
 
     [Fact]
@@ -103,9 +107,12 @@ public class BudgetsControllerTest : IDisposable
             StartDate = DateOnly.FromDateTime(DateTime.Now),
             CategoryId = category.Id,
         };
-        
+
         var response = await _client.PostAsJsonAsync("/api/budgets", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal("Category does not exist", problem!.Detail);
     }
 
     [Fact]
@@ -179,7 +186,7 @@ public class BudgetsControllerTest : IDisposable
     public async Task Create_UserCategory_ReturnsCreatedStatusCode()
     {
         var user = await UserFactory.CreateAsync(_context);
-        var category = await CategoryFactory.CreateAsync(_context, user.Id);
+        var category = await CategoryFactory.CreateAsync(_context, user.Id, type: CategoryType.Expense);
         _client.ActAsUser(user);
 
         var request = new
@@ -199,7 +206,7 @@ public class BudgetsControllerTest : IDisposable
     public async Task Create_SystemDefaultCategory_ReturnsCreatedStatusCode()
     {
         var user = await UserFactory.CreateAsync(_context);
-        var category = await CategoryFactory.CreateAsync(_context);
+        var category = await CategoryFactory.CreateAsync(_context, type: CategoryType.Expense);
         _client.ActAsUser(user);
 
         var request = new
@@ -213,6 +220,75 @@ public class BudgetsControllerTest : IDisposable
         
         var response = await _client.PostAsJsonAsync("/api/budgets", request);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Create_WithOwnIncomeCategory_ReturnsBadRequestWithDetail()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var category = await CategoryFactory.CreateAsync(_context, user.Id, type: CategoryType.Income);
+        _client.ActAsUser(user);
+
+        var request = new
+        {
+            Name = "Transpo Budget",
+            AmountLimit = 5000,
+            Period = BudgetPeriod.Weekly,
+            StartDate = DateOnly.FromDateTime(DateTime.Now),
+            CategoryId = category.Id,
+        };
+
+        var response = await _client.PostAsJsonAsync("/api/budgets", request);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal("A budget can only be narrowed to an expense category.", problem!.Detail);
+    }
+
+    [Fact]
+    public async Task Create_WithSystemDefaultIncomeCategory_ReturnsBadRequest()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        // System default, IsDefault == true — visible to everyone, but still Income.
+        var category = await CategoryFactory.CreateAsync(_context, name: "Salary", type: CategoryType.Income);
+        _client.ActAsUser(user);
+
+        var request = new
+        {
+            Name = "Transpo Budget",
+            AmountLimit = 5000,
+            Period = BudgetPeriod.Weekly,
+            StartDate = DateOnly.FromDateTime(DateTime.Now),
+            CategoryId = category.Id,
+        };
+
+        var response = await _client.PostAsJsonAsync("/api/budgets", request);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal("A budget can only be narrowed to an expense category.", problem!.Detail);
+    }
+
+    [Fact]
+    public async Task Create_WithNullCategory_ReturnsCreated()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(user);
+
+        var request = new
+        {
+            Name = "Transpo Budget",
+            AmountLimit = 5000,
+            Period = BudgetPeriod.Weekly,
+            StartDate = DateOnly.FromDateTime(DateTime.Now),
+            CategoryId = (int?)null,
+        };
+
+        var response = await _client.PostAsJsonAsync("/api/budgets", request);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<BudgetResource>(TestJsonOptions.Default);
+        Assert.Null(body!.CategoryId);
     }
 
     [Fact]
@@ -731,6 +807,9 @@ public class BudgetsControllerTest : IDisposable
 
         var response = await _client.PutAsJsonAsync("/api/budgets/" + budget.Id, request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal("Category does not exist", problem!.Detail);
     }
 
     [Fact]
@@ -755,13 +834,94 @@ public class BudgetsControllerTest : IDisposable
 
         var response = await _client.PutAsJsonAsync("/api/budgets/" + budget.Id, request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal("Category does not exist", problem!.Detail);
+    }
+
+    [Fact]
+    public async Task Update_WithOwnIncomeCategory_ReturnsBadRequestWithDetail()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var category = await CategoryFactory.CreateAsync(_context, user.Id, type: CategoryType.Income);
+        var budget = await BudgetFactory.CreateAsync(_context, user.Id);
+
+        _client.ActAsUser(user);
+
+        var request = new
+        {
+            Name = "Updated Budget",
+            AmountLimit = 5000,
+            Period = BudgetPeriod.Weekly,
+            StartDate = DateOnly.FromDateTime(DateTime.Now),
+            CategoryId = category.Id,
+        };
+
+        var response = await _client.PutAsJsonAsync("/api/budgets/" + budget.Id, request);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal("A budget can only be narrowed to an expense category.", problem!.Detail);
+    }
+
+    [Fact]
+    public async Task Update_ChangingOnlyNameOfIncomeCategoryBudget_ReturnsBadRequest()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        // The API can no longer create this fixture, so the factory seeds it directly:
+        // an existing Budget already narrowed to an income category.
+        var category = await CategoryFactory.CreateAsync(_context, user.Id, type: CategoryType.Income);
+        var budget = await BudgetFactory.CreateAsync(
+            _context, user.Id, name: "Old name", categoryId: category.Id);
+
+        _client.ActAsUser(user);
+
+        // PUT is a full replacement; the body still carries the same (unchanged) CategoryId.
+        var request = new
+        {
+            Name = "New name",
+            AmountLimit = budget.AmountLimit,
+            Period = budget.Period,
+            StartDate = budget.StartDate,
+            CategoryId = category.Id,
+        };
+
+        var response = await _client.PutAsJsonAsync("/api/budgets/" + budget.Id, request);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal("A budget can only be narrowed to an expense category.", problem!.Detail);
+    }
+
+    [Fact]
+    public async Task Update_WithNullCategory_ReturnsOk()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var budget = await BudgetFactory.CreateAsync(_context, user.Id);
+
+        _client.ActAsUser(user);
+
+        var request = new
+        {
+            Name = "Updated Budget",
+            AmountLimit = 5000,
+            Period = BudgetPeriod.Weekly,
+            StartDate = DateOnly.FromDateTime(DateTime.Now),
+            CategoryId = (int?)null,
+        };
+
+        var response = await _client.PutAsJsonAsync("/api/budgets/" + budget.Id, request);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<BudgetResource>(TestJsonOptions.Default);
+        Assert.Null(body!.CategoryId);
     }
 
     [Fact]
     public async Task Update_ReturnsOk()
     {
         var user = await UserFactory.CreateAsync(_context);
-        var category = await CategoryFactory.CreateAsync(_context, user.Id);
+        var category = await CategoryFactory.CreateAsync(_context, user.Id, type: CategoryType.Expense);
         var budget = await BudgetFactory.CreateAsync(_context, user.Id);
         
         _client.ActAsUser(user);
@@ -794,7 +954,7 @@ public class BudgetsControllerTest : IDisposable
     public async Task Update_CategoryIdToNull_ReturnsOk()
     {
         var user = await UserFactory.CreateAsync(_context);
-        var category = await CategoryFactory.CreateAsync(_context, user.Id);
+        var category = await CategoryFactory.CreateAsync(_context, user.Id, type: CategoryType.Expense);
         var budget = await BudgetFactory.CreateAsync(_context, user.Id, categoryId: category.Id);
         
         _client.ActAsUser(user);
@@ -953,7 +1113,7 @@ public class BudgetsControllerTest : IDisposable
     public async Task Update_WithEndDateBeforeStartDate_ReturnsBadRequest()
     {
         var user = await UserFactory.CreateAsync(_context);
-        var category = await CategoryFactory.CreateAsync(_context, user.Id);
+        var category = await CategoryFactory.CreateAsync(_context, user.Id, type: CategoryType.Expense);
         var budget = await BudgetFactory.CreateAsync(_context, user.Id);
         
         _client.ActAsUser(user);
