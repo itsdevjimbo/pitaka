@@ -48,6 +48,10 @@ _Avoid_: Filtered, scoped, assigned
 What a Transaction is filed under. Each Category is permanently either Income or Expense, and a Transaction has at most one.
 _Avoid_: Tag, label
 
+**In use**:
+A Category is in use once anything points at it — a Transaction filed under it, a Budget narrowed to it, a recurring transaction carrying it, or a child Category beneath it. A Category in use cannot be deleted; what was filed under it stays filed.
+_Avoid_: Referenced, linked, has dependents
+
 **Tag**:
 A free label on a Transaction, for finding it again. A Transaction may carry any number.
 _Avoid_: Category, group
