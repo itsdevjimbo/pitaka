@@ -15,22 +15,36 @@ namespace PitakaApp.Api.Controllers;
 public class BudgetsController : ControllerBase
 {
     private readonly BudgetService _budgetService;
-    private readonly VerifyCategoryExistence _verifyCategoryExistence;
+    private readonly VerifyBudgetCategory _verifyBudgetCategory;
     private readonly GetBudgetWithSpend _getBudgetWithSpend;
     private readonly CurrentUserAccessor _currentUserAccessor;
 
     public BudgetsController(
         BudgetService budgetService,
-        VerifyCategoryExistence verifyCategoryExistence,
+        VerifyBudgetCategory verifyBudgetCategory,
         GetBudgetWithSpend getBudgetWithSpend,
         CurrentUserAccessor currentUserAccessor
     )
     {
         _budgetService = budgetService;
-        _verifyCategoryExistence = verifyCategoryExistence;
+        _verifyBudgetCategory = verifyBudgetCategory;
         _getBudgetWithSpend = getBudgetWithSpend;
         _currentUserAccessor = currentUserAccessor;
     }
+
+    // Maps VerifyBudgetCategory's verdict to the 400 to send, or null when the category is
+    // acceptable. The existence wording is copied verbatim from TransactionsController — the
+    // same failure should not read two ways across endpoints.
+    private IActionResult? RejectBudgetCategory(BudgetCategoryVerdict verdict) => verdict switch
+    {
+        BudgetCategoryVerdict.NotFound =>
+            Problem(detail: "Category does not exist", statusCode: StatusCodes.Status400BadRequest),
+        BudgetCategoryVerdict.NotExpense => Problem(
+            detail: "A budget can only be narrowed to an expense category.",
+            statusCode: StatusCodes.Status400BadRequest
+        ),
+        _ => null,
+    };
 
     [HttpGet]
     public async Task<IActionResult> Get()
@@ -61,9 +75,10 @@ public class BudgetsController : ControllerBase
             return Problem(detail: "A budget with this name already exists.", statusCode: StatusCodes.Status409Conflict);
         }
         
-        if (request.CategoryId is int categoryId  && !await _verifyCategoryExistence.VerifyAsync(user, categoryId))
+        if (request.CategoryId is int categoryId
+            && RejectBudgetCategory(await _verifyBudgetCategory.VerifyAsync(user, categoryId)) is { } rejection)
         {
-            return BadRequest();
+            return rejection;
         }
 
         var budget = await _budgetService.CreateAsync(user, request.ToInput());
@@ -101,16 +116,17 @@ public class BudgetsController : ControllerBase
             return Forbid();
         }
         
-        if (request.CategoryId is int categoryId  && !await _verifyCategoryExistence.VerifyAsync(user, categoryId))
-        {
-            return BadRequest();
-        }
-
         if (await _budgetService.NameExistsForUserAsync(user.Id, request.Name, excludeId: id))
         {
             return Problem(detail: "A budget with this name already exists.", statusCode: StatusCodes.Status409Conflict);
         }
-        
+
+        if (request.CategoryId is int categoryId
+            && RejectBudgetCategory(await _verifyBudgetCategory.VerifyAsync(user, categoryId)) is { } rejection)
+        {
+            return rejection;
+        }
+
         await _budgetService.UpdateAsync(budget, request.ToInput());
 
         return Ok(BudgetResource.FromModel(budget));
