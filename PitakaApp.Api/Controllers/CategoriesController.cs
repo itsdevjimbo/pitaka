@@ -48,7 +48,7 @@ public class CategoriesController : ControllerBase
 
     [TypeFilter(typeof(ResolveCurrentUserFilter))]
     [HttpPost]
-    public async Task<IActionResult> Create(CategoryRequest request)
+    public async Task<IActionResult> Create(CreateCategoryRequest request)
     {
         var user = _currentUserAccessor.User!;
 
@@ -82,7 +82,7 @@ public class CategoriesController : ControllerBase
 
     [TypeFilter(typeof(ResolveCurrentUserFilter))]
     [HttpPut("{id}")]
-    public async Task<IActionResult> Update(int id, CategoryRequest request)
+    public async Task<IActionResult> Update(int id, UpdateCategoryRequest request)
     {
         var user = _currentUserAccessor.User!;
         var category = await _categoryService.GetTrackedByIdAsync(id);

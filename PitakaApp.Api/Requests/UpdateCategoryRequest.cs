@@ -1,15 +1,11 @@
 using System.ComponentModel.DataAnnotations;
-using PitakaApp.Api.Enums;
 using PitakaApp.Api.Inputs;
 
 namespace PitakaApp.Api.Requests;
 
-public record CategoryRequest (
+public record UpdateCategoryRequest (
     [Required, MaxLength(255)]
     string Name,
-
-    [Required]
-    CategoryType Type,
 
     string? Description,
 
@@ -22,6 +18,6 @@ public record CategoryRequest (
     int? ParentId
 )
 {
-    public CategoryInput ToInput() =>
-        new(Name: Name, Type: Type, Description: Description, Icon: Icon, Color: Color, ParentId: ParentId);
+    public UpdateCategoryInput ToInput() =>
+        new(Name: Name, Description: Description, Icon: Icon, Color: Color, ParentId: ParentId);
 }
