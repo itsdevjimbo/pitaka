@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PitakaApp.Api.Actions;
+using PitakaApp.Api.Enums;
 using PitakaApp.Api.Filters;
+using PitakaApp.Api.Models;
 using PitakaApp.Api.Requests;
 using PitakaApp.Api.Resources;
 using PitakaApp.Api.Services;
@@ -15,21 +17,45 @@ namespace PitakaApp.Api.Controllers;
 public class BudgetsController : ControllerBase
 {
     private readonly BudgetService _budgetService;
-    private readonly VerifyCategoryExistence _verifyCategoryExistence;
+    private readonly CategoryService _categoryService;
     private readonly GetBudgetWithSpend _getBudgetWithSpend;
     private readonly CurrentUserAccessor _currentUserAccessor;
 
     public BudgetsController(
         BudgetService budgetService,
-        VerifyCategoryExistence verifyCategoryExistence,
+        CategoryService categoryService,
         GetBudgetWithSpend getBudgetWithSpend,
         CurrentUserAccessor currentUserAccessor
     )
     {
         _budgetService = budgetService;
-        _verifyCategoryExistence = verifyCategoryExistence;
+        _categoryService = categoryService;
         _getBudgetWithSpend = getBudgetWithSpend;
         _currentUserAccessor = currentUserAccessor;
+    }
+
+    // A Budget's Category, when present, must be an expense category: only expenses count
+    // against a Budget, so an income-narrowed Budget reports zero spent forever. Same
+    // visibility rule as elsewhere (own or system default); returns the rejection to send,
+    // or null when the category is acceptable.
+    private async Task<IActionResult?> RejectNonExpenseCategory(User user, int categoryId)
+    {
+        var category = await _categoryService.GetByIdForUser(user, categoryId);
+
+        if (category == null)
+        {
+            return Problem(detail: "Category does not exist", statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        if (category.Type != CategoryType.Expense)
+        {
+            return Problem(
+                detail: "A budget can only be narrowed to an expense category.",
+                statusCode: StatusCodes.Status400BadRequest
+            );
+        }
+
+        return null;
     }
 
     [HttpGet]
@@ -61,9 +87,9 @@ public class BudgetsController : ControllerBase
             return Problem(detail: "A budget with this name already exists.", statusCode: StatusCodes.Status409Conflict);
         }
         
-        if (request.CategoryId is int categoryId  && !await _verifyCategoryExistence.VerifyAsync(user, categoryId))
+        if (request.CategoryId is int categoryId && await RejectNonExpenseCategory(user, categoryId) is { } rejection)
         {
-            return BadRequest();
+            return rejection;
         }
 
         var budget = await _budgetService.CreateAsync(user, request.ToInput());
@@ -101,16 +127,16 @@ public class BudgetsController : ControllerBase
             return Forbid();
         }
         
-        if (request.CategoryId is int categoryId  && !await _verifyCategoryExistence.VerifyAsync(user, categoryId))
-        {
-            return BadRequest();
-        }
-
         if (await _budgetService.NameExistsForUserAsync(user.Id, request.Name, excludeId: id))
         {
             return Problem(detail: "A budget with this name already exists.", statusCode: StatusCodes.Status409Conflict);
         }
-        
+
+        if (request.CategoryId is int categoryId && await RejectNonExpenseCategory(user, categoryId) is { } rejection)
+        {
+            return rejection;
+        }
+
         await _budgetService.UpdateAsync(budget, request.ToInput());
 
         return Ok(BudgetResource.FromModel(budget));
