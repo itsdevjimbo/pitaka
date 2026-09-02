@@ -30,10 +30,25 @@ The pull signal is circular here and cannot be trusted. The client's ADR 0001 de
 
 The learning tiebreaker settles it: password reset opens three surfaces never touched here — an `IEmailSender`, a hashed single-use token store with expiry, and SMTP configuration — where widening a resource record teaches nothing. The `smtp4dev` container already in `docker-compose.yml` records the intent. The client re-adds the deleted screens as part of the same slice.
 
+## The second exception: the `type` filter on `GET /api/accounts`
+
+`GET /api/accounts` gains `?type=` with no screen behind it, for symmetry with the five filter parameters `GET /api/transactions` already accepts.
+
+No client issue asks for it. pitaka-web#1 assessed this directly and was right: filtering and pagination are "survivable for one person's Accounts and will not be for their Transactions". Nothing about that has changed. What is pulled here is not a person's need but a reader's: two list endpoints in one API answering query strings differently, with nothing in the code saying which is the house style.
+
+The exception is deliberately narrow.
+
+- **It covers `type` alone.** The same slice adds `?isActive=`, which is *not* an exception — pitaka-web's Accounts list already filters Retired Accounts out in the browser behind a *Show retired* toggle. That is a real filter on a real screen, done client-side only because the server offers no other way. It cannot be adopted yet (the screen needs the whole set for its totals), but the demand is observed rather than assumed.
+- **It is additive.** Absent parameters mean no filter, the response stays a bare array, and a client that sends no query string cannot tell it shipped. An exception that cannot break anything is a cheap one.
+- **It does not generalise.** "Symmetry with a sibling endpoint" is not hereby a recognised class of exception; it is a call made once, recorded once. Pagination was declined in the same slice for the same rule's sake, and the remaining unfiltered lists stay unfiltered.
+
+The test of this exception is whether `?type=` has a consumer a year from now. If it does not, the pull rule was right and this is the instance that shows it.
+
 ## Consequences
 
 - **The register's severity labels no longer imply order.** B1, B2, B5, B6, C1, and D1 are all marked "blocks launch" and all stay open while E3 and C3 — merely "degrades" — ship first. This looks like negligence and is not; it is this decision.
 - **Gap IDs are frozen.** An ID is allocated once, never reused and never renumbered. Closed gaps keep their ID and are struck through in place; new gaps append to their section's tail. Client code cites these IDs across a repo boundary, so a renumber would silently retarget every citation.
 - **A slice is the planning unit; a PR is the shipping unit.** A slice such as *#5 Registration* names its API PR and its client issue, and the two merge independently — a cross-repo atomic PR is not possible, and single-concern PRs are what make review work here.
 - **The plan spans both repos; the trackers do not merge.** Issues stay in each repo's own convention — local markdown under `.scratch/` here, GitHub issues in `pitaka-web`.
+- **Exceptions are recorded in this file, not in the slice that takes them.** `.scratch/` is gitignored, so an exception noted only in a spec is invisible to a reviewer, to a future agent, and to the author months later — and this ADR would go on reading as an unbroken rule while the code contradicted it. Unpulled work is allowed; unpulled work that nobody can see is how the rule stops meaning anything.
 - Three client ADRs — 0002, 0004, 0005 — are accepted debt waiting on an API change to die. A plan that cannot see them will keep mis-ranking them.

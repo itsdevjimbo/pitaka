@@ -18,6 +18,10 @@ _Avoid_: Account, user account, my account, user settings
 A place money sits — a bank account, cash on hand, a credit card. Carries a balance.
 _Avoid_: Wallet, login, user account
 
+**Retired**:
+An Account the person has stopped using. It keeps its balance and everything it recorded, still appears in the list among the active ones, and can be brought back. Retiring is how an Account leaves everyday use without being deleted — deletion is refused outright once an Account has history.
+_Avoid_: Closed, archived, deleted, inactive, disabled
+
 > `User` and `Account` are the collision to watch. Plain English uses "account" for a login, this codebase never does.
 
 ### Money that is planned
