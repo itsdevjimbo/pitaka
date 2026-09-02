@@ -74,7 +74,7 @@ public class PitakaDbContext : DbContext
             .HasOne(c => c.Parent)
             .WithMany(c => c.Children)
             .HasForeignKey(c => c.ParentId)
-            .OnDelete(DeleteBehavior.SetNull);
+            .OnDelete(DeleteBehavior.Restrict);
 
         modelBuilder.Entity<Category>()
             .HasOne(c => c.User)
@@ -86,19 +86,19 @@ public class PitakaDbContext : DbContext
             .HasOne(b => b.Category)
             .WithMany()
             .HasForeignKey(b => b.CategoryId)
-            .OnDelete(DeleteBehavior.SetNull);
+            .OnDelete(DeleteBehavior.Restrict);
 
         modelBuilder.Entity<RecurringTransaction>()
             .HasOne(rt => rt.Category)
             .WithMany()
             .HasForeignKey(rt => rt.CategoryId)
-            .OnDelete(DeleteBehavior.SetNull);
+            .OnDelete(DeleteBehavior.Restrict);
 
         modelBuilder.Entity<Transaction>()
             .HasOne(t => t.Category)
             .WithMany()
             .HasForeignKey(t => t.CategoryId)
-            .OnDelete(DeleteBehavior.SetNull);
+            .OnDelete(DeleteBehavior.Restrict);
 
         modelBuilder.Entity<Transaction>()
             .HasOne(t => t.RecurringTransaction)

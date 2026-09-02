@@ -7,7 +7,7 @@ namespace PitakaApp.Api.Tests.Factories;
 
 public static class CategoryFactory
 {
-    public static Category Make(int? userId = null, string? name = null, CategoryType? type = null)
+    public static Category Make(int? userId = null, string? name = null, CategoryType? type = null, int? parentId = null)
     {
         var faker = new Faker();
 
@@ -16,13 +16,14 @@ public static class CategoryFactory
             Name = name ?? faker.Person.FullName, // Placeholder dont know what to set
             UserId = userId,
             Type = type ?? CategoryType.Income,
+            ParentId = parentId,
             IsDefault = userId != null ? false : true
-        };  
+        };
     }
 
-    public static async Task<Category> CreateAsync(PitakaDbContext context, int? userId = null, string? name = null, CategoryType? type = null)
+    public static async Task<Category> CreateAsync(PitakaDbContext context, int? userId = null, string? name = null, CategoryType? type = null, int? parentId = null)
     {
-        var category = Make(userId, name, type);
+        var category = Make(userId, name, type, parentId);
 
         context.Categories.Add(category);
 

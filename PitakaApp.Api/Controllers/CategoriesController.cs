@@ -128,8 +128,13 @@ public class CategoriesController : ControllerBase
             return Forbid();
         }
 
+        if (await _categoryService.IsInUseAsync(id))
+        {
+            return Problem(detail: "This category is in use and cannot be deleted.", statusCode: StatusCodes.Status409Conflict);
+        }
+
         await _categoryService.DeleteAsync(category);
 
-        return NoContent();   
+        return NoContent();
     }
 }

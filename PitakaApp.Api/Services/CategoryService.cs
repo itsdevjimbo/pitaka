@@ -97,4 +97,15 @@ public class CategoryService
         _context.Categories.Remove(category);
         await _context.SaveChangesAsync();
     }
+
+    // No user scoping is intentional. VerifyCategoryExistence.VerifyAsync and
+    // VerifyBudgetCategory already confine every reference to the category's owner,
+    // and system defaults are unreachable behind the Forbid at CategoriesController.
+    // A WHERE UserId here would be redundant and would read as if cross-user
+    // references were possible.
+    public async Task<bool> IsInUseAsync(int categoryId) =>
+        await _context.Transactions.AsNoTracking().AnyAsync(t => t.CategoryId == categoryId)
+        || await _context.Budgets.AsNoTracking().AnyAsync(b => b.CategoryId == categoryId)
+        || await _context.RecurringTransactions.AsNoTracking().AnyAsync(rt => rt.CategoryId == categoryId)
+        || await _context.Categories.AsNoTracking().AnyAsync(c => c.ParentId == categoryId);
 }
