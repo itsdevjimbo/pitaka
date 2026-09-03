@@ -6,7 +6,9 @@ status: accepted
 
 `DELETE /api/categories/{id}` succeeds unconditionally on a person's own category. Nothing is consulted about what points at it, and four relationships are configured `OnDelete(DeleteBehavior.SetNull)` to absorb the consequences: a Budget's narrowing (`PitakaDbContext.cs:89`), a Transaction's filing (`:101`), a recurring transaction's category (`:95`), and a child Category's parent (`:77`). One `204` silently rewrites all four.
 
-A Category is **in use** once anything points at it, and a Category in use cannot be deleted. One rule across all four referents, one `409`, one sentence.
+> **Amended by ADR 0006**, which removes the parent link entirely. The fourth referent — a child Category's parent — ceases to exist, leaving three. Everything below describes what shipped and remains accurate as history; the rule itself is unchanged by the subtraction, for the same reason it is unchanged by addition.
+
+A Category is **in use** once anything points at it, and a Category in use cannot be deleted. One rule across every referent, one `409`, one sentence.
 
 Nobody chose `SetNull`. It reads as EF's sensible default for an optional foreign key, not as an answer to "what should deleting a Category do to the Budgets narrowed to it". This ADR answers that question, and the answer is the same for all four things asking it.
 
@@ -22,9 +24,7 @@ The Budget failure is real and is the one #75 leads with, but it is *loud*: "gro
 
 The tempting middle — block on Budgets, let Transactions go null — was rejected for the reason ADR 0003 already gave when it rejected "block the flip while Budgets reference the category". It is a rule that grows a limb per dependent. Every future reader of `CategoryId` joins the guard, joins the error message, and joins the list of relationships a person has to reconstruct before a refusal makes sense. It also means two pointers at the same row behave differently, which arrives owing an explanation nobody can give in a `409` body.
 
-The uniform rule has no such list and never grows one. Adding a fifth referent later changes nothing about what this endpoint does or says.
-
-That uniformity is also what brings the fourth relationship in. #75 named three referents and missed `Category.Parent`, where deleting a parent silently promotes its children to top-level. It is the same defect — a structural mutation riding on a `204` — and #77 is about to make the parent link load-bearing rather than decorative. Deciding three now and the fourth later would mean writing this document twice.
+The uniform rule has no such list and never grows one. Adding a referent later changes nothing about what this endpoint does or says, and neither does removing one — which is what happened to the fourth. `Category.Parent` was brought under this rule here, on the grounds that deleting a parent silently promoting its children to top-level was the same defect as the other three. ADR 0006 then rejected the parent link outright, and the rule absorbs that without a word of it changing. That is the property this section is about.
 
 ## Why refusal, and what has to come with it
 
@@ -65,8 +65,6 @@ The five below are from #75, which filed the question with no recommendation.
 - **A race between the check and the delete surfaces as a 500.** A Transaction created between `IsInUseAsync` returning false and `SaveChangesAsync` hits `Restrict` at the database and throws `DbUpdateException`. Accepted rather than caught: translating a provider exception to reconstruct information the guard already computed is only exercisable by racing two `DbContext`s, and is worth writing the day a second concurrent session exists.
 
 - **`Restrict` collides with `User → Category` being `Cascade` (`:83`) the day profile deletion arrives.** Cascading a user delete would reach a Category still referenced by that same person's Transactions and fail at the database. There is no user-delete path in the API today, and the feature would need explicitly ordered deletion regardless — a "delete everything I have" flow that leans on FK cascade ordering is not one to trust.
-
-- **A parent Category cannot be deleted while it has children**, and the escape hatch already exists: `PUT /api/categories/{id}` accepts `parentId`, so a child is detached or re-parented first. Nothing has to be built for the hierarchy, which is deliberate — there is no plan for parent categories as a product feature, and this rule does not create one.
 
 - **A *paused* recurring transaction still pins its category.** It falls out of the uniform rule: a plan that has moved no money still carries a category, and pausing is not un-using. Worth stating because it is the one referent where "in use" and "in effect" come apart.
 

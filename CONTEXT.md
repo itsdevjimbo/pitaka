@@ -45,11 +45,11 @@ A Budget carrying a Category is _narrowed_ to it: only expenses in that category
 _Avoid_: Filtered, scoped, assigned
 
 **Category**:
-What a Transaction is filed under. Each Category is permanently either Income or Expense, and a Transaction has at most one.
-_Avoid_: Tag, label
+What a Transaction is filed under. Each Category is permanently either Income or Expense, and a Transaction has at most one. Categories are flat — no Category contains another.
+_Avoid_: Tag, label, subcategory
 
 **In use**:
-A Category is in use once anything points at it — a Transaction filed under it, a Budget narrowed to it, a recurring transaction carrying it, or a child Category beneath it. A Category in use cannot be deleted; what was filed under it stays filed.
+A Category is in use once anything points at it — a Transaction filed under it, a Budget narrowed to it, or a recurring transaction carrying it. A Category in use cannot be deleted; what was filed under it stays filed.
 _Avoid_: Referenced, linked, has dependents
 
 **Tag**:
