@@ -17,11 +17,9 @@ public record CreateCategoryRequest (
     string? Icon,
 
     [MaxLength(100)]
-    string? Color,
-
-    int? ParentId
+    string? Color
 )
 {
     public CreateCategoryInput ToInput() =>
-        new(Name: Name, Type: Type, Description: Description, Icon: Icon, Color: Color, ParentId: ParentId);
+        new(Name: Name, Type: Type, Description: Description, Icon: Icon, Color: Color);
 }
