@@ -18,11 +18,21 @@ _Avoid_: Account, user account, my account, user settings
 A place money sits — a bank account, cash on hand, a credit card. Carries a balance.
 _Avoid_: Wallet, login, user account
 
+**Initial balance**:
+What an Account held before Pitaka started watching it. It is a recorded fact about the past — the money that was already there — rather than a figure the person maintains. Set when the Account is created and never revised.
+_Avoid_: Opening balance, starting amount
+
+**Current balance**:
+What an Account holds now. Not a figure anyone states: it is the initial balance plus every Transaction the Account has recorded, and it stays fully explained by that history. Correcting it against the real world is done by recording the difference as a Transaction, never by editing the number.
+_Avoid_: Running total, actual balance
+
 **Retired**:
 An Account the person has stopped using. It keeps its balance and everything it recorded, still appears in the list among the active ones, and can be brought back. Retiring is how an Account leaves everyday use without being deleted — deletion is refused outright once an Account has history.
 _Avoid_: Closed, archived, deleted, inactive, disabled
 
 > `User` and `Account` are the collision to watch. Plain English uses "account" for a login, this codebase never does.
+
+> `Initial balance` is stated, `current balance` is derived. An Account carries both, and only one of them is ever written down.
 
 ### Money that is planned
 
@@ -66,6 +76,8 @@ _Avoid_: Timezone, offset, suffix
 
 **Recorded transaction**:
 A Transaction the person entered. Its `TransactionDate` is a real UTC instant — the write path converts whatever offset the client sent with `ToUniversalTime()`. It is the complement of a generated transaction, and the two are told apart by `RecurringTransactionId` being null.
+
+What it records about the movement of money — how much, whether money came in or went out, and which accounts it moved between — is fixed once entered, because the balances it moved are still claiming to reflect it. A mistake there is corrected by deleting the Transaction and recording it again. Its date, category, description and tags stay revisable.
 _Avoid_: Manual transaction, entered transaction
 
 **Wall-clock day**:
