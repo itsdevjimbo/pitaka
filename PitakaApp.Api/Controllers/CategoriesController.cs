@@ -57,11 +57,6 @@ public class CategoriesController : ControllerBase
             return Problem(detail: "A category with this name already exists.", statusCode: StatusCodes.Status409Conflict);
         }
 
-        if (request.ParentId != null && !await _categoryService.IsValidParentAsync(user, request.ParentId.Value))
-        {
-            return Problem(detail: "Invalid parent category.", statusCode: StatusCodes.Status400BadRequest);
-        }
-
         var category = await _categoryService.CreateUserOwnedAsync(user, request.ToInput());
         return StatusCode(StatusCodes.Status201Created, CategoryResource.FromModel(category));
     }
@@ -100,11 +95,6 @@ public class CategoriesController : ControllerBase
         if (await _categoryService.NameExistsForUserAsync(user.Id, request.Name, excludeId: id))
         {
             return Problem(detail: "A category with this name already exists.", statusCode: StatusCodes.Status409Conflict);
-        }
-
-        if (request.ParentId != null && !await _categoryService.IsValidParentAsync(user, request.ParentId.Value, excludeId: id))
-        {
-            return Problem(detail: "Invalid parent category.", statusCode: StatusCodes.Status400BadRequest);
         }
 
         category = await _categoryService.UpdateAsync(category, request.ToInput());

@@ -7,6 +7,5 @@ public record CreateCategoryInput (
     CategoryType Type,
     string? Description = null,
     string? Icon = null,
-    string? Color = null,
-    int? ParentId = null
+    string? Color = null
 );

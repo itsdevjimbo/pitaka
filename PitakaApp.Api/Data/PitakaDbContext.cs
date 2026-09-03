@@ -71,12 +71,6 @@ public class PitakaDbContext : DbContext
             .OnDelete(DeleteBehavior.SetNull);
 
         modelBuilder.Entity<Category>()
-            .HasOne(c => c.Parent)
-            .WithMany(c => c.Children)
-            .HasForeignKey(c => c.ParentId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        modelBuilder.Entity<Category>()
             .HasOne(c => c.User)
             .WithMany(u => u.Categories)
             .HasForeignKey(c => c.UserId)

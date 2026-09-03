@@ -443,22 +443,19 @@ public class BudgetsControllerTest : IDisposable
     }
 
     [Fact]
-    public async Task Show_BudgetOnParentCategory_DoesNotCountChildCategoryExpense()
+    public async Task Show_AmountSpent_CountsOnlyTheBudgetsOwnCategory()
     {
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
-        var parent = await CategoryFactory.CreateAsync(_context, user.Id, type: CategoryType.Expense);
-        var child = CategoryFactory.Make(user.Id, type: CategoryType.Expense);
-        child.ParentId = parent.Id;
-        _context.Categories.Add(child);
-        await _context.SaveChangesAsync();
+        var categoryA = await CategoryFactory.CreateAsync(_context, user.Id, type: CategoryType.Expense);
+        var categoryB = await CategoryFactory.CreateAsync(_context, user.Id, type: CategoryType.Expense);
 
         var budget = await BudgetFactory.CreateAsync(
-            _context, user.Id, period: BudgetPeriod.Daily, categoryId: parent.Id,
+            _context, user.Id, period: BudgetPeriod.Daily, categoryId: categoryA.Id,
             startDate: UtcToday.AddDays(-7));
 
-        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, TransactionType.Expense, amount: 100, categoryId: parent.Id, transactionDate: DateTime.UtcNow);
-        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, TransactionType.Expense, amount: 40, categoryId: child.Id, transactionDate: DateTime.UtcNow);
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, TransactionType.Expense, amount: 100, categoryId: categoryA.Id, transactionDate: DateTime.UtcNow);
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, TransactionType.Expense, amount: 40, categoryId: categoryB.Id, transactionDate: DateTime.UtcNow);
 
         var body = await ShowBudget(user, budget.Id);
 

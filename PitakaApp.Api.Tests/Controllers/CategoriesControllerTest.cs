@@ -140,63 +140,26 @@ public class CategoriesControllerTest : IDisposable
     }
 
     [Fact]
-    public async Task Create_WithValidParentId_ReturnsCreatedWithParentId()
+    public async Task Create_WithStrayParentId_IgnoresItAndReturnsCreated()
     {
         var user = await UserFactory.CreateAsync(_context);
         _client.ActAsUser(user);
 
-        var parent = await CategoryFactory.CreateAsync(_context, user.Id, name: "Bills");
+        var other = await CategoryFactory.CreateAsync(_context, user.Id, name: "Bills");
 
         var request = new
         {
             Name = "Electricity",
             Type = CategoryType.Expense,
-            ParentId = parent.Id,
+            ParentId = other.Id,
         };
 
         var response = await _client.PostAsJsonAsync("/api/categories", request);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
         var body = await response.Content.ReadFromJsonAsync<CategoryResource>(TestJsonOptions.Default);
-        Assert.Equal(parent.Id, body!.ParentId);
-    }
-
-    [Fact]
-    public async Task Create_WithParentBelongingToOtherUser_ReturnsBadRequest()
-    {
-        var userA = await UserFactory.CreateAsync(_context);
-        var userB = await UserFactory.CreateAsync(_context);
-
-        var parent = await CategoryFactory.CreateAsync(_context, userA.Id, name: "Bills");
-
-        _client.ActAsUser(userB);
-
-        var request = new
-        {
-            Name = "Electricity",
-            Type = CategoryType.Expense,
-            ParentId = parent.Id,
-        };
-
-        var response = await _client.PostAsJsonAsync("/api/categories", request);
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task Create_WithNonExistentParentId_ReturnsBadRequest()
-    {
-        var user = await UserFactory.CreateAsync(_context);
-        _client.ActAsUser(user);
-
-        var request = new
-        {
-            Name = "Electricity",
-            Type = CategoryType.Expense,
-            ParentId = 99999,
-        };
-
-        var response = await _client.PostAsJsonAsync("/api/categories", request);
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("Electricity", body!.Name);
+        Assert.Equal(CategoryType.Expense, body.Type);
     }
 
     [Fact]
@@ -408,24 +371,6 @@ public class CategoriesControllerTest : IDisposable
     }
 
     [Fact]
-    public async Task Update_WithSelfAsParent_ReturnsBadRequest()
-    {
-        var user = await UserFactory.CreateAsync(_context);
-        _client.ActAsUser(user);
-
-        var seededCategory = await CategoryFactory.CreateAsync(_context, user.Id, name: "Groceries");
-
-        var request = new
-        {
-            Name = "Groceries",
-            ParentId = seededCategory.Id,
-        };
-
-        var response = await _client.PutAsJsonAsync("/api/categories/" + seededCategory.Id, request);
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-    }
-
-    [Fact]
     public async Task Delete_WithoutLoggedInUser_ReturnsUnauthorized()
     {
         var user = await UserFactory.CreateAsync(_context);
@@ -508,19 +453,6 @@ public class CategoriesControllerTest : IDisposable
         await RecurringTransactionFactory.CreateAsync(_context, user.Id, account.Id, categoryId: category.Id);
 
         var response = await _client.DeleteAsync("api/categories/" + category.Id);
-        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task Delete_WithChildCategory_ReturnsConflict()
-    {
-        var user = await UserFactory.CreateAsync(_context);
-        _client.ActAsUser(user);
-
-        var parent = await CategoryFactory.CreateAsync(_context, user.Id);
-        await CategoryFactory.CreateAsync(_context, user.Id, parentId: parent.Id);
-
-        var response = await _client.DeleteAsync("api/categories/" + parent.Id);
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
     }
 
