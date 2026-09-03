@@ -145,20 +145,21 @@ public class CategoriesControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         _client.ActAsUser(user);
 
-        var parent = await CategoryFactory.CreateAsync(_context, user.Id, name: "Bills");
+        var other = await CategoryFactory.CreateAsync(_context, user.Id, name: "Bills");
 
         var request = new
         {
             Name = "Electricity",
             Type = CategoryType.Expense,
-            ParentId = parent.Id,
+            ParentId = other.Id,
         };
 
         var response = await _client.PostAsJsonAsync("/api/categories", request);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-        var raw = await response.Content.ReadAsStringAsync();
-        Assert.DoesNotContain("parentId", raw, StringComparison.OrdinalIgnoreCase);
+        var body = await response.Content.ReadFromJsonAsync<CategoryResource>(TestJsonOptions.Default);
+        Assert.Equal("Electricity", body!.Name);
+        Assert.Equal(CategoryType.Expense, body.Type);
     }
 
     [Fact]
