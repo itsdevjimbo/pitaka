@@ -13,11 +13,9 @@ public record UpdateCategoryRequest (
     string? Icon,
 
     [MaxLength(100)]
-    string? Color,
-
-    int? ParentId
+    string? Color
 )
 {
     public UpdateCategoryInput ToInput() =>
-        new(Name: Name, Description: Description, Icon: Icon, Color: Color, ParentId: ParentId);
+        new(Name: Name, Description: Description, Icon: Icon, Color: Color);
 }

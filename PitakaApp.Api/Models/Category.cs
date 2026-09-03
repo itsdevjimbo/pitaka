@@ -7,8 +7,6 @@ public class Category : TimestampedEntity
 {
     public int? UserId { get; set; }
 
-    public int? ParentId { get; set; }
-
     [MaxLength(255)]
     public required string Name { get; set;}
 
@@ -26,8 +24,4 @@ public class Category : TimestampedEntity
 
 
     public User? User { get; set; }
-
-    public Category? Parent { get; set;}
-
-    public ICollection<Category> Children { get; set; } = new List<Category>();
 }
