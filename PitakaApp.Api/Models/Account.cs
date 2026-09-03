@@ -15,7 +15,7 @@ public class Account: TimestampedEntity
     public required AccountType Type { get; set; }
     
     [Column(TypeName = "decimal(14, 2)")]
-    public decimal InitialBalance { get; set;} = 0;
+    public decimal InitialBalance { get; init; } = 0;
 
     [Column(TypeName = "decimal(14, 2)")]
     public decimal CurrentBalance { get; set; } = 0;
