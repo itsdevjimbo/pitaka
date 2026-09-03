@@ -552,6 +552,22 @@ public class CategoriesControllerTest : IDisposable
     }
 
     [Fact]
+    public async Task Patch_RetiringCategoryNarrowingABudget_ReturnsOk()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(user);
+
+        var category = await CategoryFactory.CreateAsync(_context, user.Id);
+        await BudgetFactory.CreateAsync(_context, user.Id, categoryId: category.Id);
+
+        var response = await _client.PatchAsJsonAsync("/api/categories/" + category.Id + "/status", new { IsActive = false });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var budget = await _context.Budgets.AsNoTracking().SingleAsync(b => b.CategoryId == category.Id);
+        Assert.Equal(category.Id, budget.CategoryId);
+    }
+
+    [Fact]
     public async Task Get_IncludesRetiredCategories()
     {
         var user = await UserFactory.CreateAsync(_context);
