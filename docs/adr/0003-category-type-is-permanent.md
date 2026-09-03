@@ -14,7 +14,9 @@ What separates `Type` from every other field on a Category is that other rules *
 
 Enforcement is structural rather than guarded, in two layers. `CategoryRequest` and `CategoryInput` split into `Create`/`Update` pairs — the same shape `Transaction` and `Account` already use — and the update half carries no `Type`, so the assignment in `UpdateAsync` is deleted rather than protected by a check. Then `Category.Type` becomes `{ get; init; }`, so re-adding that assignment later is a compile error rather than a silent regression. `CategorySeeder` and `CreateUserOwnedAsync` are the only remaining writers, and the compiler holds them to it.
 
-Only the first of those two layers has precedent here. `UpdateTransactionRequest` has no `Type` and `UpdateAccountRequest` carries `Name` alone — an immutable field is not rejected, it is not accepted. But `Transaction.Type` and `Account.InitialBalance` are still plain settable properties, so `Category.Type` is the first field in this codebase that the compiler actually defends. Widening `init` to those two is mechanical and filed as #80; until it lands, the precedent cited above is contract-level only.
+Only the first of those two layers has precedent here. `UpdateTransactionRequest` has no `Type` and `UpdateAccountRequest` carries `Name` alone — an immutable field is not rejected, it is not accepted. `Category.Type` is the first field in this codebase that the compiler defends.
+
+The criterion that put it there generalises, and ADR 0007 states it: a field takes `init` when something has already acted on its value and stored a result that still claims to describe the current value. `Category.Type` qualifies because `VerifyBudgetCategory` reads it and a Budget's narrowing is that decision written to a row. That ADR applies the same test to `Transaction` and `Account`, and it is the place to look for what does and does not qualify — including `Account.Type`, which reads like it should and does not, because nothing in the API reads it at all.
 
 ## Considered options
 
@@ -30,7 +32,7 @@ The four below are from #74, which filed the question with no recommendation. Al
 
 ## Consequences
 
-- **Not every limb is enforced at the time of writing.** This ADR records the position; #74 implements immutability and #76 is filed and unscheduled. A reader comparing this to the code should expect to find the gap, not assume the document is stale. A third limb — a child Category's type must match its parent's (#77) — was written here and has since been **withdrawn rather than deferred**: ADR 0006 rejects the parent link, so there is no such relationship left to constrain.
+- **Not every limb is enforced at the time of writing.** This ADR records the position; #74 has since shipped and #76 is filed and unscheduled. A reader comparing this to the code should expect to find that gap, not assume the document is stale. A third limb — a child Category's type must match its parent's (#77) — was written here and has since been **withdrawn rather than deferred**: ADR 0006 rejects the parent link, so there is no such relationship left to constrain.
 
 - **The only correction path for a mis-typed category is delete and recreate**, and that path today unnarrows every Budget pointing at the category and un-files every Transaction, silently, in one `204`. This is accepted rather than solved: the state being prevented is silent and permanent, the correction path is loud and requires the person to actively destroy something. Those are not equivalent risks. #75 asks what that delete should actually do, and is the more important of the two to answer.
 
