@@ -6,6 +6,7 @@ public record TransactionQueryInput(
     int? AccountId,
     int? CategoryId,
     TransactionType? Type,
+    string? Description,
     DateTimeOffset? From,
     DateTimeOffset? To,
     int Page,
