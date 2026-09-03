@@ -44,6 +44,18 @@ public class TransactionService
             filtered = filtered.Where(t => t.Type == type);
         }
 
+        // A case-insensitive substring match on Description and nothing else (issue #73).
+        // Lower both sides so the match does not depend on the column's collation, and use
+        // Contains so LIKE metacharacters in the caller's value match literally rather than
+        // as wildcards. The request has already collapsed an empty or whitespace-only value
+        // to null.
+        if (query.Description is string descriptionContains)
+        {
+            var needle = descriptionContains.ToLowerInvariant();
+            filtered = filtered.Where(t =>
+                t.Description != null && t.Description.ToLower().Contains(needle));
+        }
+
         // `from`/`to` are half-open bounds that each carry their own zone (ADR 0005).
         // TransactionDate holds two frames (CONTEXT.md, "Time"): a recorded Transaction is a
         // real UTC instant, a generated one is a wall-clock day with no offset. A

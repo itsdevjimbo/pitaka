@@ -483,6 +483,132 @@ public class TransactionsControllerTest : IDisposable
         Assert.Equal(0, body!.TotalCount);
     }
 
+    [Fact]
+    public async Task Get_FilterByDescription_NarrowsToRowsWhoseDescriptionContainsTheValue_CaseInsensitively()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+
+        var upper = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, description: "Weekly COFFEE run");
+        var lower = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, description: "office coffee beans");
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, description: "train ticket");
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/transactions?description=coffee");
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+
+        Assert.Equal(new[] { lower.Id, upper.Id }.OrderByDescending(x => x),
+            body!.Data.Select(t => t.Id).OrderByDescending(x => x));
+        Assert.Equal(2, body!.TotalCount);
+    }
+
+    [Fact]
+    public async Task Get_FilterByDescription_NeverMatchesARowWithANullDescription()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+
+        var noted = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, description: "lunch with Sam");
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, description: null);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/transactions?description=lunch");
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+
+        Assert.Equal(new[] { noted.Id }, body!.Data.Select(t => t.Id));
+        Assert.Equal(1, body!.TotalCount);
+    }
+
+    [Fact]
+    public async Task Get_FilterByDescription_MatchesTheDescriptionOnly_NotACategoryOrAccountName()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id, name: "Groceries card");
+        var category = await CategoryFactory.CreateAsync(_context, user.Id, name: "Groceries");
+
+        var matched = await TransactionFactory.CreateAsync(
+            _context, user.Id, account.Id, categoryId: category.Id, description: "weekly groceries");
+        // Same category and account — whose names contain the needle — but a description that does not.
+        await TransactionFactory.CreateAsync(
+            _context, user.Id, account.Id, categoryId: category.Id, description: "parking");
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/transactions?description=groceries");
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+
+        Assert.Equal(new[] { matched.Id }, body!.Data.Select(t => t.Id));
+        Assert.Equal(1, body!.TotalCount);
+    }
+
+    [Fact]
+    public async Task Get_FilterByDescription_CombinesWithTypeAndPaging_TotalCountIsTheFilteredCount()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+
+        for (var i = 0; i < 3; i++)
+        {
+            await TransactionFactory.CreateAsync(
+                _context, user.Id, account.Id, type: TransactionType.Expense, description: "taxi home");
+        }
+        // Right description, wrong type.
+        await TransactionFactory.CreateAsync(
+            _context, user.Id, account.Id, type: TransactionType.Income, description: "taxi refund");
+        // Right type, wrong description.
+        await TransactionFactory.CreateAsync(
+            _context, user.Id, account.Id, type: TransactionType.Expense, description: "groceries");
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/transactions?description=taxi&type=Expense&pageSize=2");
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+
+        Assert.Equal(2, body!.Data.Count);
+        Assert.Equal(3, body!.TotalCount);
+        Assert.All(body!.Data, t => Assert.Contains("taxi", t.Description));
+    }
+
+    [Theory]
+    [InlineData("description=")]
+    [InlineData("description=%20%20")]
+    public async Task Get_FilterByDescription_EmptyOrWhitespaceOnly_IsTreatedAsAbsent(string query)
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, description: "one");
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, description: null);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/transactions?" + query);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+        Assert.Equal(2, body!.TotalCount);
+    }
+
+    [Fact]
+    public async Task Get_FilterByDescription_MatchingNoRow_ReturnsEmptyPageWithZeroTotalCount_NotA404()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, description: "coffee");
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/transactions?description=nothingmatchesthis");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+        Assert.Empty(body!.Data);
+        Assert.Equal(0, body!.TotalCount);
+    }
+
     [Theory]
     [InlineData("page=0")]
     [InlineData("pageSize=0")]

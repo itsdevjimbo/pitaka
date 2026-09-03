@@ -9,6 +9,11 @@ public record TransactionQueryRequest(
     int? CategoryId = null,
     TransactionType? Type = null,
 
+    // A case-insensitive substring match on a Transaction's `Description` and nothing else —
+    // never a Category or Account name. Empty or whitespace-only is absent, not a filter
+    // that matches everything. See issue #73.
+    string? Description = null,
+
     // `from`/`to` are half-open calendar bounds that each carry their own zone. A
     // DateTimeOffset holds both an instant and the wall-clock reading it was taken from —
     // the two frames TransactionDate stores (CONTEXT.md, "Time"). A bare timestamp with no
@@ -59,6 +64,7 @@ public record TransactionQueryRequest(
         AccountId: AccountId,
         CategoryId: CategoryId,
         Type: Type,
+        Description: string.IsNullOrWhiteSpace(Description) ? null : Description,
         From: From,
         To: To,
         Page: Page ?? 1,
