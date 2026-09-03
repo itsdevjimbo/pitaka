@@ -74,6 +74,21 @@ public class CategoryService
         return category;
     }
 
+    public async Task<Category> PatchActiveStatus(Category category, PatchCategoryActiveInput input)
+    {
+        if (input.IsActive)
+        {
+            category.Activate();
+        }
+        else
+        {
+            category.Deactivate();
+        }
+
+        await _context.SaveChangesAsync();
+        return category;
+    }
+
     public async Task DeleteAsync(Category category)
     {
         _context.Categories.Remove(category);
