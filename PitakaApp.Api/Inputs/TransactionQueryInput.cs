@@ -6,8 +6,8 @@ public record TransactionQueryInput(
     int? AccountId,
     int? CategoryId,
     TransactionType? Type,
-    DateTime? From,
-    DateTime? To,
+    DateTimeOffset? From,
+    DateTimeOffset? To,
     int Page,
     int PageSize
 );

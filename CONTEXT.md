@@ -58,6 +58,22 @@ _Avoid_: Category, group
 
 > `Category` and `Tag` are the second collision to watch. A Transaction has **one** Category and **many** Tags; a Category is typed and may be a system default, a Tag is untyped and always the person's own. Budgets count Categories and never Tags.
 
+### Time
+
+**Zone designator**:
+The tail of a timestamp naming the clock it was read on — `Z`, `+08:00`, `-05:00`. A timestamp without one is a clock reading rather than a moment: it names a time on somebody's wall, and which wall is not recorded. `from`/`to` require one; a Transaction's `transactionDate` carries one on the wire only when it is a recorded transaction.
+_Avoid_: Timezone, offset, suffix
+
+**Recorded transaction**:
+A Transaction the person entered. Its `TransactionDate` is a real UTC instant — the write path converts whatever offset the client sent with `ToUniversalTime()`. It is the complement of a generated transaction, and the two are told apart by `RecurringTransactionId` being null.
+_Avoid_: Manual transaction, entered transaction
+
+**Wall-clock day**:
+The frame a generated transaction's `TransactionDate` is in: midnight of a calendar date with no offset attached, not an instant. A recurring transaction runs on a `DateOnly` cadence, so the Transaction it creates is dated `2026-09-01`, not `2026-09-01T00:00:00Z` — there is no zone in which that midnight is a fact.
+_Avoid_: Naive datetime, local time
+
+> `TransactionDate` therefore holds two frames in one column. A read disambiguates them by `RecurringTransactionId` (ADR on the serialiser, issue #71); the `from`/`to` filter interprets each frame in its own terms (ADR 0005).
+
 ## Where Pitaka Web diverges
 
 Pitaka Web mirrors this repo's names except in three places, translated at its HTTP adapter and nowhere above it (its ADR 0003). Those three are the only points where the same concept has two correct names, so they are the only points an agent working across both repos can get wrong:

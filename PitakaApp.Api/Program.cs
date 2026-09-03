@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 using PitakaApp.Api.Infra;
 using Microsoft.AspNetCore.Mvc.ApplicationModels;
 using PitakaApp.Api.Handlers;
+using PitakaApp.Api.ModelBinding;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,6 +12,12 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers(options =>
     {
         options.Conventions.Add(new RouteTokenTransformerConvention(new SlugifyParameterTransformer()));
+
+        // A DateTimeOffset bound from the wire (query/route/form, never a JSON body) must
+        // carry its own zone designator. Without this the default binder reads a bare
+        // timestamp in the server's zone — a different answer in the container than on a
+        // developer's machine. Governs `from`/`to` on GET /api/transactions. See ADR 0005.
+        options.ModelBinderProviders.Insert(0, new ZoneBearingDateTimeOffsetModelBinderProvider());
     })
     .AddJsonOptions(options =>
         {
