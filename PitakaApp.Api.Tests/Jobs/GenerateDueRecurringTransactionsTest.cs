@@ -12,9 +12,17 @@ namespace PitakaApp.Api.Tests.Jobs;
 public class GenerateDueRecurringTransactionsTest : IDisposable
 {
     
+    // The ceiling of the decimal(14, 2) columns Amount and CurrentBalance map to.
+    private const decimal DecimalColumnCeiling = 999_999_999_999.99m;
+
     private readonly IServiceScope _scope;
     private readonly PitakaDbContext _context;
     private readonly GenerateDueRecurringTransactions _generateDueRecurringTransactions;
+
+    // Schedules built to fail on purpose. This collection shares one database with no
+    // per-test reset, so they are purged in Dispose — even if an assertion threw first —
+    // to stop later tests' GenerateAsync runs tripping over them every tick.
+    private readonly List<int> _schedulesToPurge = new();
 
     public GenerateDueRecurringTransactionsTest(PitakaWebApplicationFactory factory)
     {
@@ -153,5 +161,82 @@ public class GenerateDueRecurringTransactionsTest : IDisposable
         Assert.Equal(DateTimeKind.Unspecified, transaction.TransactionDate.Kind);
     }
 
-    public void Dispose() => _scope.Dispose();
+    [Fact]
+    public async Task Generate_OneScheduleHasAnUnmappedType_TheRestOfTheRunStillGenerates()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 100);
+
+        var date = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        // Inserted first so it is reached first: an enum value with no case in
+        // GenerateTransaction, which throws InvalidOperationException rather than a
+        // DbUpdateException. The run must not end on it.
+        var failing = await RecurringTransactionFactory.CreateAsync(
+            _context, user.Id, account.Id, startDate: date.AddDays(-1), nextRunDate: date,
+            type: (RecurringTransactionType)99, name: "Unmapped type"
+        );
+        _schedulesToPurge.Add(failing.Id);
+
+        var healthy = await RecurringTransactionFactory.CreateAsync(
+            _context, user.Id, account.Id, startDate: date.AddDays(-1), nextRunDate: date,
+            type: RecurringTransactionType.Income, amount: 300, name: "Healthy"
+        );
+
+        await _generateDueRecurringTransactions.GenerateAsync();
+
+        Assert.False(await _context.Transactions.AnyAsync(t => t.RecurringTransactionId == failing.Id));
+        Assert.True(await _context.Transactions.AnyAsync(t => t.RecurringTransactionId == healthy.Id));
+
+        var healthyAfter = await _context.RecurringTransactions.AsNoTracking().FirstAsync(rt => rt.Id == healthy.Id);
+        Assert.Equal(date.AddDays(1), healthyAfter.NextRunDate);
+    }
+
+    [Fact]
+    public async Task Generate_OneScheduleFailsToSave_ItsTrackedStateDoesNotLeakIntoTheNext()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+
+        // Balance sits at the decimal(14, 2) ceiling; the generated income tips
+        // CurrentBalance past the column and SaveChangesAsync throws DbUpdateException
+        // after the balance was mutated and the Transaction was already tracked.
+        var overflowingAccount = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: DecimalColumnCeiling);
+        var healthyAccount = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 500);
+
+        var date = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        var failing = await RecurringTransactionFactory.CreateAsync(
+            _context, user.Id, overflowingAccount.Id, startDate: date.AddDays(-1), nextRunDate: date,
+            amount: DecimalColumnCeiling, name: "Overflows"
+        );
+        _schedulesToPurge.Add(failing.Id);
+
+        var healthy = await RecurringTransactionFactory.CreateAsync(
+            _context, user.Id, healthyAccount.Id, startDate: date.AddDays(-1), nextRunDate: date,
+            amount: 300, name: "Healthy"
+        );
+
+        await _generateDueRecurringTransactions.GenerateAsync();
+
+        Assert.True(await _context.Transactions.AnyAsync(t => t.RecurringTransactionId == healthy.Id));
+        Assert.False(await _context.Transactions.AnyAsync(t => t.RecurringTransactionId == failing.Id));
+
+        // The healthy account moved by exactly its own amount: the failed iteration's
+        // balance change did not ride along on this SaveChangesAsync.
+        var healthyAfter = await _context.Accounts.AsNoTracking().FirstAsync(a => a.Id == healthyAccount.Id);
+        Assert.Equal(800, healthyAfter.CurrentBalance);
+
+        var overflowingAfter = await _context.Accounts.AsNoTracking().FirstAsync(a => a.Id == overflowingAccount.Id);
+        Assert.Equal(DecimalColumnCeiling, overflowingAfter.CurrentBalance);
+    }
+
+    public void Dispose()
+    {
+        if (_schedulesToPurge.Count > 0)
+        {
+            _context.RecurringTransactions.Where(rt => _schedulesToPurge.Contains(rt.Id)).ExecuteDelete();
+        }
+
+        _scope.Dispose();
+    }
 }

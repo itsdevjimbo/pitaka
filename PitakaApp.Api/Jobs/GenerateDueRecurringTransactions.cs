@@ -67,10 +67,23 @@ public class GenerateDueRecurringTransactions
                 }
 
                 await _context.SaveChangesAsync();
-            } 
+            }
             catch (DbUpdateConcurrencyException ex)
             {
-                _logger.LogWarning(ex, "Recurring transaction {Id} failed to generate due to a concurrency conflict.", recurringTransaction.Id);
+                // Expected and self-healing: Account.Version lost an optimistic-concurrency
+                // race, so the next tick regenerates this schedule. Stays at Warning so a
+                // routine lost race doesn't read as an alert.
+                _logger.LogWarning(ex, "Recurring transaction {Id} lost a concurrency race; it will be retried next run.", recurringTransaction.Id);
+                _context.ChangeTracker.Clear();
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // Any other failure — an FK violation, an unmapped enum, a missing account —
+                // must not abandon the rest of the run. Discard the half-applied balance
+                // mutation and the added Transaction that are still tracked, then move to the
+                // next schedule. A persistent failure now starves only itself, not every
+                // schedule ordered behind it. Cancellation is left to propagate.
+                _logger.LogError(ex, "Recurring transaction {Id} failed to generate; skipping it for this run.", recurringTransaction.Id);
                 _context.ChangeTracker.Clear();
             }
         }
