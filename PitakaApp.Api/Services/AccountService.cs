@@ -38,14 +38,7 @@ public class AccountService
 
     public async Task<Account> CreateAsync(User user, CreateAccountInput input)
     {
-        var account = new Account
-        {
-            UserId = user.Id,
-            Name = input.Name,
-            Type = input.Type,
-            InitialBalance = input.InitialBalance,
-            CurrentBalance = input.InitialBalance
-        };
+        var account = Account.Open(user.Id, input.Name, input.Type, input.InitialBalance);
 
         _context.Accounts.Add(account);
 
