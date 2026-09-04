@@ -17,6 +17,9 @@ public static class ApplicationServiceExtensions
         services.AddScoped<CurrentUserAccessor>();
         services.AddScoped<RequestPasswordReset>();
         services.AddScoped<ResetPassword>();
+        services.AddScoped<SendEmailConfirmation>();
+        services.AddScoped<ConfirmEmail>();
+        services.AddScoped<ResendConfirmation>();
 
         // Category
         services.AddScoped<CategoryService>();

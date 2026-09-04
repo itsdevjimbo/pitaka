@@ -27,6 +27,13 @@ public static class EmailExtensions
             .Validate(o => o.TokenLifetime > TimeSpan.Zero, "PasswordReset:TokenLifetime must be greater than zero.")
             .ValidateOnStart();
 
+        // Bound and validated alongside PasswordResetOption — same shape, same reason:
+        // a missing confirm URL fails on boot, not on the first person who registers.
+        builder.Services.AddOptions<EmailConfirmationOption>()
+            .Bind(builder.Configuration.GetSection(EmailConfirmationOption.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
         builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
 
         return builder;

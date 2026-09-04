@@ -37,8 +37,8 @@ public class RegisterUserConcurrencyTest : IDisposable
         var userManagerA = scopeA.ServiceProvider.GetRequiredService<UserManager<User>>();
         var userManagerB = scopeB.ServiceProvider.GetRequiredService<UserManager<User>>();
 
-        var registerA = new RegisterUser(userManagerA);
-        var registerB = new RegisterUser(userManagerB);
+        var registerA = new RegisterUser(userManagerA, scopeA.ServiceProvider.GetRequiredService<SendEmailConfirmation>());
+        var registerB = new RegisterUser(userManagerB, scopeB.ServiceProvider.GetRequiredService<SendEmailConfirmation>());
 
         var inputA = new RegisterInput("Racer A", email, "TestPass123!");
         var inputB = new RegisterInput("Racer B", email, "TestPass123!");

@@ -12,10 +12,12 @@ public class RegisterUser
     private const int DuplicateKeyErrorNumber = 1062;
 
     private readonly UserManager<User> _userManager;
+    private readonly SendEmailConfirmation _sendEmailConfirmation;
 
-    public RegisterUser(UserManager<User> userManager)
+    public RegisterUser(UserManager<User> userManager, SendEmailConfirmation sendEmailConfirmation)
     {
         _userManager = userManager;
+        _sendEmailConfirmation = sendEmailConfirmation;
     }
 
     public async Task<User?> ExecuteAsync(RegisterInput input)
@@ -50,6 +52,11 @@ public class RegisterUser
             // is a real fault: rethrow.
             return null;
         }
+
+        // S2: RequireConfirmedAccount means this Profile cannot sign in until this link
+        // is used. No token is handed back on this path any more — the controller routes
+        // to a "check your inbox" screen instead.
+        await _sendEmailConfirmation.ExecuteAsync(user);
 
         return user;
     }

@@ -21,6 +21,8 @@ public class AuthController : ControllerBase
     private readonly GetCurrentUser _getCurrentUser;
     private readonly RequestPasswordReset _requestPasswordReset;
     private readonly ResetPassword _resetPassword;
+    private readonly ConfirmEmail _confirmEmail;
+    private readonly ResendConfirmation _resendConfirmation;
 
     public AuthController(
         LoginUser loginUser,
@@ -28,7 +30,9 @@ public class AuthController : ControllerBase
         GenerateJwtToken generateJwtToken,
         GetCurrentUser getCurrentUser,
         RequestPasswordReset requestPasswordReset,
-        ResetPassword resetPassword
+        ResetPassword resetPassword,
+        ConfirmEmail confirmEmail,
+        ResendConfirmation resendConfirmation
     )
     {
         _loginUser = loginUser;
@@ -37,21 +41,35 @@ public class AuthController : ControllerBase
         _getCurrentUser = getCurrentUser;
         _requestPasswordReset = requestPasswordReset;
         _resetPassword = resetPassword;
+        _confirmEmail = confirmEmail;
+        _resendConfirmation = resendConfirmation;
     }
 
     [HttpPost("login")]
     public async Task<IActionResult> Login(LoginRequest request)
     {
-        var user = await _loginUser.ExecuteAsync(request.ToInput());
-        if (user == null)
+        var result = await _loginUser.ExecuteAsync(request.ToInput());
+
+        switch (result.Outcome)
         {
-            return Problem(detail: "Invalid email or password.", statusCode: StatusCodes.Status401Unauthorized);
+            case LoginOutcome.Succeeded:
+                var token = _generateJwtToken.Execute(result.User!);
+                var userResponse = new UserResponse(result.User!.Id, result.User.Name, result.User.Email!);
+                return Ok(new LoginResponse(token, userResponse));
+
+            // Correct password, unconfirmed email. Supersedes the pre-S2 behaviour where
+            // this was indistinguishable from a wrong password — see ADR 0012.
+            case LoginOutcome.NotConfirmed:
+                return Problem(detail: "Confirm your email to sign in.", statusCode: StatusCodes.Status403Forbidden);
+
+            case LoginOutcome.LockedOut:
+                return Problem(
+                    detail: "Too many failed sign-in attempts. Try again shortly.",
+                    statusCode: StatusCodes.Status423Locked);
+
+            default:
+                return Problem(detail: "Invalid email or password.", statusCode: StatusCodes.Status401Unauthorized);
         }
-
-        var token = _generateJwtToken.Execute(user);
-        var userResponse = new UserResponse(user.Id, user.Name, user.Email!);
-
-        return Ok(new LoginResponse(token, userResponse));
     }
 
     [HttpPost("register")]
@@ -64,12 +82,38 @@ public class AuthController : ControllerBase
             return Problem(detail: "A user with this email already exists.", statusCode: StatusCodes.Status409Conflict);
         }
 
-        var token = _generateJwtToken.Execute(user);
         var userResponse = new UserResponse(user.Id, user.Name, user.Email!);
 
-        // 201 with no Location header — matches AccountsController.Create. There is no
-        // canonical GET /users/{id} to point at; GET /api/auth/me is derived from the token.
-        return StatusCode(StatusCodes.Status201Created, new LoginResponse(token, userResponse));
+        // 201 with the Profile only — no token. A new Profile cannot sign in until it
+        // confirms the email RegisterUser just sent (ADR 0012). No Location header —
+        // matches AccountsController.Create; there is no canonical GET /users/{id}.
+        return StatusCode(StatusCodes.Status201Created, userResponse);
+    }
+
+    // Anonymous. Body carries the userId and token RegisterUser/ResendConfirmation put
+    // on the confirm link. Unknown id, bad token and expired token all collapse to the
+    // same 400 — an onlooker cannot tell which one happened.
+    [HttpPost("confirm-email")]
+    public async Task<IActionResult> ConfirmEmail(ConfirmEmailRequest request)
+    {
+        var succeeded = await _confirmEmail.ExecuteAsync(request.ToInput());
+        if (!succeeded)
+        {
+            return Problem(
+                detail: "This confirmation link is invalid or has expired.",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        return NoContent();
+    }
+
+    // Always 202 Accepted with no body, for a known unconfirmed address, a confirmed
+    // address and an unknown one alike — same indistinguishability as forgot-password.
+    [HttpPost("resend-confirmation")]
+    public async Task<IActionResult> ResendConfirmation(ResendConfirmationRequest request)
+    {
+        await _resendConfirmation.ExecuteAsync(request.ToInput());
+        return Accepted();
     }
 
     // Always 202 Accepted with no body, for a known address and an unknown one alike —

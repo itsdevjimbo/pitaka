@@ -41,9 +41,10 @@ public static class IdentityExtensions
     // and the test store can't silently drift apart on what counts as a valid password.
     public static void ConfigureIdentityOptions(IdentityOptions options)
     {
-        // S1 keeps behaviour byte-identical to today: every registered Profile could
-        // sign in immediately. S2 flips this to true.
-        options.SignIn.RequireConfirmedAccount = false;
+        // S2: a Profile must confirm its email before CheckPasswordSignInAsync will
+        // succeed for it — an otherwise-correct sign-in comes back IsNotAllowed instead.
+        // S1 kept this false to stay byte-identical to pre-Identity behaviour.
+        options.SignIn.RequireConfirmedAccount = true;
 
         // The exact length-only rule PasswordRules already expresses — the store and
         // the request-edge [StringLength] agree on what a valid password is.

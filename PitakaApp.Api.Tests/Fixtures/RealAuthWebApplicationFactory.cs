@@ -1,9 +1,12 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using PitakaApp.Api.Data;
+using PitakaApp.Api.Services;
 
 namespace PitakaApp.Api.Tests.Fixtures;
 
@@ -27,6 +30,11 @@ public class RealAuthWebApplicationFactory : WebApplicationFactory<Program>, IAs
     // actual value only needs to be self-consistent within this factory's own host.
     private const string TestJwtKey = "test-only-jwt-signing-key-not-for-real-use-0000";
 
+    // S2's register -> confirm -> login -> me arc needs the confirmation link, and this
+    // factory otherwise leaves the real SmtpEmailSender wired — nothing in S1 was
+    // authenticated, so nothing here ever needed to read a sent message before.
+    public readonly RecordingEmailSender EmailSender = new();
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.ConfigureAppConfiguration((_, config) =>
@@ -37,6 +45,12 @@ public class RealAuthWebApplicationFactory : WebApplicationFactory<Program>, IAs
                 ["Jwt:Key"] = TestJwtKey,
                 ["RecurringTransaction:Enabled"] = "false"
             });
+        });
+
+        builder.ConfigureTestServices(services =>
+        {
+            services.RemoveAll<IEmailSender>();
+            services.AddSingleton<IEmailSender>(EmailSender);
         });
     }
 

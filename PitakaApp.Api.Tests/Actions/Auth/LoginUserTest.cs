@@ -30,9 +30,10 @@ public class LoginUserTest : IDisposable
         const string password = "Test123!";
         await UserFactory.CreateAsync(_context, email, password);
 
-        var loggedInUser = await _loginUser.ExecuteAsync(new LoginInput(email, password));
+        var result = await _loginUser.ExecuteAsync(new LoginInput(email, password));
 
-        Assert.NotNull(loggedInUser);
+        Assert.Equal(LoginOutcome.Succeeded, result.Outcome);
+        Assert.NotNull(result.User);
     }
 
     [Fact]
@@ -42,9 +43,10 @@ public class LoginUserTest : IDisposable
         const string password = "Test123!";
         await UserFactory.CreateAsync(_context, email, password);
 
-        var user = await _loginUser.ExecuteAsync(new LoginInput("wrong@email.com", password));
+        var result = await _loginUser.ExecuteAsync(new LoginInput("wrong@email.com", password));
 
-        Assert.Null(user);
+        Assert.Equal(LoginOutcome.InvalidCredentials, result.Outcome);
+        Assert.Null(result.User);
     }
 
     [Fact]
@@ -53,9 +55,25 @@ public class LoginUserTest : IDisposable
         var email = _faker.Internet.Email();
         await UserFactory.CreateAsync(_context, email, "Test123!");
 
-        var user = await _loginUser.ExecuteAsync(new LoginInput(email, "wrongpassword123!"));
+        var result = await _loginUser.ExecuteAsync(new LoginInput(email, "wrongpassword123!"));
 
-        Assert.Null(user);
+        Assert.Equal(LoginOutcome.InvalidCredentials, result.Outcome);
+        Assert.Null(result.User);
+    }
+
+    [Fact]
+    public async Task Login_WithUnconfirmedEmail_ReturnsNotConfirmed()
+    {
+        var email = _faker.Internet.Email();
+        const string password = "Test123!";
+        var user = await UserFactory.CreateAsync(_context, email, password);
+        user.EmailConfirmed = false;
+        await _context.SaveChangesAsync();
+
+        var result = await _loginUser.ExecuteAsync(new LoginInput(email, password));
+
+        Assert.Equal(LoginOutcome.NotConfirmed, result.Outcome);
+        Assert.Null(result.User);
     }
 
     public void Dispose() => _scope.Dispose();
