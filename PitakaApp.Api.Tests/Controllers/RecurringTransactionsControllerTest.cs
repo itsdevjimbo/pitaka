@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using PitakaApp.Api.Data;
@@ -952,6 +953,91 @@ public class RecurringTransactionsControllerTest : IDisposable
         await _context.Transactions.Entry(transaction).ReloadAsync();
         Assert.Null(transaction.RecurringTransactionId);
 
+    }
+
+    [Fact]
+    public async Task Create_ExpenseUnderAnIncomeCategory_ReturnsBadRequestWithReason()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var incomeCategory = await CategoryFactory.CreateAsync(_context, user.Id, type: CategoryType.Income);
+
+        _client.ActAsUser(user);
+
+        var request = new
+        {
+            AccountId = account.Id,
+            CategoryId = incomeCategory.Id,
+            Name = "Rent",
+            Type = RecurringTransactionType.Expense,
+            Frequency = Frequency.Monthly,
+            Amount = 500,
+            StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)),
+        };
+
+        var response = await _client.PostAsJsonAsync("/api/recurring-transactions", request);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal(
+            "A recurring transaction's category must be of the same type as the transaction.",
+            problem!.Detail);
+    }
+
+    [Fact]
+    public async Task Create_ExpenseUnderAnExpenseCategory_ReturnsCreated()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var expenseCategory = await CategoryFactory.CreateAsync(_context, user.Id, type: CategoryType.Expense);
+
+        _client.ActAsUser(user);
+
+        var request = new
+        {
+            AccountId = account.Id,
+            CategoryId = expenseCategory.Id,
+            Name = "Rent",
+            Type = RecurringTransactionType.Expense,
+            Frequency = Frequency.Monthly,
+            Amount = 500,
+            StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)),
+        };
+
+        var response = await _client.PostAsJsonAsync("/api/recurring-transactions", request);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<RecurringTransactionResource>(TestJsonOptions.Default);
+        Assert.Equal(expenseCategory.Id, body!.CategoryId);
+    }
+
+    [Fact]
+    public async Task Update_MovingOntoAMismatchedCategory_ReturnsBadRequestWithReason()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            _context, user.Id, account.Id, type: RecurringTransactionType.Expense);
+        var incomeCategory = await CategoryFactory.CreateAsync(_context, user.Id, type: CategoryType.Income);
+
+        _client.ActAsUser(user);
+
+        // The PUT never restates Type — it is read from the stored Expense recurring transaction.
+        var request = new
+        {
+            Name = recurringTransaction.Name,
+            Amount = 500,
+            CategoryId = incomeCategory.Id,
+        };
+
+        var response = await _client.PutAsJsonAsync(
+            "/api/recurring-transactions/" + recurringTransaction.Id, request);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal(
+            "A recurring transaction's category must be of the same type as the transaction.",
+            problem!.Detail);
     }
 
     public void Dispose() => _scope.Dispose();

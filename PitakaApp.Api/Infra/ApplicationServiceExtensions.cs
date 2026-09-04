@@ -20,8 +20,8 @@ public static class ApplicationServiceExtensions
 
         // Category
         services.AddScoped<CategoryService>();
-        services.AddScoped<VerifyCategoryExistence>();
         services.AddScoped<VerifyBudgetCategory>();
+        services.AddScoped<VerifyTransactionCategory>();
         
         // Account
         services.AddScoped<AccountService>();

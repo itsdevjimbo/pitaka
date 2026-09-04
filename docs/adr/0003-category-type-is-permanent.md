@@ -32,7 +32,7 @@ The four below are from #74, which filed the question with no recommendation. Al
 
 ## Consequences
 
-- **Not every limb is enforced at the time of writing.** This ADR records the position; #74 has since shipped and #76 is filed and unscheduled. A reader comparing this to the code should expect to find that gap, not assume the document is stale. A third limb — a child Category's type must match its parent's (#77) — was written here and has since been **withdrawn rather than deferred**: ADR 0006 rejects the parent link, so there is no such relationship left to constrain.
+- **Every surviving limb is now enforced.** This ADR records the position; #74 (a Category's type is set once) and #76 (a Transaction's — and a RecurringTransaction's — type must agree with its Category's) have both shipped. A third limb — a child Category's type must match its parent's (#77) — was written here and has since been **withdrawn rather than deferred**: ADR 0006 rejects the parent link, so there is no such relationship left to constrain.
 
 - **The only correction path for a mis-typed category is delete and recreate**, and that path today unnarrows every Budget pointing at the category and un-files every Transaction, silently, in one `204`. This is accepted rather than solved: the state being prevented is silent and permanent, the correction path is loud and requires the person to actively destroy something. Those are not equivalent risks. #75 asks what that delete should actually do, and is the more important of the two to answer.
 

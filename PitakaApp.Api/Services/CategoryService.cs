@@ -95,7 +95,7 @@ public class CategoryService
         await _context.SaveChangesAsync();
     }
 
-    // No user scoping is intentional. VerifyCategoryExistence.VerifyAsync and
+    // No user scoping is intentional. VerifyTransactionCategory and
     // VerifyBudgetCategory already confine every reference to the category's owner,
     // and system defaults are unreachable behind the Forbid at CategoriesController.
     // A WHERE UserId here would be redundant and would read as if cross-user

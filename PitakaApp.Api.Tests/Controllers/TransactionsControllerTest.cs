@@ -2030,5 +2030,148 @@ public class TransactionsControllerTest : IDisposable
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Create_ExpenseUnderAnIncomeCategory_ReturnsBadRequestWithReason()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 5000);
+        var incomeCategory = await CategoryFactory.CreateAsync(_context, user.Id, type: CategoryType.Income);
+
+        _client.ActAsUser(user);
+
+        var request = new
+        {
+            AccountId = account.Id,
+            Type = TransactionType.Expense,
+            Amount = 500,
+            CategoryId = incomeCategory.Id,
+        };
+
+        var response = await _client.PostAsJsonAsync("/api/transactions", request);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal("A transaction's category must be of the same type as the transaction.", problem!.Detail);
+    }
+
+    [Fact]
+    public async Task Create_IncomeUnderAnExpenseCategory_ReturnsBadRequestWithReason()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var expenseCategory = await CategoryFactory.CreateAsync(_context, user.Id, type: CategoryType.Expense);
+
+        _client.ActAsUser(user);
+
+        var request = new
+        {
+            AccountId = account.Id,
+            Type = TransactionType.Income,
+            Amount = 500,
+            CategoryId = expenseCategory.Id,
+        };
+
+        var response = await _client.PostAsJsonAsync("/api/transactions", request);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal("A transaction's category must be of the same type as the transaction.", problem!.Detail);
+    }
+
+    [Fact]
+    public async Task Create_ExpenseUnderASystemDefaultIncomeCategory_ReturnsBadRequest()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 5000);
+        var salary = await CategoryFactory.CreateAsync(_context, name: "Salary", type: CategoryType.Income);
+
+        _client.ActAsUser(user);
+
+        var request = new
+        {
+            AccountId = account.Id,
+            Type = TransactionType.Expense,
+            Amount = 500,
+            CategoryId = salary.Id,
+        };
+
+        var response = await _client.PostAsJsonAsync("/api/transactions", request);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal("A transaction's category must be of the same type as the transaction.", problem!.Detail);
+    }
+
+    [Fact]
+    public async Task Create_ExpenseUnderAnExpenseCategory_ReturnsCreated()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 5000);
+        var expenseCategory = await CategoryFactory.CreateAsync(_context, user.Id, type: CategoryType.Expense);
+
+        _client.ActAsUser(user);
+
+        var request = new
+        {
+            AccountId = account.Id,
+            Type = TransactionType.Expense,
+            Amount = 500,
+            CategoryId = expenseCategory.Id,
+        };
+
+        var response = await _client.PostAsJsonAsync("/api/transactions", request);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<TransactionResource>(TestJsonOptions.Default);
+        Assert.Equal(expenseCategory.Id, body!.CategoryId);
+    }
+
+    [Fact]
+    public async Task Update_MovingATransactionOntoAMismatchedCategory_ReturnsBadRequestWithReason()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 5000);
+        var transaction = await TransactionFactory.CreateAsync(
+            _context, user.Id, account.Id, type: TransactionType.Expense);
+        var incomeCategory = await CategoryFactory.CreateAsync(_context, user.Id, type: CategoryType.Income);
+
+        _client.ActAsUser(user);
+
+        // The PUT never restates Type — it is read from the stored Expense transaction.
+        var request = new
+        {
+            CategoryId = incomeCategory.Id,
+        };
+
+        var response = await _client.PutAsJsonAsync("/api/transactions/" + transaction.Id, request);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal("A transaction's category must be of the same type as the transaction.", problem!.Detail);
+    }
+
+    [Fact]
+    public async Task Update_MovingATransactionOntoAMatchingCategory_ReturnsOk()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 5000);
+        var transaction = await TransactionFactory.CreateAsync(
+            _context, user.Id, account.Id, type: TransactionType.Expense);
+        var expenseCategory = await CategoryFactory.CreateAsync(_context, user.Id, type: CategoryType.Expense);
+
+        _client.ActAsUser(user);
+
+        var request = new
+        {
+            CategoryId = expenseCategory.Id,
+        };
+
+        var response = await _client.PutAsJsonAsync("/api/transactions/" + transaction.Id, request);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<TransactionResource>(TestJsonOptions.Default);
+        Assert.Equal(expenseCategory.Id, body!.CategoryId);
+    }
+
     public void Dispose() => _scope.Dispose();
 }
