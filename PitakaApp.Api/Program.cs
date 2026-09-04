@@ -30,7 +30,7 @@ builder.Services.AddControllers(options =>
             // `default(T)` and passes, and every enum in this codebase has a real zero value
             // (`CategoryType.Income`, `GoalStatus.Active`, ...), so the write succeeds
             // silently. Every request record therefore gives an explicit default to each
-            // parameter a client may legitimately omit. See ADR 0008 and issue #82.
+            // parameter a client may legitimately omit. See ADR 0009 and issue #82.
             options.JsonSerializerOptions.RespectRequiredConstructorParameters = true;
         }
     );

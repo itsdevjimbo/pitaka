@@ -7,7 +7,7 @@ namespace PitakaApp.Api.Requests;
 // Parameters are ordered required-before-optional so the optional ones can carry a
 // default: with RespectRequiredConstructorParameters on, a parameter without a default
 // is mandatory in the body. CategoryId, Description and EndDate are the three a
-// standing instruction can legitimately omit. See ADR 0008.
+// standing instruction can legitimately omit. See ADR 0009.
 public record CreateRecurringTransactionRequest (
     [Required]
     int AccountId,
