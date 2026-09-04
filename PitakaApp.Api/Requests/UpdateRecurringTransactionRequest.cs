@@ -11,11 +11,11 @@ public record UpdateRecurringTransactionRequest (
     [Required, Range(typeof(decimal), "0.01", "999999999999.99")]
     decimal Amount,
 
-    int? CategoryId,
+    int? CategoryId = null,
 
-    string? Description,
+    string? Description = null,
 
-    DateOnly? EndDate
+    DateOnly? EndDate = null
 )
 {
     public UpdateRecurringTransactionInput ToInput() =>

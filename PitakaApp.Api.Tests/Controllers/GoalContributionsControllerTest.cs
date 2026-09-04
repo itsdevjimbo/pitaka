@@ -75,6 +75,42 @@ public class GoalContributionsControllerTest
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
+    [Theory]
+    [InlineData("goalId")]
+    [InlineData("accountId")]
+    [InlineData("amount")]
+    [InlineData("contributionDate")]
+    public async Task Create_WithoutRequiredField_ReturnsValidationBadRequestAndCreatesNothing(string omitted)
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 5000);
+        var goal = await GoalFactory.CreateAsync(_context, user.Id, targetAmount: 10000);
+        _client.ActAsUser(user);
+
+        // Every non-defaulted constructor parameter is mandatory in the body once
+        // RespectRequiredConstructorParameters is on: a missing key is a 400 from the
+        // deserialiser. Before it, a missing `goalId` bound to 0 and failed a downstream
+        // existence check with "Goal does not exist" — a confusing error for a field the
+        // caller never sent. See issue #82.
+        var request = new Dictionary<string, object>
+        {
+            ["goalId"] = goal.Id,
+            ["accountId"] = account.Id,
+            ["amount"] = 30,
+            ["contributionDate"] = DateOnly.FromDateTime(DateTime.Now).ToString("O"),
+        };
+        request.Remove(omitted);
+
+        var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>();
+        Assert.NotNull(problem);
+        Assert.NotEmpty(problem!.Errors);
+
+        Assert.False(await _context.GoalContributions.AsNoTracking().AnyAsync(gc => gc.GoalId == goal.Id));
+    }
+
     [Fact]
     public async Task Create_WithNonExistentGoal_ReturnsBadRequest()
     {

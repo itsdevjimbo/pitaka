@@ -4,11 +4,13 @@ using PitakaApp.Api.Inputs;
 
 namespace PitakaApp.Api.Requests;
 
+// Parameters are ordered required-before-optional so the optional ones can carry a
+// default: with RespectRequiredConstructorParameters on, a parameter without a default
+// is mandatory in the body. CategoryId, Description and EndDate are the three a
+// standing instruction can legitimately omit. See ADR 0009.
 public record CreateRecurringTransactionRequest (
     [Required]
     int AccountId,
-
-    int? CategoryId,
 
     [Required, MaxLength(255)]
     string Name,
@@ -22,12 +24,14 @@ public record CreateRecurringTransactionRequest (
     [Required, Range(typeof(decimal), "0.01", "999999999999.99")]
     decimal Amount,
 
-    string? Description,
-
     [Required]
     DateOnly StartDate,
 
-    DateOnly? EndDate
+    int? CategoryId = null,
+
+    string? Description = null,
+
+    DateOnly? EndDate = null
 ): IValidatableObject
 {
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)

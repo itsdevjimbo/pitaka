@@ -109,6 +109,32 @@ public class AccountsControllerTest : IDisposable
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
     }
 
+    [Theory]
+    [InlineData("name")]
+    [InlineData("type")]
+    public async Task Create_WithoutRequiredField_ReturnsBadRequestAndCreatesNothing(string omitted)
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(user);
+
+        // Every non-defaulted constructor parameter is mandatory in the body once
+        // RespectRequiredConstructorParameters is on: a missing key is a 400. Before it, a
+        // missing `type` bound to default(AccountType) == Cash and an account was created.
+        // See issue #82.
+        var request = new Dictionary<string, object>
+        {
+            ["name"] = "Savings account",
+            ["type"] = AccountType.Bank.ToString(),
+            ["initialBalance"] = 5000,
+        };
+        request.Remove(omitted);
+
+        var response = await _client.PostAsJsonAsync("/api/accounts", request);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        Assert.False(await _context.Accounts.AsNoTracking().AnyAsync(a => a.UserId == user.Id));
+    }
+
     [Fact]
     public async Task Create_RequestWithExistingAccountName_ReturnsConflict()
     {
@@ -433,6 +459,23 @@ public class AccountsControllerTest : IDisposable
 
         body = await response.Content.ReadFromJsonAsync<AccountResource>(TestJsonOptions.Default);
         Assert.True(body!.IsActive);
+    }
+
+    [Fact]
+    public async Task Patch_ActiveStatusWithEmptyBody_ReturnsBadRequestAndLeavesStatusUnchanged()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+
+        _client.ActAsUser(user);
+
+        // An empty body leaves IsActive unspecified. Before RespectRequiredConstructorParameters
+        // it bound to default(bool) == false and retired the account. See issue #82.
+        var response = await _client.PatchAsJsonAsync("/api/accounts/" + account.Id + "/status", new { });
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var stored = await _context.Accounts.AsNoTracking().SingleAsync(a => a.Id == account.Id);
+        Assert.True(stored.IsActive);
     }
 
     [Fact]

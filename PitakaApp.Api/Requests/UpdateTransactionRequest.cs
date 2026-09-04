@@ -5,10 +5,10 @@ namespace PitakaApp.Api.Requests;
 
 public record UpdateTransactionRequest (
     [RequiresUtcOffset]
-    DateTime? TransactionDate,
-    int? CategoryId,
-    string? Description,
-    int[]? TagIds
+    DateTime? TransactionDate = null,
+    int? CategoryId = null,
+    string? Description = null,
+    int[]? TagIds = null
 )
 {
     public UpdateTransactionInput ToInput() => new (

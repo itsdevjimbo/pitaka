@@ -17,11 +17,11 @@ public record BudgetRequest (
     [Required]
     DateOnly StartDate,
 
-    DateOnly? EndDate,
+    DateOnly? EndDate = null,
 
-    int? CategoryId,
+    int? CategoryId = null,
 
-    string? Description
+    string? Description = null
 ): IValidatableObject
 {
 

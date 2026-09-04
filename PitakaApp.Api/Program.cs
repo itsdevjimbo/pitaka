@@ -22,6 +22,16 @@ builder.Services.AddControllers(options =>
     .AddJsonOptions(options =>
         {
             options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+
+            // A constructor parameter with no default value is mandatory in the JSON body:
+            // a missing one is a 400 raised by the deserialiser, before the action runs.
+            // Without this, `[Required]` on a non-nullable value type (an enum, `bool`,
+            // `int`, `decimal`, `DateOnly`) validates nothing — a missing property binds to
+            // `default(T)` and passes, and every enum in this codebase has a real zero value
+            // (`CategoryType.Income`, `GoalStatus.Active`, ...), so the write succeeds
+            // silently. Every request record therefore gives an explicit default to each
+            // parameter a client may legitimately omit. See ADR 0009 and issue #82.
+            options.JsonSerializerOptions.RespectRequiredConstructorParameters = true;
         }
     );
 builder.Services.AddOpenApi();

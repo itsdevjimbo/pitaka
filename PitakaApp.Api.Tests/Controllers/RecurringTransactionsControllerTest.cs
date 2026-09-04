@@ -272,6 +272,40 @@ public class RecurringTransactionsControllerTest : IDisposable
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    [Theory]
+    [InlineData("accountId")]
+    [InlineData("name")]
+    [InlineData("type")]
+    [InlineData("frequency")]
+    [InlineData("amount")]
+    [InlineData("startDate")]
+    public async Task Create_WithoutRequiredField_ReturnsBadRequestAndCreatesNothing(string omitted)
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+
+        _client.ActAsUser(user);
+
+        // Every non-defaulted constructor parameter is mandatory in the body once
+        // RespectRequiredConstructorParameters is on: a missing key is a 400. Before it, a
+        // missing `type` bound to Income and a missing `frequency` to Daily. See issue #82.
+        var request = new Dictionary<string, object>
+        {
+            ["accountId"] = account.Id,
+            ["name"] = "Test recurring transaction",
+            ["amount"] = 500,
+            ["type"] = RecurringTransactionType.Income.ToString(),
+            ["frequency"] = Frequency.Daily.ToString(),
+            ["startDate"] = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)).ToString("O"),
+        };
+        request.Remove(omitted);
+
+        var response = await _client.PostAsJsonAsync("/api/recurring-transactions", request);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        Assert.False(await _context.RecurringTransactions.AsNoTracking().AnyAsync(r => r.UserId == user.Id));
+    }
+
     [Fact]
     public async Task Create_ReturnsCreated()
     {
@@ -792,6 +826,31 @@ public class RecurringTransactionsControllerTest : IDisposable
 
         var response = await _client.PatchAsJsonAsync("/api/recurring-transactions/" + recurringTransaction.Id + "/status", new { Status = "Completed" });
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Patch_StatusWithEmptyBody_ReturnsBadRequestAndLeavesStatusUnchanged()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            _context, user.Id, account.Id, status: RecurringTransactionStatus.Cancelled
+        );
+
+        _client.ActAsUser(user);
+
+        // An empty body leaves Status unspecified. Before RespectRequiredConstructorParameters
+        // it bound to default(RecurringTransactionStatus) == Active, which the IValidatableObject
+        // (rejecting only Completed) waved through, putting a cancelled money-movement schedule
+        // back in play. See issue #82.
+        var response = await _client.PatchAsJsonAsync(
+            "/api/recurring-transactions/" + recurringTransaction.Id + "/status", new { }
+        );
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var stored = await _context.RecurringTransactions.AsNoTracking()
+            .SingleAsync(r => r.Id == recurringTransaction.Id);
+        Assert.Equal(RecurringTransactionStatus.Cancelled, stored.Status);
     }
 
     [Fact]

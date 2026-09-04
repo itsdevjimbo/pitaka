@@ -7,13 +7,13 @@ public record UpdateCategoryRequest (
     [Required, MaxLength(255)]
     string Name,
 
-    string? Description,
+    string? Description = null,
 
     [MaxLength(100)]
-    string? Icon,
+    string? Icon = null,
 
     [MaxLength(100)]
-    string? Color
+    string? Color = null
 )
 {
     public UpdateCategoryInput ToInput() =>

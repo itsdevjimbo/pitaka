@@ -15,16 +15,16 @@ public record CreateTransactionRequest (
     [Required, Range(typeof(decimal), "0.01", "999999999999.99")]
     decimal Amount,
     
-    int? CategoryId,
-    
+    int? CategoryId = null,
+
     [RequiresUtcOffset]
-    DateTime? TransactionDate,
+    DateTime? TransactionDate = null,
 
-    int? TransferToAccountId,
+    int? TransferToAccountId = null,
 
-    string? Description,
+    string? Description = null,
 
-    int[]? TagIds
+    int[]? TagIds = null
 ): IValidatableObject
 {
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
