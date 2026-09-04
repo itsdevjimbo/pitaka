@@ -87,6 +87,32 @@ public class AuthControllerTest : IDisposable
         Assert.Equal(wrongEmailProblem.Detail, wrongPasswordProblem.Detail);
     }
 
+    // S1 keeps lockout invisible: CheckPasswordSignInAsync(..., lockoutOnFailure: true)
+    // accrues AccessFailedCount and, on the fifth failure, sets LockoutEnd — but
+    // LoginUser maps everything except Succeeded to the same generic 401, so a locked
+    // Profile presenting its correct password still gets 401, not a distinct status.
+    // S2 is where IsLockedOut becomes visible (423).
+    [Fact]
+    public async Task Login_AfterFiveFailedAttempts_CorrectPasswordStillReturns401()
+    {
+        var email = _faker.Internet.Email();
+        await UserFactory.CreateAsync(_context, email);
+
+        for (var i = 0; i < 5; i++)
+        {
+            var failed = await _client.PostAsJsonAsync("/api/auth/login", new { email, password = "WrongPassword123!" });
+            Assert.Equal(HttpStatusCode.Unauthorized, failed.StatusCode);
+        }
+
+        var withCorrectPassword = await _client.PostAsJsonAsync("/api/auth/login",
+            new { email, password = UserFactory.DefaultPassword });
+
+        Assert.Equal(HttpStatusCode.Unauthorized, withCorrectPassword.StatusCode);
+
+        var problem = await withCorrectPassword.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal("Invalid email or password.", problem!.Detail);
+    }
+
     [Theory]
     [InlineData("missing email")]
     [InlineData("missing password")]

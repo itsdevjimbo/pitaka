@@ -1,16 +1,23 @@
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using PitakaApp.Api.Models;
 
 namespace PitakaApp.Api.Data;
 
-public class PitakaDbContext : DbContext
+// IdentityUserContext<User, int>, not IdentityDbContext<...> — that adds role, user-role
+// and role-claim tables for a role model the app has no use for.
+// IDataProtectionKeyContext backs AddDataProtection().PersistKeysToDbContext<PitakaDbContext>()
+// (see IdentityExtensions), persisting the Data Protection key ring here instead of the
+// per-machine default that a container redeploy wipes.
+public class PitakaDbContext : IdentityUserContext<User, int>, IDataProtectionKeyContext
 {
     public PitakaDbContext(DbContextOptions<PitakaDbContext> options) : base(options)
     {
     }
 
-    public DbSet<User> Users { get; set; }
     public DbSet<Account> Accounts { get; set; }
     public DbSet<Category> Categories { get; set; }
     public DbSet<Transaction> Transactions { get; set; }
@@ -20,10 +27,21 @@ public class PitakaDbContext : DbContext
     public DbSet<GoalContribution> GoalContributions { get; set; }
     public DbSet<Tag> Tags { get; set; }
     public DbSet<PasswordResetToken> PasswordResetTokens { get; set; }
+    public DbSet<DataProtectionKey> DataProtectionKeys { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<User>().HasIndex(u => u.Email).IsUnique();
+        // Identity's mappings (users, user_claims, user_logins, user_tokens and their
+        // indexes) must be in place before the project's configuration below runs on
+        // top of them.
+        base.OnModelCreating(modelBuilder);
+
+        // House style: no asp_net_* names anywhere. IdentityUserContext maps
+        // AspNetUsers/AspNetUserClaims/AspNetUserLogins/AspNetUserTokens by default.
+        modelBuilder.Entity<User>().ToTable("users");
+        modelBuilder.Entity<IdentityUserClaim<int>>().ToTable("user_claims");
+        modelBuilder.Entity<IdentityUserLogin<int>>().ToTable("user_logins");
+        modelBuilder.Entity<IdentityUserToken<int>>().ToTable("user_tokens");
 
         modelBuilder.Entity<Account>().HasIndex(c => new { c.UserId, c.Name }).IsUnique();
 
@@ -51,7 +69,7 @@ public class PitakaDbContext : DbContext
             var converterType = typeof(EnumToStringConverter<>).MakeGenericType(enumType);
             var converter = (ValueConverter)Activator.CreateInstance(converterType, (object?)null)!;
             property.SetValueConverter(converter);
-            property.SetColumnType("varchar(100)"); 
+            property.SetColumnType("varchar(100)");
         }
 
         modelBuilder.Entity<Account>()
@@ -125,7 +143,7 @@ public class PitakaDbContext : DbContext
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
-        foreach (var entry in ChangeTracker.Entries<TimestampedEntity>()
+        foreach (var entry in ChangeTracker.Entries<ITimestamped>()
              .Where(e => e.State == EntityState.Modified))
         {
             entry.Entity.UpdatedAt = DateTime.UtcNow;
@@ -142,7 +160,7 @@ public class PitakaDbContext : DbContext
 
     public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
     {
-        foreach (var entry in ChangeTracker.Entries<TimestampedEntity>()
+        foreach (var entry in ChangeTracker.Entries<ITimestamped>()
              .Where(e => e.State == EntityState.Modified))
         {
             entry.Entity.UpdatedAt = DateTime.UtcNow;

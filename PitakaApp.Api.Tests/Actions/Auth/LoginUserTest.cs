@@ -1,17 +1,16 @@
 using Bogus;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
 using PitakaApp.Api.Actions.Auth;
 using PitakaApp.Api.Data;
 using PitakaApp.Api.Inputs;
-using PitakaApp.Api.Models;
+using PitakaApp.Api.Tests.Factories;
 using PitakaApp.Api.Tests.Fixtures;
 
 namespace PitakaApp.Api.Tests.Actions.Auth;
 
 [Collection("Database collection")]
 public class LoginUserTest : IDisposable
-{    
+{
     private readonly Faker _faker = new();
     private readonly IServiceScope _scope;
     private readonly LoginUser _loginUser;
@@ -28,21 +27,11 @@ public class LoginUserTest : IDisposable
     public async Task Login_WithCorrectValues()
     {
         var email = _faker.Internet.Email();
-        var hasher = new PasswordHasher<User>();
-        var password = "Test123!";
-        
-        _context.Users.Add(
-            new User
-            {
-                Name = _faker.Person.FullName,
-                Email = email,
-                PasswordHash = hasher.HashPassword(null!, password),
-            }
-        );
-        await _context.SaveChangesAsync();
+        const string password = "Test123!";
+        await UserFactory.CreateAsync(_context, email, password);
 
         var loggedInUser = await _loginUser.ExecuteAsync(new LoginInput(email, password));
-        
+
         Assert.NotNull(loggedInUser);
     }
 
@@ -50,21 +39,11 @@ public class LoginUserTest : IDisposable
     public async Task Login_WithWrongEmail()
     {
         var email = _faker.Internet.Email();
-        var hasher = new PasswordHasher<User>();
-        var password = "Test123!";
-
-        _context.Users.Add(
-            new User
-            {
-                Name = _faker.Person.FullName,
-                Email = email,
-                PasswordHash = hasher.HashPassword(null!, password),
-            }
-        );
-        await _context.SaveChangesAsync();
+        const string password = "Test123!";
+        await UserFactory.CreateAsync(_context, email, password);
 
         var user = await _loginUser.ExecuteAsync(new LoginInput("wrong@email.com", password));
-        
+
         Assert.Null(user);
     }
 
@@ -72,20 +51,10 @@ public class LoginUserTest : IDisposable
     public async Task Login_WithWrongPassword()
     {
         var email = _faker.Internet.Email();
-        var hasher = new PasswordHasher<User>();
-
-        _context.Users.Add(
-            new User
-            {
-                Name = _faker.Person.FullName,
-                Email = email,
-                PasswordHash = hasher.HashPassword(null!, hasher.HashPassword(null!, "Test123!")),
-            }
-        );
-        await _context.SaveChangesAsync();
+        await UserFactory.CreateAsync(_context, email, "Test123!");
 
         var user = await _loginUser.ExecuteAsync(new LoginInput(email, "wrongpassword123!"));
-        
+
         Assert.Null(user);
     }
 
