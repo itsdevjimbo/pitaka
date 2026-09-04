@@ -58,6 +58,18 @@ It ships anyway, as a call recorded here rather than a principle. What keeps it 
 
 The test is the type filter's test: whether a `pitaka-web` category screen consumes `/status` within a year. If none does, the pull rule was right and this is the second instance that shows it.
 
+## The fourth exception: ASP.NET Core Identity as the credential store
+
+Authentication moves from four hand-rolled pieces — an inline `PasswordHasher` in three actions, no lockout, a bespoke single-use reset-token table, a `POST /register` that issues a session with nothing proving the email — onto ASP.NET Core Identity as the store. The work is `.scratch/auth-identity/`, three slices S1/S2/S3, and it ships with new ADRs 0011 (Identity adoption), 0012 (email confirmation required), and 0013 (stateless reset tokens). Nothing in pitaka-web's queue asks for it.
+
+The rationale is none of the first three. B3's pull signal was *circular* — the client had deleted the forgot-password screen *because* this API had no endpoint behind it. The `type` filter and Category `Retired` answered a *reader's* demand — one API answering sibling endpoints two ways, with nothing saying which is the house style. This is a **product-quality judgment**: a one-person app that holds a person's entire financial history should not depend on a hand-rolled `PasswordHasher` lifecycle, a hand-rolled single-use token store, and a hand-rolled duplicate-key catch each being correct and staying correct as the surface grows. Adopting a maintained framework for password hashing and its upgrade path, lockout, email confirmation, and reset-token generation is worth doing before more is built on top — and it is not something a client can be expected to "pull", because it is a swap of the API's own internals with no visible edge until a feature (S2, S3) deliberately forces one.
+
+The learning tiebreaker does not decide this one. The project reframed mid-design: this is real-system work, not a learning exercise, so "which option opens .NET surface the author has not touched" stopped being the deciding question. The deciding question is whether the credential store should be the project's to maintain or a framework's, and the answer is the framework's.
+
+The planning units are slices S1, S2, and S3. S1 is a contract-neutral store swap — the existing suite is its whole gate. S2 (email confirmation, visible lockout) and S3 (reset through Identity's provider) each bend the wire contract and each carry a paired pitaka-web issue for every bend. S1 is the move that breaks this ADR's pull rule a fourth time; ADR 0011 ships against this amendment, not ahead of it.
+
+The test is the same as the two prior exceptions': whether the bends this work spends are consumed by pitaka-web within the year. The difference is that here they will be — S2 and S3 exist to be consumed, and the paired issues are how that is tracked.
+
 ## Consequences
 
 - **The register's severity labels no longer imply order.** B1, B2, B5, B6, C1, and D1 are all marked "blocks launch" and all stay open while E3 and C3 — merely "degrades" — ship first. This looks like negligence and is not; it is this decision.

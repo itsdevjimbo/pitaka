@@ -34,6 +34,18 @@ _Avoid_: Running total, actual balance
 An Account or a Category the person has stopped using. It keeps everything it recorded — an Account its balance, a Category the Transactions filed under it — and can be brought back. Retiring is how one of them leaves everyday use without being deleted, which stays refused once there is something to lose: an Account with history, a Category in use. The two part only in what happens next. A retired Account stays in the account list among the active ones; a retired Category drops out of the pickers but is still returned by `GET /api/categories`, because old Transactions resolve their category name from that collection. That is what each list is for, not a difference in the state.
 _Avoid_: Closed, archived, deleted, inactive, disabled
 
+**UserName**:
+Always a mirror of Email. Pitaka has no separate login handle — a person is identified by Email and nothing else.
+_Avoid_: Handle, login name, a username distinct from the email
+
+**Confirmed / unconfirmed**:
+A Profile that has, or has not, proven control of its email address. An unconfirmed Profile cannot sign in and is never issued a token; confirming is the one extra step between registering and signing in.
+_Avoid_: Verified, activated, validated
+
+**Locked out**:
+A Profile temporarily barred from signing in after repeated failed attempts. A timed state that clears itself — distinct from Retired, which is a deliberate choice and never applies to a Profile.
+_Avoid_: Banned, suspended, disabled, blocked
+
 > `User` and `Account` are the collision to watch. Plain English uses "account" for a login, this codebase never does.
 
 > `Initial balance` is stated, `current balance` is derived. An Account carries both, and only one of them is ever written down.
