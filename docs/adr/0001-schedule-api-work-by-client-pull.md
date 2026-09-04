@@ -44,6 +44,20 @@ The exception is deliberately narrow.
 
 The test of this exception is whether `?type=` has a consumer a year from now. If it does not, the pull rule was right and this is the instance that shows it.
 
+## The third exception: `Retired` for Categories (#86)
+
+`Category` gains an `is_active` column, `PATCH /api/categories/{id}/status`, and an `isActive` field on `GET /api/categories`, with no `pitaka-web` category screen behind them. ADR 0004 filed this as #86 and said it waits for a screen; this ships it first.
+
+Neither earlier exception covers it, and it is worth being plain about that. B3's reasoning — the pull signal is circular because the client deleted the screen *because* the endpoint was missing — does not apply here, and ADR 0004 says so directly: the client simply has not built category management. The learning tiebreaker runs the other way too — `Retired` for a Category is a near-mechanical copy of the Account `IsActive` precedent and opens no .NET surface the author has not touched. On the rule as written, this stays deferred.
+
+It ships anyway, as a call recorded here rather than a principle. What keeps it a cheap exception:
+
+- **It completes a pair ADR 0004 already committed to.** The refusal shipped without the half that makes it bearable, and ADR 0004's first consequence names that dead end — a person told a category they used once is theirs forever — as "the honest price of splitting the pair". This pays it early rather than banking it against a screen that may be a year out.
+- **It is additive and all but invisible.** The column defaults to active, retired Categories are still returned by `GET /api/categories`, the read gains no filter, and a client that never calls `/status` cannot tell it shipped.
+- **It is narrow.** No `?isActive=` on the list, no bulk endpoint, no picker-side behaviour — that filtering is the client's to build when the screen exists, exactly as ADR 0004 describes.
+
+The test is the type filter's test: whether a `pitaka-web` category screen consumes `/status` within a year. If none does, the pull rule was right and this is the second instance that shows it.
+
 ## Consequences
 
 - **The register's severity labels no longer imply order.** B1, B2, B5, B6, C1, and D1 are all marked "blocks launch" and all stay open while E3 and C3 — merely "degrades" — ship first. This looks like negligence and is not; it is this decision.

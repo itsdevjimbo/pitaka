@@ -27,7 +27,7 @@ What an Account holds now. Not a figure anyone states: it is the initial balance
 _Avoid_: Running total, actual balance
 
 **Retired**:
-An Account the person has stopped using. It keeps its balance and everything it recorded, still appears in the list among the active ones, and can be brought back. Retiring is how an Account leaves everyday use without being deleted — deletion is refused outright once an Account has history.
+An Account or a Category the person has stopped using. It keeps everything it recorded — an Account its balance, a Category the Transactions filed under it — and can be brought back. Retiring is how one of them leaves everyday use without being deleted, which stays refused once there is something to lose: an Account with history, a Category in use. The two part only in what happens next. A retired Account stays in the account list among the active ones; a retired Category drops out of the pickers but is still returned by `GET /api/categories`, because old Transactions resolve their category name from that collection. That is what each list is for, not a difference in the state.
 _Avoid_: Closed, archived, deleted, inactive, disabled
 
 > `User` and `Account` are the collision to watch. Plain English uses "account" for a login, this codebase never does.

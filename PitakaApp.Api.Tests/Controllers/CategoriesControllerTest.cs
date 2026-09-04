@@ -456,5 +456,158 @@ public class CategoriesControllerTest : IDisposable
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Patch_StatusWithoutLoggedInUser_ReturnsUnauthorized()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var category = await CategoryFactory.CreateAsync(_context, user.Id);
+
+        var response = await _client.PatchAsJsonAsync("/api/categories/" + category.Id + "/status", new { IsActive = false });
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Patch_NonExistentCategoryStatus_ReturnsNotFound()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(user);
+
+        var response = await _client.PatchAsJsonAsync("/api/categories/999999/status", new { IsActive = false });
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Patch_OtherUsersCategoryStatus_ReturnsForbidden()
+    {
+        var userA = await UserFactory.CreateAsync(_context);
+        var userB = await UserFactory.CreateAsync(_context);
+        var category = await CategoryFactory.CreateAsync(_context, userB.Id);
+
+        _client.ActAsUser(userA);
+
+        var response = await _client.PatchAsJsonAsync("/api/categories/" + category.Id + "/status", new { IsActive = false });
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+
+        var stored = await _context.Categories.AsNoTracking().SingleAsync(c => c.Id == category.Id);
+        Assert.True(stored.IsActive);
+    }
+
+    [Fact]
+    public async Task Patch_SystemDefaultCategoryStatus_ReturnsForbidden()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var category = await CategoryFactory.CreateAsync(_context);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.PatchAsJsonAsync("/api/categories/" + category.Id + "/status", new { IsActive = false });
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Patch_RetireOwnedCategory_ReturnsOk()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var category = await CategoryFactory.CreateAsync(_context, user.Id);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.PatchAsJsonAsync("/api/categories/" + category.Id + "/status", new { IsActive = false });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<CategoryResource>(TestJsonOptions.Default);
+        Assert.False(body!.IsActive);
+
+        var stored = await _context.Categories.AsNoTracking().SingleAsync(c => c.Id == category.Id);
+        Assert.False(stored.IsActive);
+    }
+
+    [Fact]
+    public async Task Patch_ReactivateCategory_ReturnsOk()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var category = await CategoryFactory.CreateAsync(_context, user.Id, isActive: false);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.PatchAsJsonAsync("/api/categories/" + category.Id + "/status", new { IsActive = true });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<CategoryResource>(TestJsonOptions.Default);
+        Assert.True(body!.IsActive);
+    }
+
+    [Fact]
+    public async Task Patch_RetiringCategoryInUse_ReturnsOk()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(user);
+
+        var category = await CategoryFactory.CreateAsync(_context, user.Id);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, categoryId: category.Id);
+
+        var response = await _client.PatchAsJsonAsync("/api/categories/" + category.Id + "/status", new { IsActive = false });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Patch_RetiringCategoryNarrowingABudget_ReturnsOk()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(user);
+
+        var category = await CategoryFactory.CreateAsync(_context, user.Id);
+        await BudgetFactory.CreateAsync(_context, user.Id, categoryId: category.Id);
+
+        var response = await _client.PatchAsJsonAsync("/api/categories/" + category.Id + "/status", new { IsActive = false });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var budget = await _context.Budgets.AsNoTracking().SingleAsync(b => b.CategoryId == category.Id);
+        Assert.Equal(category.Id, budget.CategoryId);
+    }
+
+    [Fact]
+    public async Task Get_IncludesRetiredCategories()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var retired = await CategoryFactory.CreateAsync(_context, user.Id, name: "Old Gym", isActive: false);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/categories");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<List<CategoryResource>>(TestJsonOptions.Default);
+        var seen = body!.Single(c => c.Id == retired.Id);
+        Assert.False(seen.IsActive);
+    }
+
+    [Fact]
+    public async Task Delete_RetiredCategoryInUse_ReturnsConflict()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(user);
+
+        var category = await CategoryFactory.CreateAsync(_context, user.Id, isActive: false);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, categoryId: category.Id);
+
+        var response = await _client.DeleteAsync("api/categories/" + category.Id);
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Delete_RetiredCategoryNotInUse_ReturnsNoContent()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(user);
+
+        var category = await CategoryFactory.CreateAsync(_context, user.Id, isActive: false);
+
+        var response = await _client.DeleteAsync("api/categories/" + category.Id);
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
     public void Dispose() => _scope.Dispose();
 }
