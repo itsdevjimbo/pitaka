@@ -110,6 +110,24 @@ public class AccountsControllerTest : IDisposable
     }
 
     [Fact]
+    public async Task Create_WithoutType_ReturnsBadRequest()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(user);
+
+        // No `type`. Before RespectRequiredConstructorParameters this bound to
+        // default(AccountType) == Cash and created a cash account. See issue #82.
+        var request = new
+        {
+            Name = "Savings account",
+            InitialBalance = 5000,
+        };
+
+        var response = await _client.PostAsJsonAsync("/api/accounts", request);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Create_RequestWithExistingAccountName_ReturnsConflict()
     {
         var user = await UserFactory.CreateAsync(_context);
@@ -433,6 +451,23 @@ public class AccountsControllerTest : IDisposable
 
         body = await response.Content.ReadFromJsonAsync<AccountResource>(TestJsonOptions.Default);
         Assert.True(body!.IsActive);
+    }
+
+    [Fact]
+    public async Task Patch_ActiveStatusWithEmptyBody_ReturnsBadRequestAndDoesNotChangeStatus()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+
+        _client.ActAsUser(user);
+
+        // An empty body leaves IsActive unspecified. Before RespectRequiredConstructorParameters
+        // it bound to default(bool) == false and deactivated the account. See issue #82.
+        var response = await _client.PatchAsJsonAsync("/api/accounts/" + account.Id + "/status", new { });
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var stored = await _context.Accounts.AsNoTracking().SingleAsync(a => a.Id == account.Id);
+        Assert.True(stored.IsActive);
     }
 
     [Fact]

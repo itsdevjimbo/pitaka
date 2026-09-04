@@ -1069,6 +1069,25 @@ public class BudgetsControllerTest : IDisposable
     }
 
     [Fact]
+    public async Task Create_WithoutPeriod_ReturnsBadRequest()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(user);
+
+        // No `period` key at all. Before RespectRequiredConstructorParameters this bound to
+        // default(BudgetPeriod) == Daily and created a daily budget. See issue #82.
+        var request = new
+        {
+            Name = "Test budget",
+            AmountLimit = 5000,
+            StartDate = DateOnly.FromDateTime(DateTime.Now),
+        };
+
+        var response = await _client.PostAsJsonAsync("/api/budgets", request);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Create_WithEndDateBeforeStartDate_ReturnsBadRequest()
     {
         var user = await UserFactory.CreateAsync(_context);

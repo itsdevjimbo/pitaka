@@ -76,6 +76,30 @@ public class GoalContributionsControllerTest
     }
 
     [Fact]
+    public async Task Create_WithoutGoalId_ReturnsValidationBadRequestNotAnExistenceError()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 5000);
+        _client.ActAsUser(user);
+
+        // No `goalId` key. Before RespectRequiredConstructorParameters this bound to 0 and
+        // failed the downstream existence check with "Goal does not exist" — a confusing
+        // error for a field the caller never sent. See issue #82.
+        var request = new
+        {
+            AccountId = account.Id,
+            Amount = 30,
+            ContributionDate = DateOnly.FromDateTime(DateTime.Now),
+        };
+
+        var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.NotEqual("Goal does not exist", problem!.Detail);
+    }
+
+    [Fact]
     public async Task Create_WithNonExistentGoal_ReturnsBadRequest()
     {
         var user = await UserFactory.CreateAsync(_context);

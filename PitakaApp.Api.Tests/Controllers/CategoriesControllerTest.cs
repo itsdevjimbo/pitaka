@@ -505,6 +505,23 @@ public class CategoriesControllerTest : IDisposable
     }
 
     [Fact]
+    public async Task Patch_StatusWithEmptyBody_ReturnsBadRequestAndDoesNotChangeStatus()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var category = await CategoryFactory.CreateAsync(_context, user.Id);
+
+        _client.ActAsUser(user);
+
+        // An empty body leaves IsActive unspecified. Before RespectRequiredConstructorParameters
+        // it bound to default(bool) == false and retired the category. See issue #82.
+        var response = await _client.PatchAsJsonAsync("/api/categories/" + category.Id + "/status", new { });
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var stored = await _context.Categories.AsNoTracking().SingleAsync(c => c.Id == category.Id);
+        Assert.True(stored.IsActive);
+    }
+
+    [Fact]
     public async Task Patch_RetireOwnedCategory_ReturnsOk()
     {
         var user = await UserFactory.CreateAsync(_context);

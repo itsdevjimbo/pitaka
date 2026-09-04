@@ -11,13 +11,13 @@ public record CreateCategoryRequest (
     [Required]
     CategoryType Type,
 
-    string? Description,
+    string? Description = null,
 
     [MaxLength(100)]
-    string? Icon,
+    string? Icon = null,
 
     [MaxLength(100)]
-    string? Color
+    string? Color = null
 )
 {
     public CreateCategoryInput ToInput() =>

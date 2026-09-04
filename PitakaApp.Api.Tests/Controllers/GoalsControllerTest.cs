@@ -391,6 +391,23 @@ public class GoalsControllerTest : IDisposable
     }
 
     [Fact]
+    public async Task Patch_GoalStatusWithEmptyBody_ReturnsBadRequestAndDoesNotResurrectGoal()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var goal = await GoalFactory.CreateAsync(_context, user.Id, status: GoalStatus.Abandoned);
+
+        _client.ActAsUser(user);
+
+        // An empty body leaves Status unspecified. Before RespectRequiredConstructorParameters
+        // it bound to default(GoalStatus) == Active and revived the abandoned goal. See issue #82.
+        var response = await _client.PatchAsJsonAsync("/api/goals/" + goal.Id + "/status", new { });
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var stored = await _context.Goals.AsNoTracking().SingleAsync(g => g.Id == goal.Id);
+        Assert.Equal(GoalStatus.Abandoned, stored.Status);
+    }
+
+    [Fact]
     public async Task Delete_WithoutLoggedInUser_ReturnsUnauthorized()
     {
         var user = await UserFactory.CreateAsync(_context);

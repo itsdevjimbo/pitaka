@@ -3,8 +3,8 @@ using PitakaApp.Api.Inputs;
 namespace PitakaApp.Api.Requests;
 
 public record UpdateGoalContributionRequest (
-    DateOnly? ContributionDate,
-    string? Note
+    DateOnly? ContributionDate = null,
+    string? Note = null
 )
 {
     public UpdateGoalContributionInput ToInput() =>

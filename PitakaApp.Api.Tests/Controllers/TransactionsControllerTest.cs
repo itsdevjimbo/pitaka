@@ -1099,6 +1099,29 @@ public class TransactionsControllerTest : IDisposable
     }
 
     [Fact]
+    public async Task Create_WithoutType_ReturnsBadRequest()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+
+        _client.ActAsUser(user);
+
+        // No `type`. Before RespectRequiredConstructorParameters this bound to
+        // default(TransactionType) == Income and recorded income. See issue #82.
+        var request = new
+        {
+            AccountId = account.Id,
+            Amount = 5000,
+        };
+
+        var response = await _client.PostAsJsonAsync("/api/transactions", request);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var stored = await _context.Accounts.AsNoTracking().SingleAsync(a => a.Id == account.Id);
+        Assert.Equal(0, stored.CurrentBalance);
+    }
+
+    [Fact]
     public async Task Create_WithValidRequest_ReturnsCreated_And_IncreaseInAccountBalance()
     {
         var user = await UserFactory.CreateAsync(_context);

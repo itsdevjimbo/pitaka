@@ -10,7 +10,7 @@ public record GoalRequest (
     [Required, Range(typeof(decimal), "0.01", "999999999999.99")]
     decimal TargetAmount,
     
-    DateOnly? TargetDate
+    DateOnly? TargetDate = null
 )
 {
     public GoalInput ToInput() =>
