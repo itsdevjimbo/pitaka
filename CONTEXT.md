@@ -18,8 +18,12 @@ _Avoid_: Account, user account, my account, user settings
 A place money sits — a bank account, cash on hand, a credit card. Carries a balance.
 _Avoid_: Wallet, login, user account
 
+**Opened**:
+How an Account comes into existence. `Account.Open` builds it with its initial balance already in place, so its current balance is fully explained from the first moment. Not the opposite of Retired: an Account is opened once, and may be retired and brought back many times afterward.
+_Avoid_: Created, registered
+
 **Initial balance**:
-What an Account held before Pitaka started watching it. It is a recorded fact about the past — the money that was already there — rather than a figure the person maintains. Set when the Account is created and never revised.
+What an Account held before Pitaka started watching it. It is a recorded fact about the past — the money that was already there — rather than a figure the person maintains. Set when the Account is opened and never revised.
 _Avoid_: Opening balance, starting amount
 
 **Current balance**:
