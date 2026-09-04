@@ -1,6 +1,4 @@
 using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
-using PitakaApp.Api.Data;
 using PitakaApp.Api.Inputs;
 using PitakaApp.Api.Models;
 
@@ -8,39 +6,34 @@ namespace PitakaApp.Api.Actions.Auth;
 
 public class LoginUser
 {
-    private readonly PitakaDbContext _context;
+    private readonly UserManager<User> _userManager;
+    private readonly SignInManager<User> _signInManager;
 
-    public LoginUser(PitakaDbContext context)
+    public LoginUser(UserManager<User> userManager, SignInManager<User> signInManager)
     {
-        _context = context;
+        _userManager = userManager;
+        _signInManager = signInManager;
     }
 
     public async Task<User?> ExecuteAsync(LoginInput input)
     {
-        var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == input.Email);
+        var user = await _userManager.FindByEmailAsync(input.Email);
 
         if (user == null)
         {
             return null;
         }
 
-        var hasher = new PasswordHasher<User>();
-        
+        // lockoutOnFailure: true — a failed attempt counts toward lockout even though S1
+        // keeps the result invisible. Only Succeeded maps to a session here; IsLockedOut
+        // and IsNotAllowed both collapse into the same generic failure as a wrong
+        // password, exactly as today (ADR 0011, S1). S2 branches on them.
+        var result = await _signInManager.CheckPasswordSignInAsync(user, input.Password, lockoutOnFailure: true);
 
-        var verificationResult = hasher.VerifyHashedPassword(user, user.PasswordHash, input.Password);
-
-
-        if (verificationResult == PasswordVerificationResult.Failed)
+        if (!result.Succeeded)
         {
             return null;
         }
-
-        if (verificationResult == PasswordVerificationResult.SuccessRehashNeeded)
-        {
-            user.PasswordHash = hasher.HashPassword(user, input.Password);
-            await _context.SaveChangesAsync();
-        }
-
 
         return user;
     }

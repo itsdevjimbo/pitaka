@@ -1,18 +1,22 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Identity;
 
 namespace PitakaApp.Api.Models;
 
-public class User : TimestampedEntity
+// IdentityUser<int> keeps the int primary key, so every existing foreign key and
+// migration is untouched. It brings Email and PasswordHash (both now inherited), plus
+// UserName, the Normalized* lookup columns, EmailConfirmed, SecurityStamp,
+// ConcurrencyStamp, lockout and two-factor columns. ITimestamped is implemented
+// directly, not through TimestampedEntity — C# has no multiple inheritance and
+// IdentityUser<int> occupies the base-class slot. See ADR 0011.
+public class User : IdentityUser<int>, ITimestamped
 {
     [MaxLength(255)]
     public required string Name { get; set; }
 
-    [MaxLength(255)]
-    public required string Email { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-    [MaxLength(255)]
-    public required string PasswordHash { get; set; }
-
+    public DateTime? UpdatedAt { get; set; }
 
     public ICollection<Account> Accounts { get; set; } = new List<Account>();
 
@@ -23,7 +27,7 @@ public class User : TimestampedEntity
     public ICollection<RecurringTransaction> RecurringTransactions { get; set; } = new List<RecurringTransaction>();
 
     public ICollection<Goal> Goals { get; set; } = new List<Goal>();
-    
+
     public ICollection<Budget> Budgets { get; set; } = new List<Budget>();
 
     public ICollection<Tag> Tags { get; set; } = new List<Tag>();

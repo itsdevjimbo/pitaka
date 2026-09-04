@@ -74,7 +74,7 @@ public class ResetPasswordTest : IDisposable
         Assert.NotNull(storedToken.UsedAt);
     }
 
-    private async Task<(User user, string plaintext, string originalHash)> SeedTokenAsync(DateTime expiresAt)
+    private async Task<(User user, string plaintext, string? originalHash)> SeedTokenAsync(DateTime expiresAt)
     {
         var user = await UserFactory.CreateAsync(_context, _faker.Internet.Email());
 

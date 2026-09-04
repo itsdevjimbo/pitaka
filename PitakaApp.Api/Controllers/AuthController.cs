@@ -9,6 +9,11 @@ namespace PitakaApp.Api.Controllers;
 [Route("api/[controller]")]
 public class AuthController : ControllerBase
 {
+    // Email is `string?` on IdentityUser<int>, but RequireUniqueEmail plus every write
+    // path here (RegisterUser, UserFactory) always setting it means a resolved User
+    // never actually carries a null one — the `!`s below are that guarantee, not a
+    // suppressed bug.
+
     private readonly LoginUser _loginUser;
     private readonly RegisterUser _registerUser;
     private readonly GenerateJwtToken _generateJwtToken;
@@ -44,7 +49,7 @@ public class AuthController : ControllerBase
         }
 
         var token = _generateJwtToken.Execute(user);
-        var userResponse = new UserResponse(user.Id, user.Name, user.Email);
+        var userResponse = new UserResponse(user.Id, user.Name, user.Email!);
 
         return Ok(new LoginResponse(token, userResponse));
     }
@@ -60,7 +65,7 @@ public class AuthController : ControllerBase
         }
 
         var token = _generateJwtToken.Execute(user);
-        var userResponse = new UserResponse(user.Id, user.Name, user.Email);
+        var userResponse = new UserResponse(user.Id, user.Name, user.Email!);
 
         // 201 with no Location header — matches AccountsController.Create. There is no
         // canonical GET /users/{id} to point at; GET /api/auth/me is derived from the token.
@@ -106,7 +111,7 @@ public class AuthController : ControllerBase
             return Unauthorized();
         }
         
-        return Ok(new UserResponse(user.Id, user.Name, user.Email));
+        return Ok(new UserResponse(user.Id, user.Name, user.Email!));
     }
 }
 

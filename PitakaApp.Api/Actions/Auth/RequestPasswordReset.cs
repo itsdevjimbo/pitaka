@@ -56,7 +56,10 @@ public class RequestPasswordReset
         });
         await _context.SaveChangesAsync();
 
-        await _emailSender.SendAsync(user.Email, "Reset your Pitaka password", ComposeBody(token));
+        // Email is `string?` on IdentityUser<int>; RequireUniqueEmail plus every write
+        // path setting it means the row FindByEmailAsync just matched never actually has
+        // a null one.
+        await _emailSender.SendAsync(user.Email!, "Reset your Pitaka password", ComposeBody(token));
     }
 
     // Plain text. Says Profile, never "user" or "account", per CONTEXT.md. States that

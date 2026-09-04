@@ -1,8 +1,10 @@
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using PitakaApp.Api.Actions.Auth;
 using PitakaApp.Api.Data;
 using PitakaApp.Api.Inputs;
+using PitakaApp.Api.Models;
 using PitakaApp.Api.Tests.Fixtures;
 
 namespace PitakaApp.Api.Tests.Data;
@@ -32,11 +34,11 @@ public class RegisterUserConcurrencyTest : IDisposable
         using var scopeA = _factory.Services.CreateScope();
         using var scopeB = _factory.Services.CreateScope();
 
-        var contextA = scopeA.ServiceProvider.GetRequiredService<PitakaDbContext>();
-        var contextB = scopeB.ServiceProvider.GetRequiredService<PitakaDbContext>();
+        var userManagerA = scopeA.ServiceProvider.GetRequiredService<UserManager<User>>();
+        var userManagerB = scopeB.ServiceProvider.GetRequiredService<UserManager<User>>();
 
-        var registerA = new RegisterUser(contextA);
-        var registerB = new RegisterUser(contextB);
+        var registerA = new RegisterUser(userManagerA);
+        var registerB = new RegisterUser(userManagerB);
 
         var inputA = new RegisterInput("Racer A", email, "TestPass123!");
         var inputB = new RegisterInput("Racer B", email, "TestPass123!");

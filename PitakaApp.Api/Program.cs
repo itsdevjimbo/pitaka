@@ -47,6 +47,7 @@ builder.Services.AddDbContext<PitakaDbContext>((serviceProvider, options) =>
     });
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddApplicationServices();
+builder.Services.AddPitakaIdentity();
 builder.AddJwtAuthentication();
 builder.AddRecurringTransactionGeneration();
 builder.AddEmailSender();
