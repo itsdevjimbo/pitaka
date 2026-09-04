@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.RegularExpressions;
 using Bogus;
 using Microsoft.Extensions.DependencyInjection;
 using PitakaApp.Api.Controllers;
@@ -21,12 +22,14 @@ public class AuthControllerRealAuthTest : IDisposable
     private readonly IServiceScope _scope;
     private readonly PitakaDbContext _context;
     private readonly HttpClient _client;
+    private readonly RecordingEmailSender _emailSender;
 
     public AuthControllerRealAuthTest(RealAuthWebApplicationFactory factory)
     {
         _scope = factory.Services.CreateScope();
         _context = _scope.ServiceProvider.GetRequiredService<PitakaDbContext>();
         _client = factory.CreateClient();
+        _emailSender = factory.EmailSender;
     }
 
     [Fact]
@@ -59,9 +62,9 @@ public class AuthControllerRealAuthTest : IDisposable
     [Fact]
     public async Task Me_WithRealJwtFromRegister_ReturnsOk()
     {
-        // "Register returns a token" only means something if it returns a *working* one:
-        // same signature, issuer, audience and NameIdentifier claim as a login token, and
-        // accepted by GET /api/auth/me with no POST /login in between.
+        // S2: register no longer hands back a token. This proves the whole arc with a
+        // real JwtBearerHandler instead — register, read the confirmation link out of
+        // the delivered mail, confirm, log in, then a real bearer token reaches me.
         var email = _faker.Internet.Email();
 
         var registerResponse = await _client.PostAsJsonAsync("/api/auth/register", new
@@ -72,11 +75,32 @@ public class AuthControllerRealAuthTest : IDisposable
         });
         Assert.Equal(HttpStatusCode.Created, registerResponse.StatusCode);
 
-        var registerBody = await registerResponse.Content.ReadFromJsonAsync<LoginResponse>();
+        var registerBody = await registerResponse.Content.ReadFromJsonAsync<UserResponse>();
         Assert.NotNull(registerBody);
 
+        var confirmMessage = Assert.Single(_emailSender.To(email));
+        var match = Regex.Match(confirmMessage.Body, @"userId=(?<userId>\d+)&token=(?<token>[^\s]+)");
+        Assert.True(match.Success, $"No confirm-email link found in email body:\n{confirmMessage.Body}");
+
+        var confirmResponse = await _client.PostAsJsonAsync("/api/auth/confirm-email", new
+        {
+            userId = int.Parse(match.Groups["userId"].Value),
+            token = Uri.UnescapeDataString(match.Groups["token"].Value),
+        });
+        Assert.Equal(HttpStatusCode.NoContent, confirmResponse.StatusCode);
+
+        var loginResponse = await _client.PostAsJsonAsync("/api/auth/login", new
+        {
+            email,
+            password = "TestPass123!",
+        });
+        Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
+
+        var loginBody = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>();
+        Assert.NotNull(loginBody);
+
         var request = new HttpRequestMessage(HttpMethod.Get, "/api/auth/me");
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", registerBody!.Token);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", loginBody!.Token);
 
         var response = await _client.SendAsync(request);
 

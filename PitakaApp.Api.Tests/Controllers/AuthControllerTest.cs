@@ -87,32 +87,6 @@ public class AuthControllerTest : IDisposable
         Assert.Equal(wrongEmailProblem.Detail, wrongPasswordProblem.Detail);
     }
 
-    // S1 keeps lockout invisible: CheckPasswordSignInAsync(..., lockoutOnFailure: true)
-    // accrues AccessFailedCount and, on the fifth failure, sets LockoutEnd — but
-    // LoginUser maps everything except Succeeded to the same generic 401, so a locked
-    // Profile presenting its correct password still gets 401, not a distinct status.
-    // S2 is where IsLockedOut becomes visible (423).
-    [Fact]
-    public async Task Login_AfterFiveFailedAttempts_CorrectPasswordStillReturns401()
-    {
-        var email = _faker.Internet.Email();
-        await UserFactory.CreateAsync(_context, email);
-
-        for (var i = 0; i < 5; i++)
-        {
-            var failed = await _client.PostAsJsonAsync("/api/auth/login", new { email, password = "WrongPassword123!" });
-            Assert.Equal(HttpStatusCode.Unauthorized, failed.StatusCode);
-        }
-
-        var withCorrectPassword = await _client.PostAsJsonAsync("/api/auth/login",
-            new { email, password = UserFactory.DefaultPassword });
-
-        Assert.Equal(HttpStatusCode.Unauthorized, withCorrectPassword.StatusCode);
-
-        var problem = await withCorrectPassword.Content.ReadFromJsonAsync<ProblemDetails>();
-        Assert.Equal("Invalid email or password.", problem!.Detail);
-    }
-
     [Theory]
     [InlineData("missing email")]
     [InlineData("missing password")]
@@ -128,7 +102,7 @@ public class AuthControllerTest : IDisposable
     }
 
     [Fact]
-    public async Task Register_WithNewEmail_ReturnsCreatedWithSession()
+    public async Task Register_WithNewEmail_ReturnsCreatedWithProfileOnly_AndNoToken()
     {
         var request = new
         {
@@ -142,11 +116,32 @@ public class AuthControllerTest : IDisposable
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         Assert.Null(response.Headers.Location);
 
-        var body = await response.Content.ReadFromJsonAsync<LoginResponse>();
+        var raw = await response.Content.ReadAsStringAsync();
+        Assert.DoesNotContain("token", raw, StringComparison.OrdinalIgnoreCase);
+
+        var body = await response.Content.ReadFromJsonAsync<UserResponse>();
         Assert.NotNull(body);
-        Assert.False(string.IsNullOrWhiteSpace(body!.Token));
-        Assert.Equal(request.email, body.User.Email);
-        Assert.Equal(request.name, body.User.Name);
+        Assert.Equal(request.email, body!.Email);
+        Assert.Equal(request.name, body.Name);
+    }
+
+    [Fact]
+    public async Task Register_WithNewEmail_DeliversConfirmationLinkToConfiguredConfirmUrl()
+    {
+        var email = _faker.Internet.Email();
+        var request = new
+        {
+            name = _faker.Person.FullName,
+            email,
+            password = "TestPass123!",
+        };
+
+        var response = await _client.PostAsJsonAsync("/api/auth/register", request);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var message = Assert.Single(_emailSender.To(email));
+        Assert.Contains(ConfiguredConfirmUrl, message.Body);
+        Assert.Contains("Profile", message.Body);
     }
 
     [Fact]
@@ -272,6 +267,9 @@ public class AuthControllerTest : IDisposable
     // The reset URL the test host serves — the appsettings.json default, since the test
     // factory overrides only the connection string, the JWT key and the worker flag.
     private const string ConfiguredResetUrl = "http://localhost:4200/reset-password";
+
+    // The confirm-email URL the test host serves — the appsettings.json default.
+    private const string ConfiguredConfirmUrl = "http://localhost:4200/confirm-email";
 
     [Fact]
     public async Task ForgotPassword_KnownEmail_Returns202_AndDeliversLinkToResetUrl()
@@ -447,6 +445,127 @@ public class AuthControllerTest : IDisposable
         Assert.Equal(PasswordResetToken.Hash(emailedToken), stored.TokenHash);
     }
 
+    [Fact]
+    public async Task ConfirmEmail_TheArc_ThenLoginSucceeds()
+    {
+        var email = _faker.Internet.Email();
+        await _client.PostAsJsonAsync("/api/auth/register", new
+        {
+            name = _faker.Person.FullName,
+            email,
+            password = "TestPass123!",
+        });
+
+        var (userId, token) = ConfirmationDeliveredTo(email);
+
+        var confirm = await _client.PostAsJsonAsync("/api/auth/confirm-email", new { userId, token });
+        Assert.Equal(HttpStatusCode.NoContent, confirm.StatusCode);
+
+        var login = await _client.PostAsJsonAsync("/api/auth/login", new { email, password = "TestPass123!" });
+        Assert.Equal(HttpStatusCode.OK, login.StatusCode);
+    }
+
+    [Fact]
+    public async Task ConfirmEmail_WithGarbageToken_ReturnsOneProblemDetails400()
+    {
+        var email = _faker.Internet.Email();
+        var user = await UserFactory.CreateAsync(_context, email);
+        user.EmailConfirmed = false;
+        await _context.SaveChangesAsync();
+
+        var response = await _client.PostAsJsonAsync("/api/auth/confirm-email",
+            new { userId = user.Id, token = "this-token-was-never-issued" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal("This confirmation link is invalid or has expired.", problem!.Detail);
+    }
+
+    [Fact]
+    public async Task Login_BeforeConfirming_Returns403WithDetail()
+    {
+        var email = _faker.Internet.Email();
+        await _client.PostAsJsonAsync("/api/auth/register", new
+        {
+            name = _faker.Person.FullName,
+            email,
+            password = "TestPass123!",
+        });
+
+        var response = await _client.PostAsJsonAsync("/api/auth/login", new { email, password = "TestPass123!" });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal("Confirm your email to sign in.", problem!.Detail);
+    }
+
+    [Fact]
+    public async Task Login_AfterFiveFailedAttempts_Returns423Locked()
+    {
+        var email = _faker.Internet.Email();
+        await UserFactory.CreateAsync(_context, email);
+
+        for (var i = 0; i < 5; i++)
+        {
+            await _client.PostAsJsonAsync("/api/auth/login", new { email, password = "WrongPassword123!" });
+        }
+
+        var response = await _client.PostAsJsonAsync("/api/auth/login",
+            new { email, password = UserFactory.DefaultPassword });
+
+        Assert.Equal((HttpStatusCode)423, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
+    public async Task ResendConfirmation_KnownUnconfirmedEmail_Returns202_AndDeliversFreshLink()
+    {
+        var email = _faker.Internet.Email();
+        var user = await UserFactory.CreateAsync(_context, email);
+        user.EmailConfirmed = false;
+        await _context.SaveChangesAsync();
+
+        var response = await _client.PostAsJsonAsync("/api/auth/resend-confirmation", new { email });
+
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        Assert.NotEmpty(_emailSender.To(email));
+    }
+
+    [Fact]
+    public async Task ResendConfirmation_UnknownEmail_IsIndistinguishable_AndDeliversNothing()
+    {
+        var knownEmail = _faker.Internet.Email();
+        var known = await UserFactory.CreateAsync(_context, knownEmail);
+        known.EmailConfirmed = false;
+        await _context.SaveChangesAsync();
+        var unknownEmail = _faker.Internet.Email();
+
+        var knownResponse = await _client.PostAsJsonAsync("/api/auth/resend-confirmation", new { email = knownEmail });
+        var unknownResponse = await _client.PostAsJsonAsync("/api/auth/resend-confirmation", new { email = unknownEmail });
+
+        Assert.Equal(HttpStatusCode.Accepted, knownResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, unknownResponse.StatusCode);
+        Assert.Equal(await knownResponse.Content.ReadAsByteArrayAsync(), await unknownResponse.Content.ReadAsByteArrayAsync());
+
+        Assert.Empty(_emailSender.To(unknownEmail));
+    }
+
+    [Fact]
+    public async Task ResendConfirmation_AlreadyConfirmedEmail_IsIndistinguishable_AndDeliversNothing()
+    {
+        var email = _faker.Internet.Email();
+        await UserFactory.CreateAsync(_context, email); // EmailConfirmed = true by default
+
+        var response = await _client.PostAsJsonAsync("/api/auth/resend-confirmation", new { email });
+
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        Assert.Empty(_emailSender.To(email));
+    }
+
     private string TokenDeliveredTo(string email)
     {
         var messages = _emailSender.To(email);
@@ -459,6 +578,18 @@ public class AuthControllerTest : IDisposable
         var match = Regex.Match(body, @"token=([A-Za-z0-9_-]+)");
         Assert.True(match.Success, $"No token found in email body:\n{body}");
         return match.Groups[1].Value;
+    }
+
+    private (int UserId, string Token) ConfirmationDeliveredTo(string email)
+    {
+        var messages = _emailSender.To(email);
+        Assert.NotEmpty(messages);
+        var body = messages[^1].Body;
+
+        var match = Regex.Match(body, @"userId=(?<userId>\d+)&token=(?<token>\S+)");
+        Assert.True(match.Success, $"No confirm-email link found in email body:\n{body}");
+
+        return (int.Parse(match.Groups["userId"].Value), Uri.UnescapeDataString(match.Groups["token"].Value));
     }
 
     public void Dispose() => _scope.Dispose();
