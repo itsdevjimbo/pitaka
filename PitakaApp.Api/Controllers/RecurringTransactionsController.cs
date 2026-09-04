@@ -196,6 +196,11 @@ public class RecurringTransactionsController : ControllerBase
             return Forbid();
         }
 
+        if (await _recurringTransactionService.HasGeneratedTransactionsAsync(id))
+        {
+            return Problem(detail: "This recurring transaction has generated transactions and cannot be deleted.", statusCode: StatusCodes.Status409Conflict);
+        }
+
         await _recurringTransactionService.DeleteAsync(recurringTransaction);
         return NoContent();
     }

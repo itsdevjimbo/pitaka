@@ -63,7 +63,7 @@ What a Transaction is filed under. Each Category is permanently either Income or
 _Avoid_: Tag, label, subcategory
 
 **In use**:
-A Category is in use once anything points at it — a Transaction filed under it, a Budget narrowed to it, or a recurring transaction carrying it. A Category in use cannot be deleted; what was filed under it stays filed.
+One rule over two entities, each judged on a different tense. A Category is in use while anything points at it _now_ — a Transaction filed under it, a Budget narrowed to it, or a recurring transaction carrying it. A recurring transaction is in use once it has _ever_ generated a Transaction, whatever has happened to it since: one that has never run is still deletable, one that generated a single Transaction years ago is not. Neither can be deleted while that holds — what was filed under a Category stays filed, and a generated transaction keeps pointing at the recurring transaction that made it.
 _Avoid_: Referenced, linked, has dependents
 
 **Tag**:
