@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using PitakaApp.Api.Data;
 using PitakaApp.Api.Enums;
 using PitakaApp.Api.Resources;
+using PitakaApp.Api.Services;
 using PitakaApp.Api.Tests.Factories;
 using PitakaApp.Api.Tests.Fixtures;
 
@@ -999,8 +1000,7 @@ public class RecurringTransactionsControllerTest : IDisposable
     {
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
-        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(_context, user.Id, account.Id );
-        var transaction = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, recurringTransactionId: recurringTransaction.Id);
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(_context, user.Id, account.Id);
 
         _client.ActAsUser(user);
 
@@ -1008,10 +1008,55 @@ public class RecurringTransactionsControllerTest : IDisposable
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
 
         Assert.False(await _context.RecurringTransactions.AnyAsync(rt => rt.Id == recurringTransaction.Id));
+    }
 
-        await _context.Transactions.Entry(transaction).ReloadAsync();
-        Assert.Null(transaction.RecurringTransactionId);
+    // The refusal turns on history, not status — a schedule that has generated a Transaction
+    // is undeletable whatever state it is in, including Completed, which the system assigns
+    // itself once a schedule runs past its end date.
+    [Theory]
+    [InlineData(RecurringTransactionStatus.Active)]
+    [InlineData(RecurringTransactionStatus.Paused)]
+    [InlineData(RecurringTransactionStatus.Completed)]
+    [InlineData(RecurringTransactionStatus.Cancelled)]
+    public async Task Delete_WithGeneratedTransaction_ReturnsConflict(RecurringTransactionStatus status)
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            _context, user.Id, account.Id, status: status);
+        var transaction = await TransactionFactory.CreateAsync(
+            _context, user.Id, account.Id, recurringTransactionId: recurringTransaction.Id);
 
+        _client.ActAsUser(user);
+
+        var response = await _client.DeleteAsync("api/recurring-transactions/" + recurringTransaction.Id);
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+
+        // The schedule survives, and so does the link — the surviving link is the point of
+        // the change, and the status code alone does not prove it.
+        Assert.True(await _context.RecurringTransactions.AnyAsync(rt => rt.Id == recurringTransaction.Id));
+        await _context.Entry(transaction).ReloadAsync();
+        Assert.Equal(recurringTransaction.Id, transaction.RecurringTransactionId);
+    }
+
+    [Fact]
+    public async Task Delete_AfterGeneratedTransactionsRemoved_ReturnsNoContent()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(_context, user.Id, account.Id);
+        var transaction = await TransactionFactory.CreateAsync(
+            _context, user.Id, account.Id, recurringTransactionId: recurringTransaction.Id);
+
+        var transactionService = _scope.ServiceProvider.GetRequiredService<TransactionService>();
+        await transactionService.DeleteAsync(transaction);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.DeleteAsync("api/recurring-transactions/" + recurringTransaction.Id);
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+
+        Assert.False(await _context.RecurringTransactions.AnyAsync(rt => rt.Id == recurringTransaction.Id));
     }
 
     [Fact]

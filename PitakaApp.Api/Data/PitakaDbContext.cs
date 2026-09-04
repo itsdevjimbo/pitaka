@@ -94,11 +94,15 @@ public class PitakaDbContext : DbContext
             .HasForeignKey(t => t.CategoryId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        // Restrict, not SetNull: a generated transaction's RecurringTransactionId is the
+        // discriminator other rules read (ADR 0007, ADR 0005, #71), so deleting a schedule
+        // must not null it out from under them. A schedule with generated transactions is
+        // in use and cannot be deleted; the person cancels it instead (ADR 0008).
         modelBuilder.Entity<Transaction>()
             .HasOne(t => t.RecurringTransaction)
             .WithMany()
             .HasForeignKey(t => t.RecurringTransactionId)
-            .OnDelete(DeleteBehavior.SetNull);
+            .OnDelete(DeleteBehavior.Restrict);
 
         modelBuilder.Entity<GoalContribution>()
             .HasOne(gc => gc.Transaction)

@@ -106,4 +106,13 @@ public class RecurringTransactionService
         _context.RecurringTransactions.Remove(recurringTransaction);
         await _context.SaveChangesAsync();
     }
+
+    // A recurring transaction is in use once a Transaction points at it. No user scoping:
+    // the controller has already established ownership, and a Transaction cannot point at
+    // another user's schedule. Nothing else in the model references a RecurringTransaction,
+    // so this is the whole question.
+    public async Task<bool> HasGeneratedTransactionsAsync(int recurringTransactionId) =>
+        await _context.Transactions
+            .AsNoTracking()
+            .AnyAsync(t => t.RecurringTransactionId == recurringTransactionId);
 }
