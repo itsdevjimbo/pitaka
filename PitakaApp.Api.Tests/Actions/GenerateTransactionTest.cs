@@ -67,7 +67,7 @@ public class GenerateTransactionTest
     }
 
     [Fact]
-    public void Generate_CorrectIsRecurringAndTransactionId()
+    public void Generate_CorrectRecurringTransactionId()
     {
         var recurringTransaction = RecurringTransactionFactory.Make(2, 3);
         recurringTransaction.Id = 5;
@@ -75,7 +75,6 @@ public class GenerateTransactionTest
         var transactionDate = recurringTransaction.NextRunDate.ToDateTime(TimeOnly.MinValue);
         var transaction = GenerateTransaction.GetTransaction(recurringTransaction, transactionDate);
 
-        Assert.True(transaction.IsRecurring);
         Assert.Equal(5, transaction.RecurringTransactionId);
     }
 }

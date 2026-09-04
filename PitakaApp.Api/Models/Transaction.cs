@@ -22,8 +22,6 @@ public class Transaction : TimestampedEntity
 
     public required DateTime TransactionDate { get; set; }
 
-    public bool IsRecurring { get; set; } = false;
-
     public int? RecurringTransactionId { get; init; }
 
     
