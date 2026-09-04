@@ -102,17 +102,17 @@ they guard the switch rather than substitute for it.
   and once callers rely on the stricter contract, loosening it back is itself a breaking
   change. This is the reason the decision is recorded here rather than made in passing.
 
-- **Coverage was added for the missing-field case**, one test per endpoint class, all
-  asserting `400` *and* that the persisted state did not move:
-  `Patch_ActiveStatusWithEmptyBody...` (accounts), `Patch_GoalStatusWithEmptyBody...`
-  (goals), `Patch_StatusWithEmptyBody...` (categories and recurring transactions),
-  `Create_WithoutType_ReturnsBadRequest` (accounts, transactions),
-  `Create_WithoutPeriod_ReturnsBadRequest` (budgets),
-  `Create_WithoutEnumField_ReturnsBadRequest` (recurring transactions, `type` and
-  `frequency`), `Create_WithoutGoalId_...` (goal contributions). An explicit `null` for a
-  value-type field already `400`'d before this change — System.Text.Json rejects `null` for
-  a non-nullable value type — so the new tests omit the key entirely, which is the case the
-  attribute missed.
+- **Coverage was added for the missing-field case**, all asserting `400` *and* that nothing
+  was written — the persisted status is unchanged, or no row was created and no balance
+  moved. The empty-body `PATCH` endpoints get one test each
+  (`Patch_ActiveStatusWithEmptyBody_ReturnsBadRequestAndLeavesStatusUnchanged` on accounts,
+  and the parallel `Patch_..._WithEmptyBody_ReturnsBadRequestAndLeavesStatusUnchanged` on
+  categories, goals and recurring transactions). Each `POST` endpoint gets a
+  `Create_WithoutRequiredField` `[Theory]` that removes one required key at a time and
+  covers every non-defaulted field — enums, the owning `AccountId`, `Amount`, the required
+  dates. An explicit `null` for a value-type field already `400`'d before this change —
+  System.Text.Json rejects `null` for a non-nullable value type — so the new tests omit the
+  key entirely, which is the case the attribute missed.
 
 - **An explicit `null` and an absent key are now the same `400` for a required field**, and
   a present `null` for an *optional* field still binds to the default. The distinction the

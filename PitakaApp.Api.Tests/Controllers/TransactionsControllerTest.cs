@@ -1098,25 +1098,33 @@ public class TransactionsControllerTest : IDisposable
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
-    [Fact]
-    public async Task Create_WithoutType_ReturnsBadRequest()
+    [Theory]
+    [InlineData("accountId")]
+    [InlineData("type")]
+    [InlineData("amount")]
+    public async Task Create_WithoutRequiredField_ReturnsBadRequestAndMovesNoMoney(string omitted)
     {
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
 
         _client.ActAsUser(user);
 
-        // No `type`. Before RespectRequiredConstructorParameters this bound to
-        // default(TransactionType) == Income and recorded income. See issue #82.
-        var request = new
+        // Every non-defaulted constructor parameter is mandatory in the body once
+        // RespectRequiredConstructorParameters is on: a missing key is a 400. Before it, a
+        // missing `type` bound to default(TransactionType) == Income and income was recorded.
+        // See issue #82.
+        var request = new Dictionary<string, object>
         {
-            AccountId = account.Id,
-            Amount = 5000,
+            ["accountId"] = account.Id,
+            ["type"] = TransactionType.Income.ToString(),
+            ["amount"] = 5000,
         };
+        request.Remove(omitted);
 
         var response = await _client.PostAsJsonAsync("/api/transactions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
+        Assert.False(await _context.Transactions.AsNoTracking().AnyAsync(t => t.UserId == user.Id));
         var stored = await _context.Accounts.AsNoTracking().SingleAsync(a => a.Id == account.Id);
         Assert.Equal(0, stored.CurrentBalance);
     }

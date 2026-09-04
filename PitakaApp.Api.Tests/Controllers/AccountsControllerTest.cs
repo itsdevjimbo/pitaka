@@ -109,22 +109,30 @@ public class AccountsControllerTest : IDisposable
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
     }
 
-    [Fact]
-    public async Task Create_WithoutType_ReturnsBadRequest()
+    [Theory]
+    [InlineData("name")]
+    [InlineData("type")]
+    public async Task Create_WithoutRequiredField_ReturnsBadRequestAndCreatesNothing(string omitted)
     {
         var user = await UserFactory.CreateAsync(_context);
         _client.ActAsUser(user);
 
-        // No `type`. Before RespectRequiredConstructorParameters this bound to
-        // default(AccountType) == Cash and created a cash account. See issue #82.
-        var request = new
+        // Every non-defaulted constructor parameter is mandatory in the body once
+        // RespectRequiredConstructorParameters is on: a missing key is a 400. Before it, a
+        // missing `type` bound to default(AccountType) == Cash and an account was created.
+        // See issue #82.
+        var request = new Dictionary<string, object>
         {
-            Name = "Savings account",
-            InitialBalance = 5000,
+            ["name"] = "Savings account",
+            ["type"] = AccountType.Bank.ToString(),
+            ["initialBalance"] = 5000,
         };
+        request.Remove(omitted);
 
         var response = await _client.PostAsJsonAsync("/api/accounts", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        Assert.False(await _context.Accounts.AsNoTracking().AnyAsync(a => a.UserId == user.Id));
     }
 
     [Fact]
@@ -454,7 +462,7 @@ public class AccountsControllerTest : IDisposable
     }
 
     [Fact]
-    public async Task Patch_ActiveStatusWithEmptyBody_ReturnsBadRequestAndDoesNotChangeStatus()
+    public async Task Patch_ActiveStatusWithEmptyBody_ReturnsBadRequestAndLeavesStatusUnchanged()
     {
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
@@ -462,7 +470,7 @@ public class AccountsControllerTest : IDisposable
         _client.ActAsUser(user);
 
         // An empty body leaves IsActive unspecified. Before RespectRequiredConstructorParameters
-        // it bound to default(bool) == false and deactivated the account. See issue #82.
+        // it bound to default(bool) == false and retired the account. See issue #82.
         var response = await _client.PatchAsJsonAsync("/api/accounts/" + account.Id + "/status", new { });
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 

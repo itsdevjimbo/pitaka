@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using PitakaApp.Api.Data;
 using PitakaApp.Api.Enums;
@@ -1068,23 +1069,33 @@ public class BudgetsControllerTest : IDisposable
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
-    [Fact]
-    public async Task Create_WithoutPeriod_ReturnsBadRequest()
+    [Theory]
+    [InlineData("name")]
+    [InlineData("amountLimit")]
+    [InlineData("period")]
+    [InlineData("startDate")]
+    public async Task Create_WithoutRequiredField_ReturnsBadRequestAndCreatesNothing(string omitted)
     {
         var user = await UserFactory.CreateAsync(_context);
         _client.ActAsUser(user);
 
-        // No `period` key at all. Before RespectRequiredConstructorParameters this bound to
-        // default(BudgetPeriod) == Daily and created a daily budget. See issue #82.
-        var request = new
+        // Every non-defaulted constructor parameter is mandatory in the body once
+        // RespectRequiredConstructorParameters is on: a missing key is a 400. Before it, a
+        // missing `period` bound to default(BudgetPeriod) == Daily and a missing `startDate`
+        // to 0001-01-01, with nothing to catch either. See issue #82.
+        var request = new Dictionary<string, object>
         {
-            Name = "Test budget",
-            AmountLimit = 5000,
-            StartDate = DateOnly.FromDateTime(DateTime.Now),
+            ["name"] = "Test budget",
+            ["amountLimit"] = 5000,
+            ["period"] = BudgetPeriod.Weekly.ToString(),
+            ["startDate"] = DateOnly.FromDateTime(DateTime.Now).ToString("O"),
         };
+        request.Remove(omitted);
 
         var response = await _client.PostAsJsonAsync("/api/budgets", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        Assert.False(await _context.Budgets.AsNoTracking().AnyAsync(b => b.UserId == user.Id));
     }
 
     [Fact]

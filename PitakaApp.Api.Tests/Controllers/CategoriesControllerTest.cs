@@ -505,7 +505,7 @@ public class CategoriesControllerTest : IDisposable
     }
 
     [Fact]
-    public async Task Patch_StatusWithEmptyBody_ReturnsBadRequestAndDoesNotChangeStatus()
+    public async Task Patch_StatusWithEmptyBody_ReturnsBadRequestAndLeavesStatusUnchanged()
     {
         var user = await UserFactory.CreateAsync(_context);
         var category = await CategoryFactory.CreateAsync(_context, user.Id);

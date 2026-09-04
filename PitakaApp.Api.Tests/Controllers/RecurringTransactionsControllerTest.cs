@@ -273,17 +273,22 @@ public class RecurringTransactionsControllerTest : IDisposable
     }
 
     [Theory]
+    [InlineData("accountId")]
+    [InlineData("name")]
     [InlineData("type")]
     [InlineData("frequency")]
-    public async Task Create_WithoutEnumField_ReturnsBadRequest(string omitted)
+    [InlineData("amount")]
+    [InlineData("startDate")]
+    public async Task Create_WithoutRequiredField_ReturnsBadRequestAndCreatesNothing(string omitted)
     {
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
 
         _client.ActAsUser(user);
 
-        // Omit one enum key entirely. Before RespectRequiredConstructorParameters a missing
-        // `type` bound to Income and a missing `frequency` to Daily. See issue #82.
+        // Every non-defaulted constructor parameter is mandatory in the body once
+        // RespectRequiredConstructorParameters is on: a missing key is a 400. Before it, a
+        // missing `type` bound to Income and a missing `frequency` to Daily. See issue #82.
         var request = new Dictionary<string, object>
         {
             ["accountId"] = account.Id,
@@ -297,6 +302,8 @@ public class RecurringTransactionsControllerTest : IDisposable
 
         var response = await _client.PostAsJsonAsync("/api/recurring-transactions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        Assert.False(await _context.RecurringTransactions.AsNoTracking().AnyAsync(r => r.UserId == user.Id));
     }
 
     [Fact]
@@ -822,7 +829,7 @@ public class RecurringTransactionsControllerTest : IDisposable
     }
 
     [Fact]
-    public async Task Patch_StatusWithEmptyBody_ReturnsBadRequestAndDoesNotReactivate()
+    public async Task Patch_StatusWithEmptyBody_ReturnsBadRequestAndLeavesStatusUnchanged()
     {
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);

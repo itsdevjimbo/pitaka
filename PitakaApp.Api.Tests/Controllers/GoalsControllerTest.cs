@@ -391,7 +391,7 @@ public class GoalsControllerTest : IDisposable
     }
 
     [Fact]
-    public async Task Patch_GoalStatusWithEmptyBody_ReturnsBadRequestAndDoesNotResurrectGoal()
+    public async Task Patch_GoalStatusWithEmptyBody_ReturnsBadRequestAndLeavesStatusUnchanged()
     {
         var user = await UserFactory.CreateAsync(_context);
         var goal = await GoalFactory.CreateAsync(_context, user.Id, status: GoalStatus.Abandoned);
@@ -399,7 +399,8 @@ public class GoalsControllerTest : IDisposable
         _client.ActAsUser(user);
 
         // An empty body leaves Status unspecified. Before RespectRequiredConstructorParameters
-        // it bound to default(GoalStatus) == Active and revived the abandoned goal. See issue #82.
+        // it bound to default(GoalStatus) == Active, moving the abandoned goal back to Active.
+        // See issue #82.
         var response = await _client.PatchAsJsonAsync("/api/goals/" + goal.Id + "/status", new { });
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
@@ -471,9 +472,32 @@ public class GoalsControllerTest : IDisposable
     }
 
     [Theory]
+    [InlineData("name")]
+    [InlineData("targetAmount")]
+    public async Task Create_WithoutRequiredField_ReturnsBadRequestAndCreatesNothing(string omitted)
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(user);
+
+        // Every non-defaulted constructor parameter is mandatory in the body once
+        // RespectRequiredConstructorParameters is on: a missing key is a 400. See issue #82.
+        var request = new Dictionary<string, object>
+        {
+            ["name"] = "New car",
+            ["targetAmount"] = 5000,
+        };
+        request.Remove(omitted);
+
+        var response = await _client.PostAsJsonAsync("/api/goals", request);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        Assert.False(await _context.Goals.AsNoTracking().AnyAsync(g => g.UserId == user.Id));
+    }
+
+    [Theory]
     [MemberData(nameof(InvalidBudgetRequests))]
     public async Task Create_WithInvalidData_ReturnsBadRequest(
-        string? name, 
+        string? name,
         decimal targetAmount
     )
     {
