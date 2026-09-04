@@ -36,6 +36,8 @@ Only the refusal ships now. ADR 0001 schedules API work by client pull, and `pit
 
 What separates the two halves is that the refusal is a **defect fix** and `Retired` is a **feature**. A shipped endpoint that destroys records was never an entry in the Gap Register, and the fix is a query, a branch and a migration. `Retired` is a column, an endpoint, a wire field and a client change — precisely the shape ADR 0001's rule exists to defer. It is filed as #86 and waits for a screen.
 
+> **Update.** `Retired` for Categories (#86) shipped ahead of that screen, as the third exception recorded in ADR 0001. This section stands as the reasoning for why it *was* deferred; the exception is why it stopped being.
+
 ## Enforcement in two layers
 
 Layer one is `CategoryService.IsInUseAsync(int categoryId)` and a `409` in the controller. The check needs no user scoping: every write path already confines a category reference to its owner — `VerifyCategoryExistence.VerifyAsync(user, categoryId)` on Transactions, `VerifyBudgetCategory` on Budgets — and system defaults are unreachable behind the existing `Forbid`. A plain `AnyAsync(x => x.CategoryId == id)` is therefore already correctly scoped, and the reason belongs in a comment rather than in a redundant `WHERE`.

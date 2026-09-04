@@ -22,6 +22,18 @@ public class Category : TimestampedEntity
 
     public bool IsDefault { get; set; } = false;
 
+    public bool IsActive { get; set; } = true;
+
 
     public User? User { get; set; }
+
+    public void Activate()
+    {
+        IsActive = true;
+    }
+
+    public void Deactivate()
+    {
+        IsActive = false;
+    }
 }

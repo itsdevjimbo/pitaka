@@ -102,6 +102,27 @@ public class CategoriesController : ControllerBase
     }
 
     [TypeFilter(typeof(ResolveCurrentUserFilter))]
+    [HttpPatch("{id}/status")]
+    public async Task<IActionResult> PatchStatus(int id, PatchCategoryActiveStatusRequest request)
+    {
+        var user = _currentUserAccessor.User!;
+        var category = await _categoryService.GetTrackedByIdAsync(id);
+
+        if (category == null)
+        {
+            return NotFound();
+        }
+
+        if (category.UserId != user.Id)
+        {
+            return Forbid();
+        }
+
+        category = await _categoryService.PatchActiveStatus(category, request.ToInput());
+        return Ok(CategoryResource.FromModel(category));
+    }
+
+    [TypeFilter(typeof(ResolveCurrentUserFilter))]
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(int id)
     {
