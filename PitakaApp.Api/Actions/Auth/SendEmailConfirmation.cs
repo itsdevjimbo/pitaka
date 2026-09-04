@@ -29,8 +29,7 @@ public class SendEmailConfirmation
         // contain characters a query string does not carry unescaped.
         var encodedToken = Uri.EscapeDataString(token);
 
-        // Email is `string?` on IdentityUser<int>; RequireUniqueEmail plus every write
-        // path setting it means a resolved User never actually carries a null one.
+        // Email is never null here — same guarantee as RequestPasswordReset.ExecuteAsync.
         await _emailSender.SendAsync(user.Email!, "Confirm your Pitaka Profile", ComposeBody(user.Id, encodedToken));
     }
 

@@ -67,8 +67,11 @@ public class AuthController : ControllerBase
                     detail: "Too many failed sign-in attempts. Try again shortly.",
                     statusCode: StatusCodes.Status423Locked);
 
-            default:
+            case LoginOutcome.InvalidCredentials:
                 return Problem(detail: "Invalid email or password.", statusCode: StatusCodes.Status401Unauthorized);
+
+            default:
+                throw new ArgumentOutOfRangeException(nameof(result.Outcome), result.Outcome, "Unhandled login outcome.");
         }
     }
 
