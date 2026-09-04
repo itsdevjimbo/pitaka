@@ -38,6 +38,8 @@ This is the single thing in this work most likely to be "fixed" by a later contr
 
 The three satellite tables `IdentityUserContext` does map are an **accepted cost**. Nothing in Pitaka writes a row to `user_claims`, `user_logins`, or `user_tokens`; they exist because `EntityFrameworkStores` expects them. They are renamed to snake_case house style so `EFCore.NamingConventions` does not leave `asp_net_*` names in one corner of the schema.
 
+Slice S1's migration therefore adds: the new Identity columns on `users`, the three satellite tables, and — for the reason ADR 0013 sets out — the persisted Data Protection key-ring table. It carries no data backfill: there is no deployed environment, and dev and CI both drop and re-migrate.
+
 ## The known gap: a live JWT outlives a credential change
 
 A password reset or a lockout does **not** revoke a JWT that has already been issued. Tokens are validated by signature and expiry only — there is no denylist and no per-Profile version claim — so a token minted before a reset stays valid for the remainder of its configured lifetime, about an hour. If the reset was prompted by a compromise, the attacker keeps that session until it expires on its own.
@@ -58,7 +60,7 @@ This is **identical to Pitaka today**. It is not a regression introduced by adop
 
 - **`AddIdentityCore` vs `AddIdentity` is a documented trap.** A later contributor who "completes" the wiring by switching to `AddIdentity` breaks bearer authentication with a one-line diff that compiles. This ADR and the wiring comment are the guard; there is no test that fails at the unit level.
 
-- **Three empty tables enter the schema.** `user_claims`, `user_logins`, `user_tokens` — mapped, renamed to house style, never written to. `IdentityUserContext` over `IdentityDbContext` already keeps three more (the role tables) out.
+- **Three empty tables enter the schema**, plus the Data Protection key-ring table. `user_claims`, `user_logins`, `user_tokens` — mapped, renamed to house style, never written to. `IdentityUserContext` over `IdentityDbContext` already keeps three more (the role tables) out. The key-ring table is written to (ADR 0013).
 
 - **`User` moves off `TimestampedEntity` onto `ITimestamped`.** `IdentityUser<int>` takes the base slot. The interface keeps `CreatedAt`/`UpdatedAt` working through the `SaveChanges` override; the twelve `TimestampedEntity` subclasses do not move.
 

@@ -35,7 +35,7 @@ An Account or a Category the person has stopped using. It keeps everything it re
 _Avoid_: Closed, archived, deleted, inactive, disabled
 
 **UserName**:
-An Identity field, always a mirror of Email. Pitaka has no separate login handle — a person is identified by Email and nothing else, and `UserName` is set equal to `Email` on the way in so the store's normalized lookup works.
+Always a mirror of Email. Pitaka has no separate login handle — a person is identified by Email and nothing else.
 _Avoid_: Handle, login name, a username distinct from the email
 
 **Confirmed / unconfirmed**:
