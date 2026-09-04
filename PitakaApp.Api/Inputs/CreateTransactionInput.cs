@@ -9,6 +9,5 @@ public record CreateTransactionInput (
     int? CategoryId = null,
     int? TransferToAccountId = null,
     string? Description = null,
-    bool? IsRecurring = null,
     int? RecurringTransactionId = null
 );

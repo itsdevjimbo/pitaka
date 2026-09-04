@@ -10,7 +10,6 @@ public record TransactionResource(
     TransactionType Type,
     decimal Amount,
     DateTime TransactionDate,
-    bool IsRecurring,
     int? CategoryId,
     int? RecurringTransactionId,
     int? TransferToAccountId,
@@ -20,7 +19,7 @@ public record TransactionResource(
 {
     public static TransactionResource FromModel(Transaction t) =>
         new(
-            t.Id, t.UserId, t.AccountId, t.Type, t.Amount, TransactionDateForWire(t), t.IsRecurring,
+            t.Id, t.UserId, t.AccountId, t.Type, t.Amount, TransactionDateForWire(t),
             t.CategoryId, t.RecurringTransactionId, t.TransferToAccountId, t.Description, TagResource.Collection(t.Tags)
         );
 

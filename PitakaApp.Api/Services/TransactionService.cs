@@ -120,7 +120,6 @@ public class TransactionService
             TransactionDate = input.TransactionDate?.ToUniversalTime() ?? DateTime.UtcNow,
             Description = input.Description,
             TransferToAccountId = input.TransferToAccountId,
-            IsRecurring = input.IsRecurring ?? false,
             RecurringTransactionId = input.RecurringTransactionId
         };
 
