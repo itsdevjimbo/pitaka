@@ -27,8 +27,8 @@ public class LoginUser
         // lockoutOnFailure: true — a failed attempt counts toward lockout even though S1
         // keeps the result invisible. Only Succeeded maps to a session here; IsLockedOut
         // and IsNotAllowed both collapse into the same generic failure as a wrong
-        // password, exactly as today (see .scratch/auth-identity/spec.md, slice S1). S2
-        // branches on them.
+        // password, exactly as today (ADR 0011; ADR 0012 covers the confirmation half
+        // S2 makes visible). S2 branches on them.
         var result = await _signInManager.CheckPasswordSignInAsync(user, input.Password, lockoutOnFailure: true);
 
         if (!result.Succeeded)
