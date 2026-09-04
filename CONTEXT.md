@@ -98,6 +98,6 @@ Pitaka Web mirrors this repo's names except in three places, translated at its H
 
 Every other name passes through unchanged, so this glossary deliberately does not restate the client's other eight terms — two files kept in sync forever, carrying no information.
 
-The consequence a reader will hit: `SchedulesService` in the client calls `/api/recurring-transactions`. That mismatch is deliberate and lives in one file.
+The consequence a reader will hit, once the client grows a schedules feature: its `SchedulesService` will call `/api/recurring-transactions`, and that name mismatch is deliberate and belongs in the one adapter file. No such service exists today.
 
 User-facing copy this API authors — reset emails, error messages — uses **Profile**, never User and never Account. The client owns nearly all such copy, so a word existing only in this repo's strings would be a second vocabulary for one person to remember.
