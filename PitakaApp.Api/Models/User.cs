@@ -8,7 +8,8 @@ namespace PitakaApp.Api.Models;
 // UserName, the Normalized* lookup columns, EmailConfirmed, SecurityStamp,
 // ConcurrencyStamp, lockout and two-factor columns. ITimestamped is implemented
 // directly, not through TimestampedEntity — C# has no multiple inheritance and
-// IdentityUser<int> occupies the base-class slot. See ADR 0011.
+// IdentityUser<int> occupies the base-class slot. See
+// .scratch/auth-identity/issues/02-identity-store-swap.md.
 public class User : IdentityUser<int>, ITimestamped
 {
     [MaxLength(255)]

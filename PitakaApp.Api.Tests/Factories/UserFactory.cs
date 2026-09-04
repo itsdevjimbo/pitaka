@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using PitakaApp.Api.Data;
+using PitakaApp.Api.Infra;
 using PitakaApp.Api.Models;
 
 namespace PitakaApp.Api.Tests.Factories;
@@ -54,15 +55,15 @@ public static class UserFactory
 
     // A UserManager<User> scoped to the given context, built by hand rather than
     // resolved from DI — UserFactory takes only a PitakaDbContext (unchanged across ~25
-    // call sites), not a service scope. Mirrors the options AddPitakaIdentity configures
-    // on the real store closely enough to behave the same for a test's purposes.
+    // call sites), not a service scope. Shares IdentityExtensions.ConfigureIdentityOptions
+    // with the real store's registration so the two can't silently drift apart on what
+    // counts as a valid password.
     private static UserManager<User> BuildUserManager(PitakaDbContext context)
     {
         var store = new UserOnlyStore<User, PitakaDbContext, int>(context);
-        var options = Microsoft.Extensions.Options.Options.Create(new IdentityOptions
-        {
-            User = { RequireUniqueEmail = true },
-        });
+        var identityOptions = new IdentityOptions();
+        IdentityExtensions.ConfigureIdentityOptions(identityOptions);
+        var options = Microsoft.Extensions.Options.Options.Create(identityOptions);
 
         return new UserManager<User>(
             store,
