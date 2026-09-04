@@ -11,15 +11,18 @@ public class AccountFactory
     {
         var faker = new Faker();
 
-        return new Account
+        var account = Account.Open(
+            userId,
+            name ?? faker.Person.FullName,
+            type ?? AccountType.Bank,
+            initialBalance ?? 0);
+
+        if (!(isActive ?? true))
         {
-            UserId = userId,
-            Name = name ?? faker.Person.FullName,
-            Type =  type ?? AccountType.Bank,
-            InitialBalance = initialBalance ?? 0,
-            CurrentBalance = initialBalance ?? 0,
-            IsActive = isActive ?? true
-        };
+            account.Deactivate();
+        }
+
+        return account;
     }
 
     public static async Task<Account> CreateAsync(PitakaDbContext context, int userId, string? name = null, AccountType? type = null, decimal? initialBalance = null, bool? isActive = true)

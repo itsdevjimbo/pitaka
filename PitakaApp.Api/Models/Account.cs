@@ -18,7 +18,7 @@ public class Account: TimestampedEntity
     public decimal InitialBalance { get; init; } = 0;
 
     [Column(TypeName = "decimal(14, 2)")]
-    public decimal CurrentBalance { get; set; } = 0;
+    public decimal CurrentBalance { get; private set; } = 0;
 
     public bool IsActive { get; set; } = true;
 
@@ -28,6 +28,16 @@ public class Account: TimestampedEntity
     public ICollection<Transaction> Transactions { get; set; } = new List<Transaction>();
 
     public ICollection<RecurringTransaction> RecurringTransactions { get; set; } = new List<RecurringTransaction>();
+
+    public static Account Open(int userId, string name, AccountType type, decimal initialBalance) =>
+        new()
+        {
+            UserId = userId,
+            Name = name,
+            Type = type,
+            InitialBalance = initialBalance,
+            CurrentBalance = initialBalance
+        };
 
     public void Increase(decimal amount)
     {
