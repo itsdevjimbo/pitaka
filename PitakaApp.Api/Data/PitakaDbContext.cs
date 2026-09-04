@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -8,11 +9,10 @@ namespace PitakaApp.Api.Data;
 
 // IdentityUserContext<User, int>, not IdentityDbContext<...> — that adds role, user-role
 // and role-claim tables for a role model the app has no use for.
-// DataProtectionKeys backs EfDataProtectionKeyRepository, which persists the Data
-// Protection key ring here instead of the per-machine default that a container redeploy
-// wipes — see that class for why this is hand-rolled rather than
-// AddDataProtection().PersistKeysToDbContext<PitakaDbContext>().
-public class PitakaDbContext : IdentityUserContext<User, int>
+// IDataProtectionKeyContext backs AddDataProtection().PersistKeysToDbContext<PitakaDbContext>()
+// (see IdentityExtensions), persisting the Data Protection key ring here instead of the
+// per-machine default that a container redeploy wipes.
+public class PitakaDbContext : IdentityUserContext<User, int>, IDataProtectionKeyContext
 {
     public PitakaDbContext(DbContextOptions<PitakaDbContext> options) : base(options)
     {
@@ -139,8 +139,6 @@ public class PitakaDbContext : IdentityUserContext<User, int>
             .WithMany()
             .HasForeignKey(t => t.UserId)
             .OnDelete(DeleteBehavior.Cascade);
-
-        modelBuilder.Entity<DataProtectionKey>().Property(k => k.Xml).HasColumnType("text");
     }
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)

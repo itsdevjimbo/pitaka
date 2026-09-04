@@ -12,11 +12,6 @@ namespace PitakaApp.Api.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            // No data backfill: there is no deployed environment with real rows, and dev
-            // and CI both drop and re-migrate. A real deployment carrying existing users
-            // would need normalized_email and user_name populated for every row before
-            // this migration could run against it — Identity's UserNameIndex/EmailIndex
-            // and FindByEmailAsync lookups depend on those columns being set.
             migrationBuilder.DropIndex(
                 name: "ix_users_email",
                 table: "users");
@@ -138,7 +133,7 @@ namespace PitakaApp.Api.Migrations
                         .Annotation("MySql:ValueGenerationStrategy", MySqlValueGenerationStrategy.IdentityColumn),
                     friendly_name = table.Column<string>(type: "longtext", nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    xml = table.Column<string>(type: "text", nullable: true)
+                    xml = table.Column<string>(type: "longtext", nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4")
                 },
                 constraints: table =>

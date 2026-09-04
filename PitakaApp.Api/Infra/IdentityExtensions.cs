@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.DataProtection.KeyManagement;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using PitakaApp.Api.Data;
 using PitakaApp.Api.Models;
@@ -24,15 +24,8 @@ public static class IdentityExtensions
         // The default key ring lives at ~/.aspnet/DataProtection-Keys — per-machine, and
         // wiped on every container redeploy, which would take every outstanding
         // confirmation/reset token with it. Persisting to the database keeps the ring
-        // (and the tokens it protects) alive across deploys. This is the hand-rolled
-        // equivalent of AddDataProtection().PersistKeysToDbContext<PitakaDbContext>() —
-        // see EfDataProtectionKeyRepository for why the official package isn't used.
-        services.AddDataProtection();
-        services.AddOptions<KeyManagementOptions>()
-            .Configure<IServiceProvider>((options, serviceProvider) =>
-            {
-                options.XmlRepository = new EfDataProtectionKeyRepository(serviceProvider);
-            });
+        // (and the tokens it protects) alive across deploys.
+        services.AddDataProtection().PersistKeysToDbContext<PitakaDbContext>();
 
         // DataProtectorTokenProvider is the default provider AddDefaultTokenProviders
         // wires for password-reset, email-confirmation and change-email tokens — one
