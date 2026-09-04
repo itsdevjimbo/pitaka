@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PitakaApp.Api.Actions;
+using PitakaApp.Api.Enums;
 using PitakaApp.Api.Filters;
 using PitakaApp.Api.Requests;
 using PitakaApp.Api.Resources;
@@ -16,8 +17,8 @@ public class RecurringTransactionsController : ControllerBase
 {
     private readonly RecurringTransactionService _recurringTransactionService;
 
-    private readonly VerifyCategoryExistence _verifyCategoryExistence;
-    
+    private readonly VerifyTransactionCategory _verifyTransactionCategory;
+
     private readonly AccountService _accountService;
 
     private readonly CurrentUserAccessor _currentUserAccessor;
@@ -25,16 +26,40 @@ public class RecurringTransactionsController : ControllerBase
 
     public RecurringTransactionsController(
         RecurringTransactionService recurringTransactionService,
-        VerifyCategoryExistence verifyCategoryExistence,
+        VerifyTransactionCategory verifyTransactionCategory,
         AccountService accountService,
         CurrentUserAccessor currentUserAccessor
     )
     {
         _recurringTransactionService = recurringTransactionService;
-        _verifyCategoryExistence = verifyCategoryExistence;
+        _verifyTransactionCategory = verifyTransactionCategory;
         _accountService = accountService;
         _currentUserAccessor = currentUserAccessor;
     }
+
+    // A RecurringTransaction's type maps 1:1 to a CategoryType — no Transfer case to carve
+    // out — so an Income recurring transaction files under an Income category and an Expense
+    // one under an Expense category.
+    private static CategoryType ExpectedCategoryType(RecurringTransactionType type) => type switch
+    {
+        RecurringTransactionType.Income => CategoryType.Income,
+        RecurringTransactionType.Expense => CategoryType.Expense,
+        _ => throw new InvalidOperationException($"{type} has no matching CategoryType."),
+    };
+
+    // Maps VerifyTransactionCategory's verdict to the 400 to send, or null when the category
+    // is acceptable. The existence wording is copied verbatim from TransactionsController;
+    // the mismatch wording says "recurring transaction" but is otherwise the same shape.
+    private IActionResult? RejectRecurringTransactionCategory(TransactionCategoryVerdict verdict) => verdict switch
+    {
+        TransactionCategoryVerdict.NotFound =>
+            Problem(detail: "Category does not exist", statusCode: StatusCodes.Status400BadRequest),
+        TransactionCategoryVerdict.TypeMismatch => Problem(
+            detail: "A recurring transaction's category must be of the same type as the transaction.",
+            statusCode: StatusCodes.Status400BadRequest
+        ),
+        _ => null,
+    };
 
     [HttpGet]
     public async Task<IActionResult> Get()
@@ -61,9 +86,12 @@ public class RecurringTransactionsController : ControllerBase
             return Problem(detail: "Account is inactive", statusCode: StatusCodes.Status400BadRequest);
         }
         
-        if (request.CategoryId is int categoryId  && !await _verifyCategoryExistence.VerifyAsync(user, categoryId))
+        if (request.CategoryId is int categoryId
+            && RejectRecurringTransactionCategory(
+                await _verifyTransactionCategory.VerifyAsync(user, categoryId, ExpectedCategoryType(request.Type))
+            ) is { } rejection)
         {
-            return Problem(detail: "Category does not exist", statusCode: StatusCodes.Status400BadRequest);
+            return rejection;
         }
 
         if (await _recurringTransactionService.NameExistsForUserAsync(user.Id, request.Name))
@@ -106,9 +134,15 @@ public class RecurringTransactionsController : ControllerBase
             return Forbid();
         }
         
-        if (request.CategoryId is int categoryId  && !await _verifyCategoryExistence.VerifyAsync(user, categoryId))
+        // Type is read from the stored row: UpdateRecurringTransactionRequest carries no
+        // Type, but its CategoryId is mutable, so a PUT can still move the row onto a
+        // mismatched category. Enforced whenever a category is supplied (ADR 0003 / #67).
+        if (request.CategoryId is int categoryId
+            && RejectRecurringTransactionCategory(
+                await _verifyTransactionCategory.VerifyAsync(user, categoryId, ExpectedCategoryType(recurringTransaction.Type))
+            ) is { } rejection)
         {
-            return BadRequest();
+            return rejection;
         }
 
         if(request.EndDate is DateOnly endDate && !recurringTransaction.CanSetEndDate(endDate))

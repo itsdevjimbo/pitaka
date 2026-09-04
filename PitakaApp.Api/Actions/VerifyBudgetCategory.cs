@@ -14,11 +14,11 @@ public enum BudgetCategoryVerdict
 
 // A Budget's Category, when present, must be an expense category visible to the user (their
 // own or a system default): only expenses count against a Budget, so an income-narrowed
-// Budget reports zero spent forever. Sibling in shape to VerifyCategoryExistence, which
-// TransactionsController and RecurringTransactionsController share and which does not want
-// the type rule — this is the Budget-only variant. One query answers both "is it visible"
-// and "is it an expense category", and the verdict keeps the two failures apart so the
-// caller can word them differently. See .scratch/budget-expense-category/spec.md.
+// Budget reports zero spent forever. Sibling in shape to VerifyTransactionCategory, which
+// serves the two transaction controllers; this is the Budget-only variant, its expected
+// type fixed to Expense rather than passed in. One query answers both "is it visible" and
+// "is it an expense category", and the verdict keeps the two failures apart so the caller
+// can word them differently. See .scratch/budget-expense-category/spec.md.
 public class VerifyBudgetCategory
 {
     private readonly PitakaDbContext _context;
