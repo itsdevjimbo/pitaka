@@ -5,6 +5,7 @@ services:
     ports:
       - "80:8080"
     environment:
+      - ASPNETCORE_ENVIRONMENT=${ENVIRONMENT}
       - ConnectionStrings__DefaultConnection=Server=mysql;Port=3306;Database=pitaka;User=root;Password=${MYSQL_ROOT_PASSWORD}
       - Jwt__Key=${JWT_KEY}
       - Email__Host=smtp4dev
