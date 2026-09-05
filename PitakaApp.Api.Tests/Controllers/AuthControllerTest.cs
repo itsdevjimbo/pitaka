@@ -266,10 +266,10 @@ public class AuthControllerTest : IDisposable
 
     // The reset URL the test host serves — the appsettings.json default, since the test
     // factory overrides only the connection string, the JWT key and the worker flag.
-    private const string ConfiguredResetUrl = "http://localhost:4200/reset-password";
+    private const string ConfiguredResetUrl = "http://localhost:4200/auth/reset-password";
 
     // The confirm-email URL the test host serves — the appsettings.json default.
-    private const string ConfiguredConfirmUrl = "http://localhost:4200/confirm-email";
+    private const string ConfiguredConfirmUrl = "http://localhost:4200/auth/confirm-email";
 
     [Fact]
     public async Task ForgotPassword_KnownEmail_Returns202_AndDeliversLinkToResetUrl()
