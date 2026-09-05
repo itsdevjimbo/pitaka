@@ -78,20 +78,42 @@ public class AuthController : ControllerBase
     [HttpPost("register")]
     public async Task<IActionResult> Register(RegisterRequest request)
     {
-        var user = await _registerUser.ExecuteAsync(request.ToInput());
+        var result = await _registerUser.ExecuteAsync(request.ToInput());
 
-        if (user == null)
+        switch (result.Outcome)
         {
-            return Problem(detail: "A user with this email already exists.", statusCode: StatusCodes.Status409Conflict);
+            case RegisterOutcome.Succeeded:
+                var userResponse = new UserResponse(result.User!.Id, result.User.Name, result.User.Email!);
+
+                // 201 with the Profile only — no token. A new Profile cannot sign in until it
+                // confirms the email RegisterUser just sent (ADR 0012). No Location header —
+                // matches AccountsController.Create; there is no canonical GET /users/{id}.
+                return StatusCode(StatusCodes.Status201Created, userResponse);
+
+            case RegisterOutcome.EmailTaken:
+                return Problem(detail: "A user with this email already exists.", statusCode: StatusCodes.Status409Conflict);
+
+            case RegisterOutcome.Failed:
+                foreach (var error in result.Errors!)
+                {
+                    ModelState.AddModelError(RegisterErrorField(error.Code), error.Description);
+                }
+                return ValidationProblem(ModelState);
+
+            default:
+                throw new ArgumentOutOfRangeException(nameof(result.Outcome), result.Outcome, "Unhandled register outcome.");
         }
-
-        var userResponse = new UserResponse(user.Id, user.Name, user.Email!);
-
-        // 201 with the Profile only — no token. A new Profile cannot sign in until it
-        // confirms the email RegisterUser just sent (ADR 0012). No Location header —
-        // matches AccountsController.Create; there is no canonical GET /users/{id}.
-        return StatusCode(StatusCodes.Status201Created, userResponse);
     }
+
+    // The store's IdentityError carries a Code, not a field name. UserName mirrors Email
+    // and never surfaces on its own, so a UserName/Email code is reported against Email;
+    // anything unrecognised falls back to the request as a whole rather than guessing.
+    private static string RegisterErrorField(string code) => code switch
+    {
+        _ when code.Contains("Password") => nameof(RegisterRequest.Password),
+        _ when code.Contains("UserName") || code.Contains("Email") => nameof(RegisterRequest.Email),
+        _ => string.Empty,
+    };
 
     // Anonymous. Body carries the userId and token RegisterUser/ResendConfirmation put
     // on the confirm link. Unknown id, bad token and expired token all collapse to the

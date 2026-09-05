@@ -45,14 +45,14 @@ public class RegisterUserConcurrencyTest : IDisposable
 
         // Both run before either commits: their AnyAsync pre-checks both see no row, so
         // both reach the insert and the loser lands on the unique-index write failure the
-        // catch translates back to null.
+        // catch translates back to EmailTaken.
         var results = await Task.WhenAll(
             registerA.ExecuteAsync(inputA),
             registerB.ExecuteAsync(inputB)
         );
 
-        Assert.Single(results, r => r is not null);
-        Assert.Single(results, r => r is null);
+        Assert.Single(results, r => r.Outcome == RegisterOutcome.Succeeded);
+        Assert.Single(results, r => r.Outcome == RegisterOutcome.EmailTaken);
 
         // One Profile, not two — the race did not double-insert.
         var rows = await _context.Users.CountAsync(u => u.Email == email);
