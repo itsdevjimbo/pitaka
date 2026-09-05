@@ -25,7 +25,7 @@ A confirm-email endpoint and a resend-confirmation endpoint are added to complet
 
 With confirmation required, a correct password against an unconfirmed Profile now returns `403` where a wrong password returns `401`. The two **are** distinguishable, deliberately: user story 7 in the `auth-identity` spec wants a person told that confirmation is what is missing. This ADR supersedes user story 9 on that point.
 
-The enumeration resistance user story 9 protected was already partial: `POST /register` returns `409` for a duplicate email, so "does this address have a Profile" was already answerable. What the `403` adds is only that a known address's confirmation state is visible to someone who also knows its password — not the threat the indistinguishability rule was for.
+The enumeration resistance user story 9 protected was already partial: `POST /register` returns `409` for a duplicate email, so "does this address have a Profile" was already answerable. What the `403` adds is that a known address's confirmation state is readable by anyone who submits it, correct password or not — Identity's confirmed-account gate runs before the password is even checked, so a wrong password on an unconfirmed Profile still comes back `403`. That is a smaller addition than the indistinguishability rule was protecting against, not a bound on who can read it.
 
 ## Considered options
 
@@ -42,3 +42,5 @@ The enumeration resistance user story 9 protected was already partial: `POST /re
 - **Two contract bends**, each with a paired pitaka-web issue: `POST /register` no longer returns a token, and `POST /login` gains a distinct "confirm your email" refusal.
 
 - **A mistyped signup address simply never confirms.** No email arrives, the Profile cannot sign in, and nobody else's address is confirmed into it. That is the intended behaviour, not an error path.
+
+- **An unconfirmed Profile is not rate-limited by lockout on sign-in attempts.** The confirmed-account gate returns before `AccessFailedAsync` runs, so the failure counter never moves for an unconfirmed Profile — it can 403 indefinitely without ever locking out. Not a new exposure, since the endpoint already reveals confirmation state to an unauthenticated caller regardless of the password; worth having written down before lockout gets reasoned about as a general throttle.

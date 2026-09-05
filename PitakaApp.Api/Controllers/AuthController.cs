@@ -57,8 +57,10 @@ public class AuthController : ControllerBase
                 var userResponse = new UserResponse(result.User!.Id, result.User.Name, result.User.Email!);
                 return Ok(new LoginResponse(token, userResponse));
 
-            // Correct password, unconfirmed email. Supersedes the pre-S2 behaviour where
-            // this was indistinguishable from a wrong password — see ADR 0012.
+            // Unconfirmed email, any password — Identity's confirmed-account gate runs
+            // before the password check, so this fires whether or not the password is
+            // right. Supersedes the pre-S2 behaviour where this was indistinguishable
+            // from a wrong password — see ADR 0012.
             case LoginOutcome.NotConfirmed:
                 return Problem(detail: "Confirm your email to sign in.", statusCode: StatusCodes.Status403Forbidden);
 
