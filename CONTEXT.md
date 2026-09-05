@@ -42,6 +42,12 @@ _Avoid_: Handle, login name, a username distinct from the email
 A Profile that has, or has not, proven control of its email address. An unconfirmed Profile cannot sign in and is never issued a token; confirming is the one extra step between registering and signing in.
 _Avoid_: Verified, activated, validated
 
+**Pending email**:
+An address a Profile has asked to move to, but has not yet proven control of. It is not the
+Profile's address: the live Email keeps working, and a pending email that is never proven simply
+expires. A Profile has at most one at a time — asking again replaces it.
+_Avoid_: New email, unverified email, email change request
+
 **Locked out**:
 A Profile temporarily barred from signing in after repeated failed attempts. A timed state that clears itself — distinct from Retired, which is a deliberate choice and never applies to a Profile.
 _Avoid_: Banned, suspended, disabled, blocked
