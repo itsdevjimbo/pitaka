@@ -20,6 +20,7 @@ public static class ApplicationServiceExtensions
         services.AddScoped<SendEmailConfirmation>();
         services.AddScoped<ConfirmEmail>();
         services.AddScoped<ResendConfirmation>();
+        services.AddScoped<RequestEmailChange>();
 
         // Category
         services.AddScoped<CategoryService>();
