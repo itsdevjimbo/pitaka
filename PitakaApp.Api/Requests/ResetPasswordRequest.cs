@@ -4,9 +4,12 @@ using PitakaApp.Api.Inputs;
 namespace PitakaApp.Api.Requests;
 
 public record ResetPasswordRequest (
-    // The token identifies the Profile through the store. No email address — one less
-    // thing to thread through a screen the person reached from a mail client, and one
-    // less check whose failure is an oracle.
+    // Identity's ResetPasswordAsync needs a User before it can check the token — same
+    // shape as ConfirmEmailRequest.UserId. Paired pitaka-web issue: the reset screen
+    // reads userId from the link's query string alongside the token.
+    [Required]
+    int UserId,
+
     [Required]
     string Token,
 
@@ -18,5 +21,5 @@ public record ResetPasswordRequest (
 )
 {
     public ResetPasswordInput ToInput() =>
-        new(Token: Token, Password: Password);
+        new(UserId: UserId, Token: Token, Password: Password);
 }
