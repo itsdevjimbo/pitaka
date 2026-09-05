@@ -42,6 +42,18 @@ public class PitakaDbContext : IdentityUserContext<User, int>, IDataProtectionKe
         modelBuilder.Entity<IdentityUserLogin<int>>().ToTable("user_logins");
         modelBuilder.Entity<IdentityUserToken<int>>().ToTable("user_tokens");
 
+        // Identity maps EmailIndex on normalized_email as non-unique; email uniqueness
+        // would otherwise ride on the UserName mirror (UserNameIndex is the only unique
+        // one). Make the email index unique in its own right so the database is the
+        // backstop for the change-email request-then-redeem race (ADR 0014). The
+        // Identity-default name "EmailIndex" is kept — renaming an index Identity already
+        // created buys nothing — so this stays PascalCase like its sibling UserNameIndex
+        // rather than the project's ix_* convention.
+        modelBuilder.Entity<User>()
+            .HasIndex(u => u.NormalizedEmail)
+            .HasDatabaseName("EmailIndex")
+            .IsUnique();
+
         modelBuilder.Entity<Account>().HasIndex(c => new { c.UserId, c.Name }).IsUnique();
 
         modelBuilder.Entity<Category>().HasIndex(c => new { c.UserId, c.Name }).IsUnique();
