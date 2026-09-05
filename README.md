@@ -7,7 +7,7 @@ A personal expense tracker API built with ASP.NET Core, EF Core, and MySQL.
 There are two supported ways to run the API, and they carry different guarantees:
 
 - **The Docker loop** (below) is the one the setup instructions describe. Its guarantee is that Docker with Compose is the *only* thing you need installed — no local .NET SDK, no local MySQL. Everything, including running tests and generating migrations, happens through containers. It serves the API at `http://pitaka.localhost`.
-- **[The SDK loop](#the-sdk-loop)** runs the API with `dotnet run` against your own machine's SDK. It exists for the step debugger and hot reload, which matter on a project whose purpose is learning .NET. It serves the API at `http://localhost:5044` (and `https://localhost:7272` under the `https` launch profile). This is the address Pitaka Web's `environment.ts` points at.
+- **[The SDK loop](#the-sdk-loop)** runs the API with `dotnet run` against your own machine's SDK. It exists for the step debugger and hot reload, which the containerised loop cannot offer. It serves the API at `http://localhost:5044` (and `https://localhost:7272` under the `https` launch profile). This is the address Pitaka Web's `environment.ts` points at.
 
 Pick one. The Docker loop needs nothing but Docker; the SDK loop needs a local .NET SDK and a reachable MySQL.
 
