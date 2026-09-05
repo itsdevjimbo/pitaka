@@ -1,10 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using PitakaApp.Api.Data;
-using System.Text.Json.Serialization;
 using PitakaApp.Api.Infra;
 using Microsoft.AspNetCore.Mvc.ApplicationModels;
 using PitakaApp.Api.Handlers;
 using PitakaApp.Api.ModelBinding;
+using System.Text.Json.Serialization;
+using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -34,6 +35,8 @@ builder.Services.AddControllers(options =>
             options.JsonSerializerOptions.RespectRequiredConstructorParameters = true;
         }
     );
+
+
 builder.Services.AddOpenApi();
 builder.Services.AddDbContext<PitakaDbContext>((serviceProvider, options) =>
     {
@@ -63,6 +66,7 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    app.MapScalarApiReference();
 }
 
 app.UseExceptionHandler();
