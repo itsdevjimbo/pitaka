@@ -59,5 +59,13 @@ public static class IdentityExtensions
         // hand-rolled unique index on Email. Lookups go through FindByEmailAsync, which
         // hits the normalized column.
         options.User.RequireUniqueEmail = true;
+
+        // UserName is set to Email and never surfaces (see AuthController). The default
+        // charset rejects characters — an apostrophe, say — that [EmailAddress] already
+        // let through at the request edge, which used to surface as "email already
+        // registered" for an address that was never actually taken. Widened to the rest
+        // of RFC 5322's atext so a legal email local part cannot trip this validator.
+        options.User.AllowedUserNameCharacters =
+            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._@+!#$%&'*/=?^`{|}~";
     }
 }

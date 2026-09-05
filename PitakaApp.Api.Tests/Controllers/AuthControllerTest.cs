@@ -219,6 +219,28 @@ public class AuthControllerTest : IDisposable
         Assert.Equal(HttpStatusCode.Created, noComplexity.StatusCode);
     }
 
+    // A store-level rejection that is not a duplicate (an email character the UserName
+    // validator still rejects even after widening) must not reuse the 409 wording — that
+    // asserts something untrue about an email that was never actually taken.
+    [Fact]
+    public async Task Register_WithEmailCharacterOutsideStoreCharset_ReturnsBadRequestNamingEmail_NotConflict()
+    {
+        var request = new
+        {
+            name = _faker.Person.FullName,
+            email = $"o(comment){_faker.Internet.UserName()}@example.com",
+            password = "TestPass123!",
+        };
+
+        var response = await _client.PostAsJsonAsync("/api/auth/register", request);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>();
+        Assert.NotNull(problem);
+        Assert.Contains("Email", problem!.Errors.Keys);
+    }
+
     [Fact]
     public async Task Register_WithExistingEmail_ReturnsConflict()
     {

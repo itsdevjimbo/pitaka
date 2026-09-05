@@ -6,6 +6,18 @@ using PitakaApp.Api.Models;
 
 namespace PitakaApp.Api.Actions.Auth;
 
+public enum RegisterOutcome
+{
+    Succeeded,
+    EmailTaken,
+    Failed,
+}
+
+// User is populated only when Outcome is Succeeded; Errors only when Failed. EmailTaken
+// carries no errors — the controller's wording for that path predates the store and
+// does not come from it.
+public record RegisterResult(RegisterOutcome Outcome, User? User = null, IEnumerable<IdentityError>? Errors = null);
+
 public class RegisterUser
 {
     // MySQL error number for a duplicate entry on a unique index.
@@ -20,7 +32,7 @@ public class RegisterUser
         _sendEmailConfirmation = sendEmailConfirmation;
     }
 
-    public async Task<User?> ExecuteAsync(RegisterInput input)
+    public async Task<RegisterResult> ExecuteAsync(RegisterInput input)
     {
         var user = new User
         {
@@ -33,24 +45,26 @@ public class RegisterUser
         {
             var result = await _userManager.CreateAsync(user, input.Password);
 
-            // A duplicate email is the only failure this action's callers act on — the
-            // controller's existing null -> 409 branch. Any other IdentityResult failure
-            // (password rejected by the store) should not occur: the request-edge
-            // [StringLength] on Password already ran first and is stricter than
-            // IdentityOptions.Password.
             if (!result.Succeeded)
             {
-                return null;
+                // Duplicate is the one failure the controller already has wording for.
+                // Anything else the store rejects — a validator added after this
+                // comment included — comes back as its own errors instead of silently
+                // reusing "email already exists".
+                var isDuplicate = result.Errors.Any(e => e.Code is "DuplicateUserName" or "DuplicateEmail");
+
+                return isDuplicate
+                    ? new RegisterResult(RegisterOutcome.EmailTaken)
+                    : new RegisterResult(RegisterOutcome.Failed, Errors: result.Errors);
             }
         }
         catch (DbUpdateException ex) when (ex.InnerException is MySqlException { Number: DuplicateKeyErrorNumber })
         {
             // The store's own duplicate-email check is the common path; this is the
             // backstop for the instant where two registrations of the same email both
-            // pass it and race to insert. Return the same null the check returns — the
-            // controller's null -> 409 branch covers both. Any other DbUpdateException
-            // is a real fault: rethrow.
-            return null;
+            // pass it and race to insert. Any other DbUpdateException is a real fault:
+            // rethrow.
+            return new RegisterResult(RegisterOutcome.EmailTaken);
         }
 
         // S2: RequireConfirmedAccount means this Profile cannot sign in until this link
@@ -58,6 +72,6 @@ public class RegisterUser
         // to a "check your inbox" screen instead.
         await _sendEmailConfirmation.ExecuteAsync(user);
 
-        return user;
+        return new RegisterResult(RegisterOutcome.Succeeded, user);
     }
 }
