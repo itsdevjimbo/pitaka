@@ -26,7 +26,6 @@ public class PitakaDbContext : IdentityUserContext<User, int>, IDataProtectionKe
     public DbSet<Goal> Goals { get; set; }
     public DbSet<GoalContribution> GoalContributions { get; set; }
     public DbSet<Tag> Tags { get; set; }
-    public DbSet<PasswordResetToken> PasswordResetTokens { get; set; }
     public DbSet<DataProtectionKey> DataProtectionKeys { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -54,8 +53,6 @@ public class PitakaDbContext : IdentityUserContext<User, int>, IDataProtectionKe
         modelBuilder.Entity<RecurringTransaction>().HasIndex(c => new { c.UserId, c.Name }).IsUnique();
 
         modelBuilder.Entity<Tag>().HasIndex(c => new { c.UserId, c.Name }).IsUnique();
-
-        modelBuilder.Entity<PasswordResetToken>().HasIndex(t => t.TokenHash).IsUnique();
 
         var enumProperties = modelBuilder.Model.GetEntityTypes()
             .SelectMany(e => e.GetProperties())
@@ -132,13 +129,6 @@ public class PitakaDbContext : IdentityUserContext<User, int>, IDataProtectionKe
             .HasOne(gc => gc.Account)
             .WithMany()
             .HasForeignKey(gc => gc.AccountId);
-
-        // Cascade like Category → User: deleting a user takes its reset tokens with it.
-        modelBuilder.Entity<PasswordResetToken>()
-            .HasOne(t => t.User)
-            .WithMany()
-            .HasForeignKey(t => t.UserId)
-            .OnDelete(DeleteBehavior.Cascade);
     }
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)

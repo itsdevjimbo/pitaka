@@ -1,8 +1,5 @@
-using System.Buffers.Text;
-using System.Security.Cryptography;
-using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
-using PitakaApp.Api.Data;
 using PitakaApp.Api.Inputs;
 using PitakaApp.Api.Models;
 using PitakaApp.Api.Options;
@@ -12,24 +9,14 @@ namespace PitakaApp.Api.Actions.Auth;
 
 public class RequestPasswordReset
 {
-    // 256 bits of RandomNumberGenerator output — unguessable, so no slow KDF is needed
-    // on top and a plain digest keeps the lookup a single indexed equality.
-    private const int TokenByteLength = 32;
-
-    private readonly PitakaDbContext _context;
+    private readonly UserManager<User> _userManager;
     private readonly IEmailSender _emailSender;
-    private readonly TimeProvider _timeProvider;
     private readonly PasswordResetOption _option;
 
-    public RequestPasswordReset(
-        PitakaDbContext context,
-        IEmailSender emailSender,
-        TimeProvider timeProvider,
-        IOptions<PasswordResetOption> option)
+    public RequestPasswordReset(UserManager<User> userManager, IEmailSender emailSender, IOptions<PasswordResetOption> option)
     {
-        _context = context;
+        _userManager = userManager;
         _emailSender = emailSender;
-        _timeProvider = timeProvider;
         _option = option.Value;
     }
 
@@ -38,41 +25,33 @@ public class RequestPasswordReset
     // the endpoint's indistinguishability cannot rot into a 404.
     public async Task ExecuteAsync(RequestPasswordResetInput input)
     {
-        var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == input.Email);
+        var user = await _userManager.FindByEmailAsync(input.Email);
         if (user is null)
         {
             return;
         }
 
-        // Base64Url so it survives a query string unescaped.
-        var token = Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(TokenByteLength));
-        var tokenHash = PasswordResetToken.Hash(token);
+        var token = await _userManager.GeneratePasswordResetTokenAsync(user);
 
-        _context.PasswordResetTokens.Add(new PasswordResetToken
-        {
-            UserId = user.Id,
-            TokenHash = tokenHash,
-            ExpiresAt = _timeProvider.GetUtcNow().UtcDateTime + _option.TokenLifetime,
-        });
-        await _context.SaveChangesAsync();
+        // Identity's DataProtectorTokenProvider output is base64, not base64url — it can
+        // contain characters a query string does not carry unescaped.
+        var encodedToken = Uri.EscapeDataString(token);
 
-        // Email is `string?` on IdentityUser<int>; RequireUniqueEmail plus every write
-        // path setting it means the row FindByEmailAsync just matched never actually has
-        // a null one.
-        await _emailSender.SendAsync(user.Email!, "Reset your Pitaka password", ComposeBody(token));
+        // Email is never null here — same guarantee as SendEmailConfirmation.ExecuteAsync.
+        await _emailSender.SendAsync(user.Email!, "Reset your Pitaka password", ComposeBody(user.Id, encodedToken));
     }
 
     // Plain text. Says Profile, never "user" or "account", per CONTEXT.md. States that
     // ignoring the message leaves the password unchanged. Carries the configured client
-    // reset URL with the token appended.
-    private string ComposeBody(string token) =>
+    // reset URL with the Profile id and token appended.
+    private string ComposeBody(int userId, string encodedToken) =>
         $"""
         Hi,
 
         We received a request to reset the password for your Pitaka Profile.
 
         Choose a new password here:
-        {_option.ResetUrl}?token={token}
+        {_option.ResetUrl}?userId={userId}&token={encodedToken}
 
         If you did not ask for this, you can ignore this message — your password
         will not change.

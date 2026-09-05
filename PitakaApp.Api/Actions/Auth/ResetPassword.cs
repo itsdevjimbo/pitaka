@@ -1,6 +1,4 @@
 using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
-using PitakaApp.Api.Data;
 using PitakaApp.Api.Inputs;
 using PitakaApp.Api.Models;
 
@@ -8,50 +6,26 @@ namespace PitakaApp.Api.Actions.Auth;
 
 public class ResetPassword
 {
-    private readonly PitakaDbContext _context;
-    private readonly TimeProvider _timeProvider;
+    private readonly UserManager<User> _userManager;
 
-    public ResetPassword(PitakaDbContext context, TimeProvider timeProvider)
+    public ResetPassword(UserManager<User> userManager)
     {
-        _context = context;
-        _timeProvider = timeProvider;
+        _userManager = userManager;
     }
 
-    // A bare bool. Unknown, expired and already-spent are collapsed here, where they are
-    // detected, not where they are rendered — a richer result type enumerating them would
-    // be an invitation to map each to its own status, which is exactly what must not
-    // happen.
+    // A bare bool. Unknown id, bad token and expired token all collapse here, where they
+    // are detected, not where they are rendered — a richer result type enumerating them
+    // would be an invitation to map each to its own status, which is exactly what must
+    // not happen. Same shape as ConfirmEmail.ExecuteAsync.
     public async Task<bool> ExecuteAsync(ResetPasswordInput input)
     {
-        var tokenHash = PasswordResetToken.Hash(input.Token);
-        var now = _timeProvider.GetUtcNow().UtcDateTime;
-
-        var presented = await _context.PasswordResetTokens
-            .Include(t => t.User)
-            .FirstOrDefaultAsync(t => t.TokenHash == tokenHash);
-
-        if (presented is null || presented.UsedAt is not null || presented.ExpiresAt <= now)
+        var user = await _userManager.FindByIdAsync(input.UserId.ToString());
+        if (user is null)
         {
             return false;
         }
 
-        var hasher = new PasswordHasher<User>();
-        presented.User.PasswordHash = hasher.HashPassword(presented.User, input.Password);
-
-        // Spend the presented token and every other outstanding one for this Profile, so
-        // requesting three resets and using one leaves zero live links. The presented
-        // token is the same tracked instance, so it is spent by this loop too. The new
-        // hash and every UsedAt land in one SaveChangesAsync.
-        var outstanding = await _context.PasswordResetTokens
-            .Where(t => t.UserId == presented.UserId && t.UsedAt == null)
-            .ToListAsync();
-
-        foreach (var token in outstanding)
-        {
-            token.UsedAt = now;
-        }
-
-        await _context.SaveChangesAsync();
-        return true;
+        var result = await _userManager.ResetPasswordAsync(user, input.Token, input.Password);
+        return result.Succeeded;
     }
 }
