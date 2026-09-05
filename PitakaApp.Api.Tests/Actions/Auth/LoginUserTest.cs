@@ -76,5 +76,22 @@ public class LoginUserTest : IDisposable
         Assert.Null(result.User);
     }
 
+    // Pins the PreSignInCheck ordering (confirmed-account gate before password check):
+    // an unconfirmed Profile gets NotConfirmed even with the wrong password, not
+    // InvalidCredentials. See ADR 0012 and #116.
+    [Fact]
+    public async Task Login_WithUnconfirmedEmail_AndWrongPassword_StillReturnsNotConfirmed()
+    {
+        var email = _faker.Internet.Email();
+        var user = await UserFactory.CreateAsync(_context, email, "Test123!");
+        user.EmailConfirmed = false;
+        await _context.SaveChangesAsync();
+
+        var result = await _loginUser.ExecuteAsync(new LoginInput(email, "wrongpassword123!"));
+
+        Assert.Equal(LoginOutcome.NotConfirmed, result.Outcome);
+        Assert.Null(result.User);
+    }
+
     public void Dispose() => _scope.Dispose();
 }

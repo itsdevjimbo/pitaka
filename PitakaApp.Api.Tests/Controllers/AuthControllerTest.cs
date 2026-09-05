@@ -502,6 +502,31 @@ public class AuthControllerTest : IDisposable
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
     }
 
+    // Pins the PreSignInCheck ordering at the HTTP layer: the confirmed-account gate
+    // short-circuits before AccessFailedAsync runs, so an unconfirmed Profile's failure
+    // counter never moves and it can never surface as 423. See ADR 0012 and #116.
+    [Fact]
+    public async Task Login_UnconfirmedEmail_AfterFiveFailedAttempts_StillReturns403NotConfirmed()
+    {
+        var email = _faker.Internet.Email();
+        var user = await UserFactory.CreateAsync(_context, email);
+        user.EmailConfirmed = false;
+        await _context.SaveChangesAsync();
+
+        for (var i = 0; i < 5; i++)
+        {
+            await _client.PostAsJsonAsync("/api/auth/login", new { email, password = "WrongPassword123!" });
+        }
+
+        var response = await _client.PostAsJsonAsync("/api/auth/login",
+            new { email, password = UserFactory.DefaultPassword });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal("Confirm your email to sign in.", problem!.Detail);
+    }
+
     [Fact]
     public async Task ResendConfirmation_KnownUnconfirmedEmail_Returns202_AndDeliversFreshLink()
     {
