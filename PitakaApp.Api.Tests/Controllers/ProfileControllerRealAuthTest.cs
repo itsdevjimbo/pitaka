@@ -12,7 +12,7 @@ using PitakaApp.Api.Tests.Fixtures;
 
 namespace PitakaApp.Api.Tests.Controllers;
 
-// Tickets 02 and 03 of the email-change feature, driven the way the spec asks: through
+// Tickets 02 through 05 of the email-change feature, driven the way the spec asks: through
 // the real JwtBearerHandler (RealAuthWebApplicationFactory) and the recording email
 // sender, so a session genuinely survives the pending period. Asserts only what a person
 // or client can see — status codes, which addresses sign in, what landed in the outbox —
@@ -222,31 +222,54 @@ public class ProfileControllerRealAuthTest : IDisposable
         Assert.Equal(HttpStatusCode.Unauthorized, (await LogIn(newEmail, password)).StatusCode);
     }
 
+    // ─── Ticket 05: asking again replaces the pending change ────────────────────────
+    //
+    // The mechanism this ticket turns on — redemption checking the token's address
+    // against the *stored* pending value rather than trusting the token's own payload —
+    // landed with ticket 03: RedeemEmailChange verifies the token against the stored
+    // PendingEmail, never a request field (spec decision 18). RequestEmailChange has
+    // always overwritten both pending columns in place. No production change here; this
+    // case drives a person correcting a typo (spec stories 6 and 7) and holds the
+    // replace to what a person can observe.
+
     [Fact]
-    public async Task ConfirmEmailChange_AfterASupersedingRequest_TheEarlierLinkIsDead()
+    public async Task RequestEmailChange_AskedAgainWithACorrectedAddress_ReplacesThePendingChangeAndKillsTheFirstLink()
     {
         const string password = "TestPass123!";
         var oldEmail = _faker.Internet.Email();
-        var firstTarget = _faker.Internet.Email();
-        var secondTarget = _faker.Internet.Email();
+        var typoTarget = _faker.Internet.Email();
+        var correctedTarget = _faker.Internet.Email();
         var bearer = await RegisterConfirmAndLogInAsync(oldEmail, password);
 
-        var (userId, firstToken) = await RequestChangeAndReadLink(bearer, firstTarget, password);
-        var (_, secondToken) = await RequestChangeAndReadLink(bearer, secondTarget, password);
+        var (userId, firstToken) = await RequestChangeAndReadLink(bearer, typoTarget, password);
+        var (_, secondToken) = await RequestChangeAndReadLink(bearer, correctedTarget, password);
 
-        // The first link is bound to firstTarget, but the stored pending address is now
-        // secondTarget — the first token no longer matches and is refused (spec story 7).
+        // The second request replaced the pending address in place: the Profile shows
+        // the corrected address and only that one — asking again replaces, a Profile
+        // never holds more than one pending address (CONTEXT.md, spec story 8).
+        Assert.Equal(correctedTarget, (await ReadProfile(bearer)).PendingEmail);
+
+        // The first link is bound to typoTarget, but the stored pending address is now
+        // correctedTarget — the first token no longer matches and is refused (spec
+        // story 7). It fails as the same 400 with problem+json that
+        // ConfirmEmailChange_WithGarbageToken_ReturnsOneProblemDetails400 pins for any
+        // other dead link; the spec forbids asserting on the body past that.
         var stale = await _client.PostAsJsonAsync("/api/profile/email-change/confirm",
             new { userId, token = firstToken });
         Assert.Equal(HttpStatusCode.BadRequest, stale.StatusCode);
-        Assert.Equal(HttpStatusCode.Unauthorized, (await LogIn(firstTarget, password)).StatusCode);
+        Assert.Equal("application/problem+json", stale.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await LogIn(typoTarget, password)).StatusCode);
 
-        // The most recent link still redeems.
+        // The corrected link redeems normally.
         var fresh = await _client.PostAsJsonAsync("/api/profile/email-change/confirm",
             new { userId, token = secondToken });
         Assert.Equal(HttpStatusCode.NoContent, fresh.StatusCode);
-        Assert.Equal(HttpStatusCode.OK, (await LogIn(secondTarget, password)).StatusCode);
+
+        // Only the address most recently asked for was applied: the corrected address
+        // signs in, and neither the old address nor the typo ever can.
+        Assert.Equal(HttpStatusCode.OK, (await LogIn(correctedTarget, password)).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await LogIn(oldEmail, password)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await LogIn(typoTarget, password)).StatusCode);
     }
 
     // ─── Ticket 04: seeing and clearing a pending change ────────────────────────────
