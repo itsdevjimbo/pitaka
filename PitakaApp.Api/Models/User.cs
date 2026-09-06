@@ -27,6 +27,18 @@ public class User : IdentityUser<int>, ITimestamped
     // the stored state and the confirmation token die together.
     public DateTime? PendingEmailExpiresAt { get; set; }
 
+    // The pending address as it stands at utcNow, or null (ADR 0014). Past its expiry —
+    // or never set — it is absent: not shown on the Profile, not blocking a fresh
+    // request, not redeemable. The one place that "treated as absent" rule is spelled
+    // out, so redemption and the Profile read agree. Takes the instant rather than
+    // reading a clock so the entity stays persistence- and time-source-ignorant.
+    public string? PendingEmailAsOf(DateTime utcNow) =>
+        PendingEmail is { } pending
+        && PendingEmailExpiresAt is { } expiresAt
+        && expiresAt > utcNow
+            ? pending
+            : null;
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public DateTime? UpdatedAt { get; set; }

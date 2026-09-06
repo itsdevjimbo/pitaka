@@ -23,6 +23,7 @@ public class AuthController : ControllerBase
     private readonly ResetPassword _resetPassword;
     private readonly ConfirmEmail _confirmEmail;
     private readonly ResendConfirmation _resendConfirmation;
+    private readonly TimeProvider _timeProvider;
 
     public AuthController(
         LoginUser loginUser,
@@ -32,7 +33,8 @@ public class AuthController : ControllerBase
         RequestPasswordReset requestPasswordReset,
         ResetPassword resetPassword,
         ConfirmEmail confirmEmail,
-        ResendConfirmation resendConfirmation
+        ResendConfirmation resendConfirmation,
+        TimeProvider timeProvider
     )
     {
         _loginUser = loginUser;
@@ -43,6 +45,7 @@ public class AuthController : ControllerBase
         _resetPassword = resetPassword;
         _confirmEmail = confirmEmail;
         _resendConfirmation = resendConfirmation;
+        _timeProvider = timeProvider;
     }
 
     [HttpPost("login")]
@@ -182,9 +185,18 @@ public class AuthController : ControllerBase
             return Unauthorized();
         }
         
-        return Ok(new UserResponse(user.Id, user.Name, user.Email!));
+        // The pending address is surfaced here so a person can see which address a change
+        // in flight is going to (ADR 0014, spec story 8). PendingEmailAsOf returns null
+        // once the pending window has passed, so an expired change is absent rather than
+        // shown as still live.
+        var pendingEmail = user.PendingEmailAsOf(_timeProvider.GetUtcNow().UtcDateTime);
+
+        return Ok(new UserResponse(user.Id, user.Name, user.Email!, pendingEmail));
     }
 }
 
-public record UserResponse(int Id, string Name, string Email);
+// PendingEmail is additive and nullable: existing clients reading Id/Name/Email keep
+// working, and it is only ever populated by GET me (login's UserResponse leaves it
+// null). Client counterpart: pitaka-web shows a "pending change" indicator when set.
+public record UserResponse(int Id, string Name, string Email, string? PendingEmail = null);
 public record LoginResponse(string Token, UserResponse User);
