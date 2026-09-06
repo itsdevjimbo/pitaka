@@ -34,6 +34,14 @@ public static class EmailExtensions
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
+        // The change-email flow's confirm URL and token lifespan (ADR 0014). Same
+        // fail-on-boot treatment; the lifespan has a working default so only ConfirmUrl
+        // is load-bearing in configuration.
+        builder.Services.AddOptions<EmailChangeOption>()
+            .Bind(builder.Configuration.GetSection(EmailChangeOption.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
         builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
 
         return builder;
