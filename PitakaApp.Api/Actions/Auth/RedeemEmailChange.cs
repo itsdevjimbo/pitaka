@@ -63,11 +63,10 @@ public class RedeemEmailChange
         // link does not redeem. Collapsed into the same Invalid outcome as a bad token —
         // an onlooker cannot tell an expired change from a forged one. The stored expiry
         // and the token lifespan come from the one EmailChangeOption value, so a token
-        // that survives this check has not expired either.
+        // that survives this check has not expired either. PendingEmailAsOf is the
+        // shared "treated as absent" rule, the same one the Profile read applies.
         var now = _timeProvider.GetUtcNow().UtcDateTime;
-        if (user.PendingEmail is not { } pendingEmail
-            || user.PendingEmailExpiresAt is not { } expiresAt
-            || expiresAt <= now)
+        if (user.PendingEmailAsOf(now) is not { } pendingEmail)
         {
             return RedeemEmailChangeOutcome.Invalid;
         }

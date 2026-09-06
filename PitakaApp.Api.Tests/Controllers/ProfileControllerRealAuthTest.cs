@@ -249,6 +249,140 @@ public class ProfileControllerRealAuthTest : IDisposable
         Assert.Equal(HttpStatusCode.Unauthorized, (await LogIn(oldEmail, password)).StatusCode);
     }
 
+    // ─── Ticket 04: seeing and clearing a pending change ────────────────────────────
+
+    [Fact]
+    public async Task Me_WithNoPendingChange_LeavesPendingEmailNull()
+    {
+        const string password = "TestPass123!";
+        var email = _faker.Internet.Email();
+        var bearer = await RegisterConfirmAndLogInAsync(email, password);
+
+        var profile = await ReadProfile(bearer);
+
+        Assert.Equal(email, profile.Email);
+        Assert.Null(profile.PendingEmail);
+    }
+
+    [Fact]
+    public async Task Me_WithAChangeInFlight_ReportsThePendingAddressWithoutMovingTheLiveOne()
+    {
+        const string password = "TestPass123!";
+        var oldEmail = _faker.Internet.Email();
+        var newEmail = _faker.Internet.Email();
+        var bearer = await RegisterConfirmAndLogInAsync(oldEmail, password);
+
+        await RequestChangeAndReadLink(bearer, newEmail, password);
+
+        var profile = await ReadProfile(bearer);
+
+        // The person can see which address the pending change is going to (story 8),
+        // while the live address is untouched — it still signs in, the pending one does
+        // not.
+        Assert.Equal(oldEmail, profile.Email);
+        Assert.Equal(newEmail, profile.PendingEmail);
+        Assert.Equal(HttpStatusCode.OK, (await LogIn(oldEmail, password)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await LogIn(newEmail, password)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Me_AfterThePendingChangeExpires_LeavesPendingEmailNull()
+    {
+        const string password = "TestPass123!";
+        var oldEmail = _faker.Internet.Email();
+        var newEmail = _faker.Internet.Email();
+        var bearer = await RegisterConfirmAndLogInAsync(oldEmail, password);
+
+        var (userId, _) = await RequestChangeAndReadLink(bearer, newEmail, password);
+
+        // Push the stored expiry into the past — the same arrange-only style the
+        // expired-link test uses. Past its expiry the pending change is absent
+        // everywhere, including the Profile read, with no cleanup job.
+        var pending = await _context.Users.SingleAsync(u => u.Id == userId);
+        pending.PendingEmailExpiresAt = DateTime.UtcNow.AddMinutes(-1);
+        await _context.SaveChangesAsync();
+
+        var profile = await ReadProfile(bearer);
+
+        Assert.Null(profile.PendingEmail);
+    }
+
+    [Fact]
+    public async Task RequestEmailChange_AfterAnEarlierChangeExpired_ReplacesItWithoutACancel()
+    {
+        const string password = "TestPass123!";
+        var oldEmail = _faker.Internet.Email();
+        var staleTarget = _faker.Internet.Email();
+        var freshTarget = _faker.Internet.Email();
+        var bearer = await RegisterConfirmAndLogInAsync(oldEmail, password);
+
+        var (userId, _) = await RequestChangeAndReadLink(bearer, staleTarget, password);
+
+        // Let the first change lapse, then ask again — an expired pending change does not
+        // block a fresh request, it is simply overwritten in place.
+        var pending = await _context.Users.SingleAsync(u => u.Id == userId);
+        pending.PendingEmailExpiresAt = DateTime.UtcNow.AddMinutes(-1);
+        await _context.SaveChangesAsync();
+
+        await RequestChangeAndReadLink(bearer, freshTarget, password);
+
+        Assert.Equal(freshTarget, (await ReadProfile(bearer)).PendingEmail);
+    }
+
+    [Fact]
+    public async Task CancelEmailChange_ClearsThePendingAddressAndKillsTheLink()
+    {
+        const string password = "TestPass123!";
+        var oldEmail = _faker.Internet.Email();
+        var newEmail = _faker.Internet.Email();
+        var bearer = await RegisterConfirmAndLogInAsync(oldEmail, password);
+
+        var (userId, token) = await RequestChangeAndReadLink(bearer, newEmail, password);
+
+        var cancel = await Send(HttpMethod.Post, "/api/profile/email-change/cancel", bearer, body: null);
+        Assert.Equal(HttpStatusCode.NoContent, cancel.StatusCode);
+
+        // Gone from the Profile, and the link that was mailed no longer redeems — it
+        // fails with the same non-specific 400 as any other dead link.
+        Assert.Null((await ReadProfile(bearer)).PendingEmail);
+
+        var redeem = await _client.PostAsJsonAsync("/api/profile/email-change/confirm", new { userId, token });
+        Assert.Equal(HttpStatusCode.BadRequest, redeem.StatusCode);
+
+        Assert.Equal(HttpStatusCode.OK, (await LogIn(oldEmail, password)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await LogIn(newEmail, password)).StatusCode);
+    }
+
+    [Fact]
+    public async Task CancelEmailChange_WithNothingPending_Succeeds()
+    {
+        const string password = "TestPass123!";
+        var email = _faker.Internet.Email();
+        var bearer = await RegisterConfirmAndLogInAsync(email, password);
+
+        var cancel = await Send(HttpMethod.Post, "/api/profile/email-change/cancel", bearer, body: null);
+
+        Assert.Equal(HttpStatusCode.NoContent, cancel.StatusCode);
+    }
+
+    [Fact]
+    public async Task CancelEmailChange_WithoutBearerToken_ReturnsUnauthorized()
+    {
+        var response = await _client.PostAsync("/api/profile/email-change/cancel", content: null);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    // Read GET /api/auth/me with the given bearer — the Profile a client sees.
+    private async Task<UserResponse> ReadProfile(string bearer)
+    {
+        var response = await Send(HttpMethod.Get, "/api/auth/me", bearer, body: null);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var profile = await response.Content.ReadFromJsonAsync<UserResponse>();
+        Assert.NotNull(profile);
+        return profile;
+    }
+
     // Request an email change with the given bearer and read the confirmation link back
     // out of the outbox — the userId and token the client would pull from the URL.
     private async Task<(int UserId, string Token)> RequestChangeAndReadLink(

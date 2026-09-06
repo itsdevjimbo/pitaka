@@ -9,8 +9,7 @@ namespace PitakaApp.Api.Controllers;
 
 // The Profile write surface, kept off AuthController deliberately (spec: the
 // endpoint-shape decision put the Profile writes here; GET api/auth/me stays where it
-// is). Ticket 02 lands the request handler; ticket 03 the confirm handler; cancel
-// follows in ticket 04.
+// is and is where the pending address is read, not here).
 //
 // ResolveCurrentUserFilter is applied per-action rather than at class level (as
 // CategoriesController does) so the anonymous confirm endpoint — reached from a link in
@@ -22,15 +21,18 @@ public class ProfileController : ControllerBase
 {
     private readonly RequestEmailChange _requestEmailChange;
     private readonly RedeemEmailChange _redeemEmailChange;
+    private readonly CancelEmailChange _cancelEmailChange;
     private readonly CurrentUserAccessor _currentUserAccessor;
 
     public ProfileController(
         RequestEmailChange requestEmailChange,
         RedeemEmailChange redeemEmailChange,
+        CancelEmailChange cancelEmailChange,
         CurrentUserAccessor currentUserAccessor)
     {
         _requestEmailChange = requestEmailChange;
         _redeemEmailChange = redeemEmailChange;
+        _cancelEmailChange = cancelEmailChange;
         _currentUserAccessor = currentUserAccessor;
     }
 
@@ -113,5 +115,17 @@ public class ProfileController : ControllerBase
                 throw new ArgumentOutOfRangeException(
                     nameof(outcome), outcome, "Unhandled email-change confirm outcome.");
         }
+    }
+
+    // Authenticated. Clears any pending change on the caller's own Profile — there is no
+    // target id, so a session can only cancel its own (ADR 0014). Afterwards the pending
+    // address is gone from GET api/auth/me and the link that was mailed no longer
+    // redeems. Idempotent: cancelling with nothing pending still answers 204.
+    [TypeFilter(typeof(ResolveCurrentUserFilter))]
+    [HttpPost("email-change/cancel")]
+    public async Task<IActionResult> CancelEmailChange()
+    {
+        await _cancelEmailChange.ExecuteAsync(_currentUserAccessor.User!);
+        return NoContent();
     }
 }

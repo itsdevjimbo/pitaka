@@ -22,6 +22,7 @@ public static class ApplicationServiceExtensions
         services.AddScoped<ResendConfirmation>();
         services.AddScoped<RequestEmailChange>();
         services.AddScoped<RedeemEmailChange>();
+        services.AddScoped<CancelEmailChange>();
 
         // Category
         services.AddScoped<CategoryService>();
