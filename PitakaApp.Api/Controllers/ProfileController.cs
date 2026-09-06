@@ -53,10 +53,11 @@ public class ProfileController : ControllerBase
                 return NoContent();
 
             // POST /register's 409 for an address already held; worded per CONTEXT.md,
-            // which register's own string predates.
+            // which register's own string predates. Names the remedy — pick another
+            // address — since the caller chose this one and can choose again (ticket 06).
             case RequestEmailChangeOutcome.EmailTaken:
                 return Problem(
-                    detail: "A Profile with this email already exists.",
+                    detail: "A Profile with this email already exists. Choose a different address.",
                     statusCode: StatusCodes.Status409Conflict);
 
             // The address submitted is already this Profile's — there is nothing to
@@ -95,12 +96,14 @@ public class ProfileController : ControllerBase
             case RedeemEmailChangeOutcome.Succeeded:
                 return NoContent();
 
-            // The address was taken between the request and this click. Its own 409, so
-            // the person picks a different address instead of clicking a dead link
-            // again (spec story 13).
+            // The address was claimed by another Profile between the request and this
+            // click. Its own 409, and its own wording: it names what happened, so the
+            // person requests the change again with a different address rather than
+            // retrying a link that can never work now (spec story 13, ticket 06).
             case RedeemEmailChangeOutcome.EmailTaken:
                 return Problem(
-                    detail: "A Profile with this email already exists.",
+                    detail: "This address was taken by another Profile after you requested the change. "
+                        + "Request the change again with a different address.",
                     statusCode: StatusCodes.Status409Conflict);
 
             // Unknown Profile, bad token, expired token, address no longer pending — one

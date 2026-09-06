@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.RegularExpressions;
 using Bogus;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using PitakaApp.Api.Controllers;
@@ -126,7 +127,7 @@ public class ProfileControllerRealAuthTest : IDisposable
     }
 
     [Fact]
-    public async Task RequestEmailChange_ToAddressHeldByAnotherProfile_ReturnsConflict()
+    public async Task RequestEmailChange_ToAddressHeldByAnotherProfile_ReturnsConflictAndStoresNoPendingChange()
     {
         const string password = "TestPass123!";
         var oldEmail = _faker.Internet.Email();
@@ -142,6 +143,15 @@ public class ProfileControllerRealAuthTest : IDisposable
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         Assert.Empty(_emailSender.To(otherProfile.Email!));
+
+        // The message names the remedy — pick a different address — rather than just
+        // reporting the collision (ticket 06).
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Contains("different address", problem!.Detail, StringComparison.OrdinalIgnoreCase);
+
+        // Nothing was stored: the Profile has no pending change and can ask again.
+        var profile = await ReadProfile(token);
+        Assert.Null(profile.PendingEmail);
     }
 
     // ─── Ticket 03: redeeming the link moves the address ────────────────────────────
@@ -270,6 +280,52 @@ public class ProfileControllerRealAuthTest : IDisposable
         Assert.Equal(HttpStatusCode.OK, (await LogIn(correctedTarget, password)).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await LogIn(oldEmail, password)).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await LogIn(typoTarget, password)).StatusCode);
+    }
+
+    // ─── Ticket 06: the address was claimed while the link sat unread ───────────────
+
+    [Fact]
+    public async Task ConfirmEmailChange_WhenTheAddressWasClaimedSinceTheRequest_ReturnsConflictAndLeavesTheProfileUntouched()
+    {
+        const string password = "TestPass123!";
+        var oldEmail = _faker.Internet.Email();
+        var newEmail = _faker.Internet.Email();
+        var bearer = await RegisterConfirmAndLogInAsync(oldEmail, password);
+
+        var (userId, token) = await RequestChangeAndReadLink(bearer, newEmail, password);
+
+        // Between the request and the click, another Profile registers the same address.
+        // This is the deterministic case of spec story 13 — the pool-hidden race itself
+        // is covered by RedeemEmailChangeConcurrencyTest.
+        await UserFactory.CreateAsync(_context, newEmail);
+
+        var response = await _client.PostAsJsonAsync("/api/profile/email-change/confirm", new { userId, token });
+
+        // Its own 409 — distinct from the non-specific 400 every other redemption
+        // failure collapses to — and worded to say what happened (the address was
+        // taken since the request) and where to go next (ask again, different address),
+        // so the person does not just retry the dead link (spec story 13).
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Contains("taken", problem!.Detail, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("different address", problem.Detail, StringComparison.OrdinalIgnoreCase);
+        // Says Profile, never User or Account (CONTEXT.md).
+        Assert.DoesNotContain("account", problem.Detail, StringComparison.OrdinalIgnoreCase);
+
+        // The Profile is untouched: the live address still signs in, and the pending
+        // change is still there — so the person can go straight to requesting another.
+        Assert.Equal(HttpStatusCode.OK, (await LogIn(oldEmail, password)).StatusCode);
+        var profile = await ReadProfile(bearer);
+        Assert.Equal(oldEmail, profile.Email);
+        Assert.Equal(newEmail, profile.PendingEmail);
+
+        // And a fresh request to a different address is accepted.
+        var retry = await Send(HttpMethod.Post, "/api/profile/email-change", bearer, new
+        {
+            newEmail = _faker.Internet.Email(),
+            currentPassword = password,
+        });
+        Assert.Equal(HttpStatusCode.NoContent, retry.StatusCode);
     }
 
     // ─── Ticket 04: seeing and clearing a pending change ────────────────────────────
