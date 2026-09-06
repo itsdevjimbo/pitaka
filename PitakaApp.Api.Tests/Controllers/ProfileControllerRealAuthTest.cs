@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.RegularExpressions;
 using Bogus;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using PitakaApp.Api.Controllers;
 using PitakaApp.Api.Data;
@@ -11,11 +12,13 @@ using PitakaApp.Api.Tests.Fixtures;
 
 namespace PitakaApp.Api.Tests.Controllers;
 
-// Ticket 02 of the email-change feature, driven the way the spec asks: through the real
-// JwtBearerHandler (RealAuthWebApplicationFactory) and the recording email sender, so a
-// session genuinely survives the request. Asserts only what a person or client can see —
-// status codes, which addresses sign in, what landed in the outbox. Redeeming the link
-// is ticket 03; these tests stop at "the link is in the outbox".
+// Tickets 02 and 03 of the email-change feature, driven the way the spec asks: through
+// the real JwtBearerHandler (RealAuthWebApplicationFactory) and the recording email
+// sender, so a session genuinely survives the pending period. Asserts only what a person
+// or client can see — status codes, which addresses sign in, what landed in the outbox —
+// never token internals or how the pending state is stored. The one race redemption
+// cannot show over HTTP (an address taken while the link sat unread) is at the data
+// layer in RedeemEmailChangeConcurrencyTest.
 [Collection("RealAuthDatabase collection")]
 public class ProfileControllerRealAuthTest : IDisposable
 {
@@ -141,6 +144,130 @@ public class ProfileControllerRealAuthTest : IDisposable
         Assert.Empty(_emailSender.To(otherProfile.Email!));
     }
 
+    // ─── Ticket 03: redeeming the link moves the address ────────────────────────────
+
+    [Fact]
+    public async Task ConfirmEmailChange_TheArc_NewAddressSignsIn_OldDoesNot_PasswordAndSessionSurvive()
+    {
+        const string password = "TestPass123!";
+        var oldEmail = _faker.Internet.Email();
+        var newEmail = _faker.Internet.Email();
+        var bearer = await RegisterConfirmAndLogInAsync(oldEmail, password);
+
+        var (userId, token) = await RequestChangeAndReadLink(bearer, newEmail, password);
+
+        var confirm = await _client.PostAsJsonAsync("/api/profile/email-change/confirm", new { userId, token });
+        Assert.Equal(HttpStatusCode.NoContent, confirm.StatusCode);
+
+        // The new address signs in; the old one no longer does.
+        Assert.Equal(HttpStatusCode.OK, (await LogIn(newEmail, password)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await LogIn(oldEmail, password)).StatusCode);
+
+        // The password is untouched by the move — the new address signs in with the
+        // same one, and nothing about it was reset.
+        var withNewAddress = await LogIn(newEmail, password);
+        Assert.Equal(HttpStatusCode.OK, withNewAddress.StatusCode);
+
+        // The session made before the change still works after it — the change rotates
+        // the security stamp but does not revoke issued JWTs (ADR 0011 B1/B2), and
+        // GET /me now reports the new address.
+        var me = await Send(HttpMethod.Get, "/api/auth/me", bearer, body: null);
+        Assert.Equal(HttpStatusCode.OK, me.StatusCode);
+        var profile = await me.Content.ReadFromJsonAsync<UserResponse>();
+        Assert.Equal(newEmail, profile!.Email);
+    }
+
+    [Fact]
+    public async Task ConfirmEmailChange_WithGarbageToken_ReturnsOneProblemDetails400()
+    {
+        const string password = "TestPass123!";
+        var oldEmail = _faker.Internet.Email();
+        var newEmail = _faker.Internet.Email();
+        var bearer = await RegisterConfirmAndLogInAsync(oldEmail, password);
+
+        var (userId, _) = await RequestChangeAndReadLink(bearer, newEmail, password);
+
+        var response = await _client.PostAsJsonAsync("/api/profile/email-change/confirm",
+            new { userId, token = "this-token-was-never-issued" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+
+        // The live address is untouched — a bad token changes nothing.
+        Assert.Equal(HttpStatusCode.OK, (await LogIn(oldEmail, password)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await LogIn(newEmail, password)).StatusCode);
+    }
+
+    [Fact]
+    public async Task ConfirmEmailChange_WithExpiredLink_IsRefusedAndTheProfileIsUntouched()
+    {
+        const string password = "TestPass123!";
+        var oldEmail = _faker.Internet.Email();
+        var newEmail = _faker.Internet.Email();
+        var bearer = await RegisterConfirmAndLogInAsync(oldEmail, password);
+
+        var (userId, token) = await RequestChangeAndReadLink(bearer, newEmail, password);
+
+        // Simulate the pending window having elapsed: push the stored expiry into the
+        // past. The stored expiry and the token lifespan are the one value, so a link
+        // whose window has passed is exactly this state.
+        var pending = await _context.Users.SingleAsync(u => u.Id == userId);
+        pending.PendingEmailExpiresAt = DateTime.UtcNow.AddMinutes(-1);
+        await _context.SaveChangesAsync();
+
+        var response = await _client.PostAsJsonAsync("/api/profile/email-change/confirm", new { userId, token });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await LogIn(oldEmail, password)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await LogIn(newEmail, password)).StatusCode);
+    }
+
+    [Fact]
+    public async Task ConfirmEmailChange_AfterASupersedingRequest_TheEarlierLinkIsDead()
+    {
+        const string password = "TestPass123!";
+        var oldEmail = _faker.Internet.Email();
+        var firstTarget = _faker.Internet.Email();
+        var secondTarget = _faker.Internet.Email();
+        var bearer = await RegisterConfirmAndLogInAsync(oldEmail, password);
+
+        var (userId, firstToken) = await RequestChangeAndReadLink(bearer, firstTarget, password);
+        var (_, secondToken) = await RequestChangeAndReadLink(bearer, secondTarget, password);
+
+        // The first link is bound to firstTarget, but the stored pending address is now
+        // secondTarget — the first token no longer matches and is refused (spec story 7).
+        var stale = await _client.PostAsJsonAsync("/api/profile/email-change/confirm",
+            new { userId, token = firstToken });
+        Assert.Equal(HttpStatusCode.BadRequest, stale.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await LogIn(firstTarget, password)).StatusCode);
+
+        // The most recent link still redeems.
+        var fresh = await _client.PostAsJsonAsync("/api/profile/email-change/confirm",
+            new { userId, token = secondToken });
+        Assert.Equal(HttpStatusCode.NoContent, fresh.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await LogIn(secondTarget, password)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await LogIn(oldEmail, password)).StatusCode);
+    }
+
+    // Request an email change with the given bearer and read the confirmation link back
+    // out of the outbox — the userId and token the client would pull from the URL.
+    private async Task<(int UserId, string Token)> RequestChangeAndReadLink(
+        string bearer, string newEmail, string currentPassword)
+    {
+        var response = await Send(HttpMethod.Post, "/api/profile/email-change", bearer, new
+        {
+            newEmail,
+            currentPassword,
+        });
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+
+        var message = _emailSender.To(newEmail).Last();
+        var match = Regex.Match(message.Body, @"userId=(?<userId>\d+)&token=(?<token>[^\s]+)");
+        Assert.True(match.Success, $"No confirm-email-change link in:\n{message.Body}");
+
+        return (int.Parse(match.Groups["userId"].Value), Uri.UnescapeDataString(match.Groups["token"].Value));
+    }
+
     // Register, pull the confirmation link out of the outbox, confirm, then log in —
     // the same arc AuthControllerRealAuthTest proves, reused here to get a real bearer
     // token for a confirmed Profile.
@@ -175,12 +302,13 @@ public class ProfileControllerRealAuthTest : IDisposable
     private Task<HttpResponseMessage> LogIn(string email, string password) =>
         _client.PostAsJsonAsync("/api/auth/login", new { email, password });
 
-    private Task<HttpResponseMessage> Send(HttpMethod method, string uri, string bearerToken, object body)
+    private Task<HttpResponseMessage> Send(HttpMethod method, string uri, string bearerToken, object? body)
     {
-        var request = new HttpRequestMessage(method, uri)
+        var request = new HttpRequestMessage(method, uri);
+        if (body is not null)
         {
-            Content = JsonContent.Create(body),
-        };
+            request.Content = JsonContent.Create(body);
+        }
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
         return _client.SendAsync(request);
     }
