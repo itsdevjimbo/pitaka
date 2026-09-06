@@ -683,8 +683,8 @@ namespace PitakaApp.Api.Migrations
                         .HasColumnName("password_hash");
 
                     b.Property<string>("PendingEmail")
-                        .HasMaxLength(255)
-                        .HasColumnType("varchar(255)")
+                        .HasMaxLength(256)
+                        .HasColumnType("varchar(256)")
                         .HasColumnName("pending_email");
 
                     b.Property<DateTime?>("PendingEmailExpiresAt")

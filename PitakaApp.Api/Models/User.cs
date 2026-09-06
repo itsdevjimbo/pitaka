@@ -19,7 +19,8 @@ public class User : IdentityUser<int>, ITimestamped
     // whose PendingEmailExpiresAt is in the past is treated as absent — not returned,
     // not blocking a fresh request, not redeemable. Cleared in place on redemption or
     // cancel; overwritten when a new request supersedes an earlier one.
-    [MaxLength(255)]
+    // 256 to match Identity's Email column — on redemption this value becomes the live Email.
+    [MaxLength(256)]
     public string? PendingEmail { get; set; }
 
     // When the pending email stops counting. Set from EmailChangeOption.TokenLifespan so

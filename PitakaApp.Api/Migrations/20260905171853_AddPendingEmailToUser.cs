@@ -14,8 +14,8 @@ namespace PitakaApp.Api.Migrations
             migrationBuilder.AddColumn<string>(
                 name: "pending_email",
                 table: "users",
-                type: "varchar(255)",
-                maxLength: 255,
+                type: "varchar(256)",
+                maxLength: 256,
                 nullable: true)
                 .Annotation("MySql:CharSet", "utf8mb4");
 
