@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using MySqlConnector;
+using PitakaApp.Api.Data;
 using PitakaApp.Api.Inputs;
 using PitakaApp.Api.Models;
 
@@ -20,9 +20,6 @@ public record RegisterResult(RegisterOutcome Outcome, User? User = null, IEnumer
 
 public class RegisterUser
 {
-    // MySQL error number for a duplicate entry on a unique index.
-    private const int DuplicateKeyErrorNumber = 1062;
-
     private readonly UserManager<User> _userManager;
     private readonly SendEmailConfirmation _sendEmailConfirmation;
 
@@ -58,7 +55,7 @@ public class RegisterUser
                     : new RegisterResult(RegisterOutcome.Failed, Errors: result.Errors);
             }
         }
-        catch (DbUpdateException ex) when (ex.InnerException is MySqlException { Number: DuplicateKeyErrorNumber })
+        catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
         {
             // The store's own duplicate-email check is the common path; this is the
             // backstop for the instant where two registrations of the same email both
