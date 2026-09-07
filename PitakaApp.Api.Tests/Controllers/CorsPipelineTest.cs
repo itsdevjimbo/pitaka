@@ -15,9 +15,9 @@ namespace PitakaApp.Api.Tests.Controllers;
 // redirected), never about which middleware was registered, that an options type was
 // bound, or the policy's name.
 //
-// AuthControllerRealAuthTest is the model for a class that tests pipeline behaviour and
-// needs a differently-configured host for some cases; AccountsControllerTest is the model
-// for the plain request-and-assert shape. No request here is authenticated — CORS is
+// ProfileControllerRealAuthTest is the model for a class that tests pipeline behaviour
+// and needs a differently-configured host for some cases; AccountsControllerTest is the
+// model for the plain request-and-assert shape. No request here is authenticated — CORS is
 // evaluated before authorization, so the unauthenticated 401 these endpoints return does
 // not get in the way.
 [Collection("Database collection")]
