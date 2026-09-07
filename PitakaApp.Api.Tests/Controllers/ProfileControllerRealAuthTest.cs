@@ -633,6 +633,55 @@ public class ProfileControllerRealAuthTest : IDisposable
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
+    // ─── Profile self-service ticket 08: changing your name ────────────────────────
+
+    [Fact]
+    public async Task UpdateProfile_ChangesTheNameForReal_ItSurvivesAFreshLogin()
+    {
+        const string password = "TestPass123!";
+        var email = _faker.Internet.Email();
+        var bearer = await RegisterConfirmAndLogInAsync(email, password);
+
+        var newName = _faker.Person.FullName;
+        var response = await Send(HttpMethod.Put, "/api/profile", bearer, new { name = newName });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<ProfileResponse>();
+        Assert.Equal(newName, body!.Name);
+        Assert.Equal(email, body.Email);
+
+        // The change is a real persisted mutation, not a transform of one response: a
+        // brand-new session — fresh JWT, fresh read — sees the new name too (spec story
+        // 10, "real and not cosmetic").
+        var freshLogin = await LogIn(email, password);
+        var freshBearer = (await freshLogin.Content.ReadFromJsonAsync<LoginResponse>())!.Token;
+        Assert.Equal(newName, (await ReadProfile(freshBearer)).Name);
+    }
+
+    [Fact]
+    public async Task UpdateProfile_TakesNoPasswordGate_AndLeavesTheCallersSessionWorking()
+    {
+        const string password = "TestPass123!";
+        var email = _faker.Internet.Email();
+        var bearer = await RegisterConfirmAndLogInAsync(email, password);
+
+        // No current password is supplied — the request has no field for one — and the
+        // rename still succeeds.
+        var response = await Send(HttpMethod.Put, "/api/profile", bearer, new { name = _faker.Person.FullName });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        // The session that made the change still works after it, and still signs in.
+        Assert.Equal(HttpStatusCode.OK, (await Send(HttpMethod.Get, "/api/profile", bearer, body: null)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await LogIn(email, password)).StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateProfile_WithoutBearerToken_ReturnsUnauthorized()
+    {
+        var response = await _client.PutAsJsonAsync("/api/profile", new { name = _faker.Person.FullName });
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
     // Read GET /api/profile with the given bearer — the Profile a client sees.
     private async Task<ProfileResponse> ReadProfile(string bearer)
     {
