@@ -682,6 +682,135 @@ public class ProfileControllerRealAuthTest : IDisposable
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
+    // ─── Profile self-service ticket 09: changing your password while signed in ─────
+
+    [Fact]
+    public async Task ChangePassword_WithTheCurrentPasswordAndAValidNewOne_Is204_AndSwapsWhichPasswordSignsIn()
+    {
+        const string oldPassword = "TestPass123!";
+        const string newPassword = "A-Fresh-Passphrase-9";
+        var email = _faker.Internet.Email();
+        var bearer = await RegisterConfirmAndLogInAsync(email, oldPassword);
+
+        var response = await Send(HttpMethod.Post, "/api/profile/password", bearer, new
+        {
+            oldPassword,
+            newPassword,
+        });
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Empty(await response.Content.ReadAsByteArrayAsync());
+
+        // The new password signs in afterwards and the old one no longer does.
+        Assert.Equal(HttpStatusCode.OK, (await LogIn(email, newPassword)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await LogIn(email, oldPassword)).StatusCode);
+    }
+
+    [Fact]
+    public async Task ChangePassword_LeavesTheCallersOwnSessionWorking()
+    {
+        const string oldPassword = "TestPass123!";
+        const string newPassword = "A-Fresh-Passphrase-9";
+        var email = _faker.Internet.Email();
+        var bearer = await RegisterConfirmAndLogInAsync(email, oldPassword);
+
+        var response = await Send(HttpMethod.Post, "/api/profile/password", bearer, new
+        {
+            oldPassword,
+            newPassword,
+        });
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+
+        // The change rotates the security stamp but does not revoke issued JWTs
+        // (ADR 0011) — the session that made the change still reads the Profile.
+        var read = await Send(HttpMethod.Get, "/api/profile", bearer, body: null);
+        Assert.Equal(HttpStatusCode.OK, read.StatusCode);
+    }
+
+    [Fact]
+    public async Task ChangePassword_WithAWrongCurrentPassword_Is401WithTheSameDetailAsEmailChange_AndNothingChanges()
+    {
+        const string password = "TestPass123!";
+        var email = _faker.Internet.Email();
+        var bearer = await RegisterConfirmAndLogInAsync(email, password);
+
+        var response = await Send(HttpMethod.Post, "/api/profile/password", bearer, new
+        {
+            oldPassword = "not-the-password",
+            newPassword = "A-Fresh-Passphrase-9",
+        });
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+
+        // The same detail string the email-change request uses for a wrong current
+        // password — both password-gated forms on one client screen speak identically.
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal("Your current password is incorrect.", problem!.Detail);
+
+        // Nothing about the Profile changed: the current password still signs in and the
+        // one that was offered as a replacement does not.
+        Assert.Equal(HttpStatusCode.OK, (await LogIn(email, password)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await LogIn(email, "A-Fresh-Passphrase-9")).StatusCode);
+    }
+
+    [Fact]
+    public async Task ChangePassword_CheckingTheCurrentPassword_CannotLockTheProfileOut()
+    {
+        const string password = "TestPass123!";
+        var email = _faker.Internet.Email();
+        var bearer = await RegisterConfirmAndLogInAsync(email, password);
+
+        // Far more wrong attempts than the sign-in lockout threshold. CheckPasswordAsync
+        // carries no lockout side effect, so none of these count against the Profile.
+        for (var i = 0; i < 12; i++)
+        {
+            var attempt = await Send(HttpMethod.Post, "/api/profile/password", bearer, new
+            {
+                oldPassword = "still-not-it",
+                newPassword = "A-Fresh-Passphrase-9",
+            });
+            Assert.Equal(HttpStatusCode.Unauthorized, attempt.StatusCode);
+        }
+
+        // The current password still signs in — not 423 Locked.
+        Assert.Equal(HttpStatusCode.OK, (await LogIn(email, password)).StatusCode);
+    }
+
+    [Fact]
+    public async Task ChangePassword_WithANewPasswordFailingRegistrationsRule_IsValidationProblemNamingTheField_AndTheCurrentPasswordStillWorks()
+    {
+        const string password = "TestPass123!";
+        var email = _faker.Internet.Email();
+        var bearer = await RegisterConfirmAndLogInAsync(email, password);
+
+        var response = await Send(HttpMethod.Post, "/api/profile/password", bearer, new
+        {
+            oldPassword = password,
+            newPassword = "short",
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>();
+        Assert.Contains("NewPassword", problem!.Errors.Keys);
+
+        // The rejected attempt never reached the change: the current password still
+        // signs in and the weak one does not.
+        Assert.Equal(HttpStatusCode.OK, (await LogIn(email, password)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await LogIn(email, "short")).StatusCode);
+    }
+
+    [Fact]
+    public async Task ChangePassword_WithoutBearerToken_ReturnsUnauthorized()
+    {
+        var response = await _client.PostAsJsonAsync("/api/profile/password", new
+        {
+            oldPassword = "TestPass123!",
+            newPassword = "A-Fresh-Passphrase-9",
+        });
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
     // Read GET /api/profile with the given bearer — the Profile a client sees.
     private async Task<ProfileResponse> ReadProfile(string bearer)
     {

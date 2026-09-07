@@ -9,7 +9,7 @@ namespace PitakaApp.Api.Controllers;
 
 // Everything a person can read or change about their own Profile lives here, at
 // api/profile: the read (moved from GET api/auth/me, which is removed), the name write,
-// and the email-change flow, with the password write to follow.
+// the password write, and the email-change flow.
 //
 // ResolveCurrentUserFilter is applied per-action rather than at class level (as
 // CategoriesController does) so the anonymous confirm endpoint — reached from a link in
@@ -23,6 +23,7 @@ public class ProfileController : ControllerBase
     private readonly RedeemEmailChange _redeemEmailChange;
     private readonly CancelEmailChange _cancelEmailChange;
     private readonly ChangeProfileName _changeProfileName;
+    private readonly ChangePassword _changePassword;
     private readonly CurrentUserAccessor _currentUserAccessor;
     private readonly TimeProvider _timeProvider;
 
@@ -31,6 +32,7 @@ public class ProfileController : ControllerBase
         RedeemEmailChange redeemEmailChange,
         CancelEmailChange cancelEmailChange,
         ChangeProfileName changeProfileName,
+        ChangePassword changePassword,
         CurrentUserAccessor currentUserAccessor,
         TimeProvider timeProvider)
     {
@@ -38,6 +40,7 @@ public class ProfileController : ControllerBase
         _redeemEmailChange = redeemEmailChange;
         _cancelEmailChange = cancelEmailChange;
         _changeProfileName = changeProfileName;
+        _changePassword = changePassword;
         _currentUserAccessor = currentUserAccessor;
         _timeProvider = timeProvider;
     }
@@ -71,6 +74,40 @@ public class ProfileController : ControllerBase
         var pendingEmail = updated.PendingEmailAsOf(_timeProvider.GetUtcNow().UtcDateTime);
 
         return Ok(new ProfileResponse(updated.Id, updated.Name, updated.Email!, pendingEmail));
+    }
+
+    // Authenticated. Body carries the current password and its replacement. A
+    // maintenance operation, not a recovery one — the caller proves the current
+    // password and stays signed in (spec stories 15–21). A noun, not a verb: unlike
+    // auth/reset-password there is a resource here to name. Returns 204 — success is
+    // unambiguous and there is no body to interpret. Nothing new goes on the wire about
+    // sessions that survive the change; not misleading the person about them is the
+    // client's obligation (ADR 0011, spec Client counterpart).
+    [TypeFilter(typeof(ResolveCurrentUserFilter))]
+    [HttpPost("password")]
+    public async Task<IActionResult> ChangePassword(ChangePasswordRequest request)
+    {
+        var user = _currentUserAccessor.User!;
+        var outcome = await _changePassword.ExecuteAsync(user, request.ToInput());
+
+        switch (outcome)
+        {
+            case ChangePasswordOutcome.Succeeded:
+                return NoContent();
+
+            // The same 401 and detail string the email-change request uses for a wrong
+            // current password, so both password-gated forms on one client screen speak
+            // identically. CheckPasswordAsync carries no lockout side effect — fumbling
+            // your own password here cannot lock you out.
+            case ChangePasswordOutcome.IncorrectPassword:
+                return Problem(
+                    detail: "Your current password is incorrect.",
+                    statusCode: StatusCodes.Status401Unauthorized);
+
+            default:
+                throw new ArgumentOutOfRangeException(
+                    nameof(outcome), outcome, "Unhandled change-password outcome.");
+        }
     }
 
     // Authenticated. Body carries the new address and the current password. Stores the
