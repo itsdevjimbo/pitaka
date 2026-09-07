@@ -8,8 +8,8 @@ using PitakaApp.Api.Services;
 namespace PitakaApp.Api.Controllers;
 
 // Everything a person can read or change about their own Profile lives here, at
-// api/profile: the read (moved from GET api/auth/me, which is removed) and the
-// email-change flow, with the name and password writes to follow.
+// api/profile: the read (moved from GET api/auth/me, which is removed), the name write,
+// and the email-change flow, with the password write to follow.
 //
 // ResolveCurrentUserFilter is applied per-action rather than at class level (as
 // CategoriesController does) so the anonymous confirm endpoint — reached from a link in
@@ -22,6 +22,7 @@ public class ProfileController : ControllerBase
     private readonly RequestEmailChange _requestEmailChange;
     private readonly RedeemEmailChange _redeemEmailChange;
     private readonly CancelEmailChange _cancelEmailChange;
+    private readonly ChangeProfileName _changeProfileName;
     private readonly CurrentUserAccessor _currentUserAccessor;
     private readonly TimeProvider _timeProvider;
 
@@ -29,12 +30,14 @@ public class ProfileController : ControllerBase
         RequestEmailChange requestEmailChange,
         RedeemEmailChange redeemEmailChange,
         CancelEmailChange cancelEmailChange,
+        ChangeProfileName changeProfileName,
         CurrentUserAccessor currentUserAccessor,
         TimeProvider timeProvider)
     {
         _requestEmailChange = requestEmailChange;
         _redeemEmailChange = redeemEmailChange;
         _cancelEmailChange = cancelEmailChange;
+        _changeProfileName = changeProfileName;
         _currentUserAccessor = currentUserAccessor;
         _timeProvider = timeProvider;
     }
@@ -52,6 +55,22 @@ public class ProfileController : ControllerBase
         var pendingEmail = user.PendingEmailAsOf(_timeProvider.GetUtcNow().UtcDateTime);
 
         return Ok(new ProfileResponse(user.Id, user.Name, user.Email!, pendingEmail));
+    }
+
+    // Authenticated. Body carries the new name and nothing else — { name } genuinely is
+    // the whole writable Profile, which is why this is PUT (spec ticket 08). No password
+    // gate: a name is a label, not the recovery path the email change guards. Returns the
+    // updated Profile so the screen that just rendered one is correct the moment it saves,
+    // without a follow-up GET. Email and any pending email come back untouched.
+    [TypeFilter(typeof(ResolveCurrentUserFilter))]
+    [HttpPut]
+    public async Task<IActionResult> UpdateProfile(UpdateProfileRequest request)
+    {
+        var user = _currentUserAccessor.User!;
+        var updated = await _changeProfileName.ExecuteAsync(user, request.ToInput());
+        var pendingEmail = updated.PendingEmailAsOf(_timeProvider.GetUtcNow().UtcDateTime);
+
+        return Ok(new ProfileResponse(updated.Id, updated.Name, updated.Email!, pendingEmail));
     }
 
     // Authenticated. Body carries the new address and the current password. Stores the
