@@ -16,8 +16,9 @@ public enum RequestEmailChangeOutcome
 }
 
 // The first half of the change-email flow (ADR 0014): hold the new address as a pending
-// email and mail a confirmation link to it. Redeeming that link is ticket 03; the
-// courtesy notice to the old address is ticket 07.
+// email, mail a confirmation link to it, and send a courtesy notice to the live address
+// so the change does not happen in silence at the address being left behind (ticket 07).
+// Redeeming the link is ticket 03.
 public class RequestEmailChange
 {
     private readonly UserManager<User> _userManager;
@@ -101,6 +102,16 @@ public class RequestEmailChange
             "Confirm your new Pitaka Profile email",
             ComposeBody(managed.Id, encodedToken));
 
+        // The only warning the real owner gets if someone with a live session tries to
+        // redirect their Profile (ADR 0014). Notice only: it names the requested address
+        // and carries no link — an undo control reachable from a mailbox is its own
+        // security surface and is out of scope. Email is never null on a signed-in
+        // Profile, same guarantee as SendEmailConfirmation.
+        await _emailSender.SendAsync(
+            managed.Email!,
+            "A change was requested for your Pitaka Profile email",
+            ComposeNoticeBody(input.NewEmail));
+
         return RequestEmailChangeOutcome.Succeeded;
     }
 
@@ -118,6 +129,26 @@ public class RequestEmailChange
 
         If you ignore this message, your Profile keeps its current address — nothing
         changes until this link is used.
+
+        — Pitaka
+        """;
+
+    // The courtesy notice to the address being left behind. Plain text, says Profile
+    // (CONTEXT.md), names the requested address, and deliberately carries no link — not
+    // the confirmation link and no undo control. Tells the person what to do if they did
+    // not ask for this: act from the Profile they can still sign in to.
+    private static string ComposeNoticeBody(string requestedEmail) =>
+        $"""
+        Hi,
+
+        Someone asked to move your Pitaka Profile to a new email address:
+        {requestedEmail}
+
+        The change is not finished — it only completes when that address is confirmed
+        from the link we sent there. Your Profile keeps its current address until then.
+
+        If this was you, no action is needed. If it was not, sign in to your Profile and
+        cancel the pending change.
 
         — Pitaka
         """;

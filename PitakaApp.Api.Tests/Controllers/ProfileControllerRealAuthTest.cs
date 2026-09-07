@@ -13,7 +13,7 @@ using PitakaApp.Api.Tests.Fixtures;
 
 namespace PitakaApp.Api.Tests.Controllers;
 
-// Tickets 02 through 05 of the email-change feature, driven the way the spec asks: through
+// Tickets 02 through 07 of the email-change feature, driven the way the spec asks: through
 // the real JwtBearerHandler (RealAuthWebApplicationFactory) and the recording email
 // sender, so a session genuinely survives the pending period. Asserts only what a person
 // or client can see — status codes, which addresses sign in, what landed in the outbox —
@@ -63,10 +63,20 @@ public class ProfileControllerRealAuthTest : IDisposable
         Assert.DoesNotContain("Account", message.Subject);
         Assert.Matches(@"userId=\d+&token=\S+", message.Body);
 
-        // The old address got nothing new — its only message is still the sign-up
-        // confirmation from registration. The courtesy notice is ticket 07.
-        var toOld = Assert.Single(_emailSender.To(oldEmail));
-        Assert.Equal("Confirm your Pitaka Profile", toOld.Subject);
+        // The old address is told, alongside the confirmation to the new one (ticket 07):
+        // its messages are the sign-up confirmation from registration plus a courtesy
+        // notice naming the requested address and carrying no link of any kind.
+        var toOld = _emailSender.To(oldEmail);
+        Assert.Equal(2, toOld.Count);
+        Assert.Equal("Confirm your Pitaka Profile", toOld[0].Subject);
+        var notice = toOld[1];
+        Assert.Contains(newEmail, notice.Body);
+        Assert.DoesNotContain("http", notice.Body, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Profile", notice.Body);
+        Assert.DoesNotContain("User", notice.Body);
+        Assert.DoesNotContain("Account", notice.Body);
+        Assert.DoesNotContain("User", notice.Subject);
+        Assert.DoesNotContain("Account", notice.Subject);
 
         // The live address still signs in; the pending one does not.
         Assert.Equal(HttpStatusCode.OK, (await LogIn(oldEmail, password)).StatusCode);
@@ -89,6 +99,10 @@ public class ProfileControllerRealAuthTest : IDisposable
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.Empty(_emailSender.To(newEmail));
+        // A refused request sends nothing to either address — the old address still has
+        // only its sign-up confirmation, no courtesy notice (ticket 07).
+        var toOld = Assert.Single(_emailSender.To(oldEmail));
+        Assert.Equal("Confirm your Pitaka Profile", toOld.Subject);
         Assert.Equal(HttpStatusCode.OK, (await LogIn(oldEmail, password)).StatusCode);
     }
 
@@ -143,6 +157,10 @@ public class ProfileControllerRealAuthTest : IDisposable
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         Assert.Empty(_emailSender.To(otherProfile.Email!));
+        // A refused request tells no one — the old address gets no courtesy notice
+        // either (ticket 07).
+        var toOld = Assert.Single(_emailSender.To(oldEmail));
+        Assert.Equal("Confirm your Pitaka Profile", toOld.Subject);
 
         // The message names the remedy — pick a different address — rather than just
         // reporting the collision (ticket 06).
@@ -152,6 +170,50 @@ public class ProfileControllerRealAuthTest : IDisposable
         // Nothing was stored: the Profile has no pending change and can ask again.
         var profile = await ReadProfile(token);
         Assert.Null(profile.PendingEmail);
+    }
+
+    // ─── Ticket 07: the old address gets told ──────────────────────────────────────
+
+    [Fact]
+    public async Task RequestEmailChange_TellsTheOldAddress_WithANoticeNamingTheRequestedAddressAndNoLink()
+    {
+        const string password = "TestPass123!";
+        var oldEmail = _faker.Internet.Email();
+        var newEmail = _faker.Internet.Email();
+        var token = await RegisterConfirmAndLogInAsync(oldEmail, password);
+
+        // Everything the old address has received so far (the sign-up confirmation), so
+        // the assertion below is about what this one request adds.
+        var oldBefore = _emailSender.To(oldEmail).Count;
+
+        var response = await Send(HttpMethod.Post, "/api/profile/email-change", token, new
+        {
+            newEmail,
+            currentPassword = password,
+        });
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+
+        // One request, two sends: the confirmation link to the new address and a notice
+        // to the old one.
+        var toNew = Assert.Single(_emailSender.To(newEmail));
+        Assert.Matches(@"userId=\d+&token=\S+", toNew.Body);
+
+        Assert.Equal(oldBefore + 1, _emailSender.To(oldEmail).Count);
+        var notice = _emailSender.To(oldEmail).Last();
+
+        // It names the address that was asked for...
+        Assert.Contains(newEmail, notice.Body);
+        // ...and carries no link of any kind — it is a notice, not an undo control.
+        Assert.DoesNotContain("http", notice.Body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("?userId=", notice.Body);
+        Assert.DoesNotContain("token=", notice.Body);
+
+        // Says Profile, never User and never Account (CONTEXT.md).
+        Assert.Contains("Profile", notice.Body);
+        Assert.DoesNotContain("User", notice.Body);
+        Assert.DoesNotContain("Account", notice.Body);
+        Assert.DoesNotContain("User", notice.Subject);
+        Assert.DoesNotContain("Account", notice.Subject);
     }
 
     // ─── Ticket 03: redeeming the link moves the address ────────────────────────────
