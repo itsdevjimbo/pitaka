@@ -42,7 +42,9 @@ Slice S1's migration therefore adds: the new Identity columns on `users`, the th
 
 ## The known gap: a live JWT outlives a credential change
 
-A password reset or a lockout does **not** revoke a JWT that has already been issued. Tokens are validated by signature and expiry only — there is no denylist and no per-Profile version claim — so a token minted before a reset stays valid for the remainder of its configured lifetime, about an hour. If the reset was prompted by a compromise, the attacker keeps that session until it expires on its own.
+**No credential change revokes a JWT that has already been issued** — not a password reset, not a lockout, not a signed-in password change, not an email change. Tokens are validated by signature and expiry only — there is no denylist and no per-Profile version claim — so a token minted before the change stays valid for the remainder of its configured lifetime, about an hour. If the change was prompted by a compromise, the attacker keeps that session until it expires on its own.
+
+The rule is stated generically on purpose. Every one of these flows rotates the Profile's `SecurityStamp`, which kills outstanding *links* — reset, confirmation, email-change — and does nothing to *sessions*; the gap is a property of how the JWT is validated, not of which flow ran. This section is the canonical statement of it. Specs and later ADRs cite this heading rather than restating the gap in their own words, so there is one sentence to keep true instead of four that can drift apart.
 
 This is **identical to Pitaka today**. It is not a regression introduced by adopting Identity; it is the existing behaviour, now written down because the work around it makes it worth naming. Closing it needs refresh tokens plus short-lived access tokens — a token denylist or a version claim checked on every request — which is its own future slice and its own ADR. It is named here so the ~1-hour window reads as a known, deliberate consequence rather than something this work broke.
 
@@ -64,6 +66,6 @@ This is **identical to Pitaka today**. It is not a regression introduced by adop
 
 - **`User` moves off `TimestampedEntity` onto `ITimestamped`.** `IdentityUser<int>` takes the base slot. The interface keeps `CreatedAt`/`UpdatedAt` working through the `SaveChanges` override; the twelve `TimestampedEntity` subclasses do not move.
 
-- **A reset or a lockout still leaves a live JWT valid for ~1 hour.** Unchanged from today, named as a known gap, closed only by a future refresh-token slice. Recorded so it is not rediscovered as a surprise regression.
+- **Any credential change still leaves a live JWT valid for ~1 hour.** Unchanged from today, named as a known gap, closed only by a future refresh-token slice. Recorded so it is not rediscovered as a surprise regression, and stated generically so that each new credential-changing flow inherits the statement instead of writing its own.
 
 - **`GenerateJwtToken`, `GetCurrentUser`, `ResolveCurrentUserFilter`, and `CurrentUserAccessor` are untouched.** How a request's Profile is resolved does not ripple from this change.
