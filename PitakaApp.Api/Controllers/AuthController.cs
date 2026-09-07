@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PitakaApp.Api.Actions.Auth;
 using PitakaApp.Api.Requests;
@@ -18,34 +17,28 @@ public class AuthController : ControllerBase
     private readonly RegisterUser _registerUser;
     private readonly GenerateJwtToken _generateJwtToken;
 
-    private readonly GetCurrentUser _getCurrentUser;
     private readonly RequestPasswordReset _requestPasswordReset;
     private readonly ResetPassword _resetPassword;
     private readonly ConfirmEmail _confirmEmail;
     private readonly ResendConfirmation _resendConfirmation;
-    private readonly TimeProvider _timeProvider;
 
     public AuthController(
         LoginUser loginUser,
         RegisterUser registerUser,
         GenerateJwtToken generateJwtToken,
-        GetCurrentUser getCurrentUser,
         RequestPasswordReset requestPasswordReset,
         ResetPassword resetPassword,
         ConfirmEmail confirmEmail,
-        ResendConfirmation resendConfirmation,
-        TimeProvider timeProvider
+        ResendConfirmation resendConfirmation
     )
     {
         _loginUser = loginUser;
         _registerUser = registerUser;
         _generateJwtToken = generateJwtToken;
-        _getCurrentUser = getCurrentUser;
         _requestPasswordReset = requestPasswordReset;
         _resetPassword = resetPassword;
         _confirmEmail = confirmEmail;
         _resendConfirmation = resendConfirmation;
-        _timeProvider = timeProvider;
     }
 
     [HttpPost("login")]
@@ -57,8 +50,8 @@ public class AuthController : ControllerBase
         {
             case LoginOutcome.Succeeded:
                 var token = _generateJwtToken.Execute(result.User!);
-                var userResponse = new UserResponse(result.User!.Id, result.User.Name, result.User.Email!);
-                return Ok(new LoginResponse(token, userResponse));
+                var profileResponse = new ProfileResponse(result.User!.Id, result.User.Name, result.User.Email!);
+                return Ok(new LoginResponse(token, profileResponse));
 
             // Unconfirmed email, any password — Identity's confirmed-account gate runs
             // before the password check, so this fires whether or not the password is
@@ -88,12 +81,12 @@ public class AuthController : ControllerBase
         switch (result.Outcome)
         {
             case RegisterOutcome.Succeeded:
-                var userResponse = new UserResponse(result.User!.Id, result.User.Name, result.User.Email!);
+                var profileResponse = new ProfileResponse(result.User!.Id, result.User.Name, result.User.Email!);
 
                 // 201 with the Profile only — no token. A new Profile cannot sign in until it
                 // confirms the email RegisterUser just sent (ADR 0012). No Location header —
                 // matches AccountsController.Create; there is no canonical GET /users/{id}.
-                return StatusCode(StatusCodes.Status201Created, userResponse);
+                return StatusCode(StatusCodes.Status201Created, profileResponse);
 
             case RegisterOutcome.EmailTaken:
                 return Problem(detail: "A user with this email already exists.", statusCode: StatusCodes.Status409Conflict);
@@ -173,30 +166,11 @@ public class AuthController : ControllerBase
 
         return NoContent();
     }
-
-    [Authorize]
-    [HttpGet("me")]
-    public async Task<IActionResult> Me()
-    {
-        var user = await _getCurrentUser.ExecuteAsync(User);
-
-        if (user == null)
-        {
-            return Unauthorized();
-        }
-        
-        // The pending address is surfaced here so a person can see which address a change
-        // in flight is going to (ADR 0014, spec story 8). PendingEmailAsOf returns null
-        // once the pending window has passed, so an expired change is absent rather than
-        // shown as still live.
-        var pendingEmail = user.PendingEmailAsOf(_timeProvider.GetUtcNow().UtcDateTime);
-
-        return Ok(new UserResponse(user.Id, user.Name, user.Email!, pendingEmail));
-    }
 }
 
-// PendingEmail is additive and nullable: existing clients reading Id/Name/Email keep
-// working, and it is only ever populated by GET me (login's UserResponse leaves it
-// null). Client counterpart: pitaka-web shows a "pending change" indicator when set.
-public record UserResponse(int Id, string Name, string Email, string? PendingEmail = null);
-public record LoginResponse(string Token, UserResponse User);
+// The signed-in Profile, read at GET api/profile (ProfileController) and embedded in
+// LoginResponse. PendingEmail is nullable and only ever populated by the Profile read —
+// login leaves it null. Client counterpart: pitaka-web shows a "pending change"
+// indicator when set.
+public record ProfileResponse(int Id, string Name, string Email, string? PendingEmail = null);
+public record LoginResponse(string Token, ProfileResponse User);

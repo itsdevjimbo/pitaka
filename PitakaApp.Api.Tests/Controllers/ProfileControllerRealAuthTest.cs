@@ -13,13 +13,19 @@ using PitakaApp.Api.Tests.Fixtures;
 
 namespace PitakaApp.Api.Tests.Controllers;
 
-// Tickets 02 through 07 of the email-change feature, driven the way the spec asks: through
-// the real JwtBearerHandler (RealAuthWebApplicationFactory) and the recording email
-// sender, so a session genuinely survives the pending period. Asserts only what a person
-// or client can see — status codes, which addresses sign in, what landed in the outbox —
-// never token internals or how the pending state is stored. The one race redemption
-// cannot show over HTTP (an address taken while the link sat unread) is at the data
-// layer in RedeemEmailChangeConcurrencyTest.
+// The Profile endpoints driven the way the spec asks: through the real JwtBearerHandler
+// (RealAuthWebApplicationFactory) and the recording email sender, so a session genuinely
+// survives the pending period. Asserts only what a person or client can see — status
+// codes, which addresses sign in, what landed in the outbox — never token internals or
+// how the pending state is stored. The one race redemption cannot show over HTTP (an
+// address taken while the link sat unread) is at the data layer in
+// RedeemEmailChangeConcurrencyTest.
+//
+// The GET api/profile block below is also the suite's only coverage of real token
+// signature/issuer/audience/expiry validation — those tests moved here with the read
+// when GET api/auth/me was removed (profile-self-service ticket 07). The email-change
+// sections that follow are numbered against their own spec, so a ticket number here only
+// means something next to the feature it names.
 [Collection("RealAuthDatabase collection")]
 public class ProfileControllerRealAuthTest : IDisposable
 {
@@ -36,6 +42,119 @@ public class ProfileControllerRealAuthTest : IDisposable
         _client = factory.CreateClient();
         _emailSender = factory.EmailSender;
     }
+
+    // ─── Profile self-service ticket 07: the read, moved from GET api/auth/me ───────
+
+    [Fact]
+    public async Task GetProfile_WithRealJwtFromLogin_ReturnsOk()
+    {
+        var email = _faker.Internet.Email();
+        await UserFactory.CreateAsync(_context, email);
+
+        var loginResponse = await _client.PostAsJsonAsync("/api/auth/login", new
+        {
+            email,
+            password = UserFactory.DefaultPassword,
+        });
+        Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
+
+        var loginBody = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>();
+        Assert.NotNull(loginBody);
+
+        var request = new HttpRequestMessage(HttpMethod.Get, "/api/profile");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", loginBody!.Token);
+
+        var response = await _client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<ProfileResponse>();
+        Assert.Equal(email, body!.Email);
+    }
+
+    [Fact]
+    public async Task GetProfile_WithRealJwtFromRegister_ReturnsOk()
+    {
+        // S2: register no longer hands back a token. This proves the whole arc with a
+        // real JwtBearerHandler instead — register, read the confirmation link out of
+        // the delivered mail, confirm, log in, then a real bearer token reaches the read.
+        var email = _faker.Internet.Email();
+
+        var registerResponse = await _client.PostAsJsonAsync("/api/auth/register", new
+        {
+            name = _faker.Person.FullName,
+            email,
+            password = "TestPass123!",
+        });
+        Assert.Equal(HttpStatusCode.Created, registerResponse.StatusCode);
+
+        var registerBody = await registerResponse.Content.ReadFromJsonAsync<ProfileResponse>();
+        Assert.NotNull(registerBody);
+
+        var confirmMessage = Assert.Single(_emailSender.To(email));
+        var match = Regex.Match(confirmMessage.Body, @"userId=(?<userId>\d+)&token=(?<token>[^\s]+)");
+        Assert.True(match.Success, $"No confirm-email link found in email body:\n{confirmMessage.Body}");
+
+        var confirmResponse = await _client.PostAsJsonAsync("/api/auth/confirm-email", new
+        {
+            userId = int.Parse(match.Groups["userId"].Value),
+            token = Uri.UnescapeDataString(match.Groups["token"].Value),
+        });
+        Assert.Equal(HttpStatusCode.NoContent, confirmResponse.StatusCode);
+
+        var loginResponse = await _client.PostAsJsonAsync("/api/auth/login", new
+        {
+            email,
+            password = "TestPass123!",
+        });
+        Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
+
+        var loginBody = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>();
+        Assert.NotNull(loginBody);
+
+        var request = new HttpRequestMessage(HttpMethod.Get, "/api/profile");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", loginBody!.Token);
+
+        var response = await _client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<ProfileResponse>();
+        Assert.Equal(email, body!.Email);
+    }
+
+    [Fact]
+    public async Task GetProfile_WithTamperedToken_ReturnsUnauthorized()
+    {
+        var email = _faker.Internet.Email();
+        await UserFactory.CreateAsync(_context, email);
+
+        var loginResponse = await _client.PostAsJsonAsync("/api/auth/login", new
+        {
+            email,
+            password = UserFactory.DefaultPassword,
+        });
+        var loginBody = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>();
+
+        // Flip the last character of the signature segment — same claims, invalid signature.
+        var tamperedToken = loginBody!.Token[..^1] + (loginBody.Token[^1] == 'A' ? 'B' : 'A');
+
+        var request = new HttpRequestMessage(HttpMethod.Get, "/api/profile");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", tamperedToken);
+
+        var response = await _client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetProfile_WithNoToken_ReturnsUnauthorized()
+    {
+        var response = await _client.GetAsync("/api/profile");
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    // ─── Email-change flow ─────────────────────────────────────────────────────────
 
     [Fact]
     public async Task RequestEmailChange_WithCurrentPasswordAndFreshAddress_SendsLinkAndLeavesLiveAddressWorking()
@@ -172,7 +291,7 @@ public class ProfileControllerRealAuthTest : IDisposable
         Assert.Null(profile.PendingEmail);
     }
 
-    // ─── Ticket 07: the old address gets told ──────────────────────────────────────
+    // ─── Email-change ticket 07: the old address gets told ─────────────────────────
 
     [Fact]
     public async Task RequestEmailChange_TellsTheOldAddress_WithANoticeNamingTheRequestedAddressAndNoLink()
@@ -242,10 +361,10 @@ public class ProfileControllerRealAuthTest : IDisposable
 
         // The session made before the change still works after it — the change rotates
         // the security stamp but does not revoke issued JWTs (ADR 0011 B1/B2), and
-        // GET /me now reports the new address.
-        var me = await Send(HttpMethod.Get, "/api/auth/me", bearer, body: null);
-        Assert.Equal(HttpStatusCode.OK, me.StatusCode);
-        var profile = await me.Content.ReadFromJsonAsync<UserResponse>();
+        // GET api/profile now reports the new address.
+        var read = await Send(HttpMethod.Get, "/api/profile", bearer, body: null);
+        Assert.Equal(HttpStatusCode.OK, read.StatusCode);
+        var profile = await read.Content.ReadFromJsonAsync<ProfileResponse>();
         Assert.Equal(newEmail, profile!.Email);
     }
 
@@ -514,12 +633,12 @@ public class ProfileControllerRealAuthTest : IDisposable
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    // Read GET /api/auth/me with the given bearer — the Profile a client sees.
-    private async Task<UserResponse> ReadProfile(string bearer)
+    // Read GET /api/profile with the given bearer — the Profile a client sees.
+    private async Task<ProfileResponse> ReadProfile(string bearer)
     {
-        var response = await Send(HttpMethod.Get, "/api/auth/me", bearer, body: null);
+        var response = await Send(HttpMethod.Get, "/api/profile", bearer, body: null);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var profile = await response.Content.ReadFromJsonAsync<UserResponse>();
+        var profile = await response.Content.ReadFromJsonAsync<ProfileResponse>();
         Assert.NotNull(profile);
         return profile;
     }
@@ -544,8 +663,8 @@ public class ProfileControllerRealAuthTest : IDisposable
     }
 
     // Register, pull the confirmation link out of the outbox, confirm, then log in —
-    // the same arc AuthControllerRealAuthTest proves, reused here to get a real bearer
-    // token for a confirmed Profile.
+    // the same arc the GetProfile_WithRealJwtFromRegister test proves, reused here to
+    // get a real bearer token for a confirmed Profile.
     private async Task<string> RegisterConfirmAndLogInAsync(string email, string password)
     {
         var registerResponse = await _client.PostAsJsonAsync("/api/auth/register", new

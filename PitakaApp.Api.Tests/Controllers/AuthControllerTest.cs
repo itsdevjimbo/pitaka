@@ -119,7 +119,7 @@ public class AuthControllerTest : IDisposable
         var raw = await response.Content.ReadAsStringAsync();
         Assert.DoesNotContain("token", raw, StringComparison.OrdinalIgnoreCase);
 
-        var body = await response.Content.ReadFromJsonAsync<UserResponse>();
+        var body = await response.Content.ReadFromJsonAsync<ProfileResponse>();
         Assert.NotNull(body);
         Assert.Equal(request.email, body!.Email);
         Assert.Equal(request.name, body.Name);
@@ -261,29 +261,6 @@ public class AuthControllerTest : IDisposable
         var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
 
         Assert.Equal("A user with this email already exists.", problem!.Detail);
-    }
-
-    [Fact]
-    public async Task Me_WithValidToken_ReturnsCurrentUser()
-    {
-        var email = _faker.Internet.Email();
-
-        var user = await UserFactory.CreateAsync(_context, email);
-
-        _client.ActAsUser(user);
-
-        var response = await _client.GetAsync("/api/auth/me");
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        
-        var body = await response.Content.ReadFromJsonAsync<UserResponse>();
-        Assert.Equal(email, body!.Email);
-    }
-
-    [Fact]
-    public async Task Me_WithoutToken_ReturnsUnauthorized()
-    {
-        var response = await _client.GetAsync("/api/auth/me");
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     // The reset URL the test host serves — the appsettings.json default, since the test

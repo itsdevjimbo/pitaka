@@ -7,9 +7,9 @@ using PitakaApp.Api.Services;
 
 namespace PitakaApp.Api.Controllers;
 
-// The Profile write surface, kept off AuthController deliberately (spec: the
-// endpoint-shape decision put the Profile writes here; GET api/auth/me stays where it
-// is and is where the pending address is read, not here).
+// Everything a person can read or change about their own Profile lives here, at
+// api/profile: the read (moved from GET api/auth/me, which is removed) and the
+// email-change flow, with the name and password writes to follow.
 //
 // ResolveCurrentUserFilter is applied per-action rather than at class level (as
 // CategoriesController does) so the anonymous confirm endpoint — reached from a link in
@@ -23,17 +23,35 @@ public class ProfileController : ControllerBase
     private readonly RedeemEmailChange _redeemEmailChange;
     private readonly CancelEmailChange _cancelEmailChange;
     private readonly CurrentUserAccessor _currentUserAccessor;
+    private readonly TimeProvider _timeProvider;
 
     public ProfileController(
         RequestEmailChange requestEmailChange,
         RedeemEmailChange redeemEmailChange,
         CancelEmailChange cancelEmailChange,
-        CurrentUserAccessor currentUserAccessor)
+        CurrentUserAccessor currentUserAccessor,
+        TimeProvider timeProvider)
     {
         _requestEmailChange = requestEmailChange;
         _redeemEmailChange = redeemEmailChange;
         _cancelEmailChange = cancelEmailChange;
         _currentUserAccessor = currentUserAccessor;
+        _timeProvider = timeProvider;
+    }
+
+    // Authenticated. The signed-in Profile: id, name, live email, and any email change
+    // still pending. Moved verbatim from GET api/auth/me (spec ticket 07). The pending
+    // address is surfaced so a person can see which address a change in flight is going
+    // to (ADR 0014, spec story 2); PendingEmailAsOf returns null once the pending window
+    // has passed, so an expired change is absent rather than shown as still live.
+    [TypeFilter(typeof(ResolveCurrentUserFilter))]
+    [HttpGet]
+    public IActionResult GetProfile()
+    {
+        var user = _currentUserAccessor.User!;
+        var pendingEmail = user.PendingEmailAsOf(_timeProvider.GetUtcNow().UtcDateTime);
+
+        return Ok(new ProfileResponse(user.Id, user.Name, user.Email!, pendingEmail));
     }
 
     // Authenticated. Body carries the new address and the current password. Stores the
@@ -122,7 +140,7 @@ public class ProfileController : ControllerBase
 
     // Authenticated. Clears any pending change on the caller's own Profile — there is no
     // target id, so a session can only cancel its own (ADR 0014). Afterwards the pending
-    // address is gone from GET api/auth/me and the link that was mailed no longer
+    // address is gone from GET api/profile and the link that was mailed no longer
     // redeems. Idempotent: cancelling with nothing pending still answers 204.
     [TypeFilter(typeof(ResolveCurrentUserFilter))]
     [HttpPost("email-change/cancel")]
