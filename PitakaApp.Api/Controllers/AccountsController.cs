@@ -29,10 +29,10 @@ public class AccountsController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> Get()
+    public async Task<IActionResult> Get([FromQuery] AccountQueryRequest request)
     {
         var user = _currentUserAccessor.User!;
-        var accounts = await _accountService.GetAllForUser(user);
+        var accounts = await _accountService.GetAllForUser(user, request.ToInput());
 
         return Ok(AccountResource.Collection(accounts));
     }

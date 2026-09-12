@@ -55,6 +55,165 @@ public class AccountsControllerTest : IDisposable
     }
 
     [Fact]
+    public async Task Get_WithTypeFilter_ReturnsOnlyAccountsOfThatType()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+
+        await AccountFactory.CreateAsync(_context, user.Id, "Checking", AccountType.Bank);
+        await AccountFactory.CreateAsync(_context, user.Id, "Cash", AccountType.Cash);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/accounts?type=Bank");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<List<AccountResource>>(TestJsonOptions.Default);
+        Assert.Equal(["Checking"], body!.Select(a => a.Name));
+    }
+
+    [Fact]
+    public async Task Get_WithActiveFilter_ReturnsOnlyActiveAccounts()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+
+        await AccountFactory.CreateAsync(_context, user.Id, "Active", isActive: true);
+        await AccountFactory.CreateAsync(_context, user.Id, "Retired", isActive: false);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/accounts?isActive=true");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<List<AccountResource>>(TestJsonOptions.Default);
+        Assert.Equal(["Active"], body!.Select(a => a.Name));
+    }
+
+    [Fact]
+    public async Task Get_WithRetiredFilter_ReturnsOnlyRetiredAccounts()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+
+        await AccountFactory.CreateAsync(_context, user.Id, "Active", isActive: true);
+        await AccountFactory.CreateAsync(_context, user.Id, "Retired", isActive: false);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/accounts?isActive=false");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<List<AccountResource>>(TestJsonOptions.Default);
+        Assert.Equal(["Retired"], body!.Select(a => a.Name));
+    }
+
+    [Fact]
+    public async Task Get_WithTypeAndActiveFilters_ReturnsTheirIntersection()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+
+        await AccountFactory.CreateAsync(_context, user.Id, "Active bank", AccountType.Bank, isActive: true);
+        await AccountFactory.CreateAsync(_context, user.Id, "Retired bank", AccountType.Bank, isActive: false);
+        await AccountFactory.CreateAsync(_context, user.Id, "Active cash", AccountType.Cash, isActive: true);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/accounts?type=Bank&isActive=true");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<List<AccountResource>>(TestJsonOptions.Default);
+        Assert.Equal(["Active bank"], body!.Select(a => a.Name));
+    }
+
+    [Fact]
+    public async Task Get_WithFilterMatchingNothing_ReturnsEmptyList()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        await AccountFactory.CreateAsync(_context, user.Id, type: AccountType.Cash);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/accounts?type=Investment");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<List<AccountResource>>(TestJsonOptions.Default);
+        Assert.Empty(body!);
+    }
+
+    [Fact]
+    public async Task Get_WithoutFilters_ReturnsActiveAndRetiredAccounts()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+
+        await AccountFactory.CreateAsync(_context, user.Id, "Active", isActive: true);
+        await AccountFactory.CreateAsync(_context, user.Id, "Retired", isActive: false);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/accounts");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<List<AccountResource>>(TestJsonOptions.Default);
+        Assert.Equal(["Active", "Retired"], body!.Select(a => a.Name));
+    }
+
+    [Fact]
+    public async Task Get_WithFilter_ReturnsAccountsOrderedByNameAscending()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+
+        await AccountFactory.CreateAsync(_context, user.Id, "Zephyr", AccountType.Bank);
+        await AccountFactory.CreateAsync(_context, user.Id, "Apricot", AccountType.Bank);
+        await AccountFactory.CreateAsync(_context, user.Id, "Mango", AccountType.Cash);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/accounts?type=Bank");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<List<AccountResource>>(TestJsonOptions.Default);
+        Assert.Equal(["Apricot", "Zephyr"], body!.Select(a => a.Name));
+    }
+
+    [Fact]
+    public async Task Get_WithFilters_ReturnsOnlyTheLoggedInUsersAccounts()
+    {
+        var userA = await UserFactory.CreateAsync(_context);
+        var userB = await UserFactory.CreateAsync(_context);
+
+        await AccountFactory.CreateAsync(_context, userA.Id, "Mine", AccountType.Bank, isActive: true);
+        await AccountFactory.CreateAsync(_context, userB.Id, "Theirs", AccountType.Bank, isActive: true);
+
+        _client.ActAsUser(userA);
+
+        var response = await _client.GetAsync("/api/accounts?type=Bank&isActive=true");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<List<AccountResource>>(TestJsonOptions.Default);
+        Assert.Equal(["Mine"], body!.Select(a => a.Name));
+    }
+
+    [Fact]
+    public async Task Get_WithUnparseableType_ReturnsBadRequest()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/accounts?type=nonsense");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Get_WithNumericActiveFilter_ReturnsBadRequest()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/accounts?isActive=1");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Get_ReturnsAccountsOrderedByNameAscending()
     {
         var user = await UserFactory.CreateAsync(_context);
