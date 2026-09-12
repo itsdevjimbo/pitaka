@@ -92,8 +92,8 @@ public class ProfileControllerRealAuthTest : IDisposable
         Assert.NotNull(registerBody);
 
         var confirmMessage = Assert.Single(_emailSender.To(email));
-        var match = Regex.Match(confirmMessage.Body, @"userId=(?<userId>\d+)&token=(?<token>[^\s]+)");
-        Assert.True(match.Success, $"No confirm-email link found in email body:\n{confirmMessage.Body}");
+        var match = Regex.Match(confirmMessage.TextBody, @"userId=(?<userId>\d+)&token=(?<token>[^\s]+)");
+        Assert.True(match.Success, $"No confirm-email link found in email body:\n{confirmMessage.TextBody}");
 
         var confirmResponse = await _client.PostAsJsonAsync("/api/auth/confirm-email", new
         {
@@ -175,12 +175,12 @@ public class ProfileControllerRealAuthTest : IDisposable
         // A confirmation link reached the new address, and the copy says Profile —
         // never User, never Account (CONTEXT.md).
         var message = Assert.Single(_emailSender.To(newEmail));
-        Assert.Contains("Profile", message.Body);
-        Assert.DoesNotContain("User", message.Body);
-        Assert.DoesNotContain("Account", message.Body);
+        Assert.Contains("Profile", message.TextBody);
+        Assert.DoesNotContain("User", message.TextBody);
+        Assert.DoesNotContain("Account", message.TextBody);
         Assert.DoesNotContain("User", message.Subject);
         Assert.DoesNotContain("Account", message.Subject);
-        Assert.Matches(@"userId=\d+&token=\S+", message.Body);
+        Assert.Matches(@"userId=\d+&token=\S+", message.TextBody);
 
         // The old address is told, alongside the confirmation to the new one (ticket 07):
         // its messages are the sign-up confirmation from registration plus a courtesy
@@ -189,11 +189,11 @@ public class ProfileControllerRealAuthTest : IDisposable
         Assert.Equal(2, toOld.Count);
         Assert.Equal("Confirm your Pitaka Profile", toOld[0].Subject);
         var notice = toOld[1];
-        Assert.Contains(newEmail, notice.Body);
-        Assert.DoesNotContain("http", notice.Body, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Profile", notice.Body);
-        Assert.DoesNotContain("User", notice.Body);
-        Assert.DoesNotContain("Account", notice.Body);
+        Assert.Contains(newEmail, notice.TextBody);
+        Assert.DoesNotContain("http", notice.TextBody, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Profile", notice.TextBody);
+        Assert.DoesNotContain("User", notice.TextBody);
+        Assert.DoesNotContain("Account", notice.TextBody);
         Assert.DoesNotContain("User", notice.Subject);
         Assert.DoesNotContain("Account", notice.Subject);
 
@@ -315,22 +315,22 @@ public class ProfileControllerRealAuthTest : IDisposable
         // One request, two sends: the confirmation link to the new address and a notice
         // to the old one.
         var toNew = Assert.Single(_emailSender.To(newEmail));
-        Assert.Matches(@"userId=\d+&token=\S+", toNew.Body);
+        Assert.Matches(@"userId=\d+&token=\S+", toNew.TextBody);
 
         Assert.Equal(oldBefore + 1, _emailSender.To(oldEmail).Count);
         var notice = _emailSender.To(oldEmail).Last();
 
         // It names the address that was asked for...
-        Assert.Contains(newEmail, notice.Body);
+        Assert.Contains(newEmail, notice.TextBody);
         // ...and carries no link of any kind — it is a notice, not an undo control.
-        Assert.DoesNotContain("http", notice.Body, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("?userId=", notice.Body);
-        Assert.DoesNotContain("token=", notice.Body);
+        Assert.DoesNotContain("http", notice.TextBody, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("?userId=", notice.TextBody);
+        Assert.DoesNotContain("token=", notice.TextBody);
 
         // Says Profile, never User and never Account (CONTEXT.md).
-        Assert.Contains("Profile", notice.Body);
-        Assert.DoesNotContain("User", notice.Body);
-        Assert.DoesNotContain("Account", notice.Body);
+        Assert.Contains("Profile", notice.TextBody);
+        Assert.DoesNotContain("User", notice.TextBody);
+        Assert.DoesNotContain("Account", notice.TextBody);
         Assert.DoesNotContain("User", notice.Subject);
         Assert.DoesNotContain("Account", notice.Subject);
     }
@@ -834,8 +834,8 @@ public class ProfileControllerRealAuthTest : IDisposable
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
 
         var message = _emailSender.To(newEmail).Last();
-        var match = Regex.Match(message.Body, @"userId=(?<userId>\d+)&token=(?<token>[^\s]+)");
-        Assert.True(match.Success, $"No confirm-email-change link in:\n{message.Body}");
+        var match = Regex.Match(message.TextBody, @"userId=(?<userId>\d+)&token=(?<token>[^\s]+)");
+        Assert.True(match.Success, $"No confirm-email-change link in:\n{message.TextBody}");
 
         return (int.Parse(match.Groups["userId"].Value), Uri.UnescapeDataString(match.Groups["token"].Value));
     }
@@ -854,8 +854,8 @@ public class ProfileControllerRealAuthTest : IDisposable
         Assert.Equal(HttpStatusCode.Created, registerResponse.StatusCode);
 
         var confirmMessage = Assert.Single(_emailSender.To(email));
-        var match = Regex.Match(confirmMessage.Body, @"userId=(?<userId>\d+)&token=(?<token>[^\s]+)");
-        Assert.True(match.Success, $"No confirm-email link in:\n{confirmMessage.Body}");
+        var match = Regex.Match(confirmMessage.TextBody, @"userId=(?<userId>\d+)&token=(?<token>[^\s]+)");
+        Assert.True(match.Success, $"No confirm-email link in:\n{confirmMessage.TextBody}");
 
         var confirmResponse = await _client.PostAsJsonAsync("/api/auth/confirm-email", new
         {
