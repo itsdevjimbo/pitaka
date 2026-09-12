@@ -15,20 +15,36 @@ The same person, named the way they are addressed. Every user-facing string the 
 _Avoid_: Account, user account, my account, user settings
 
 **Account**:
-A place money sits — a bank account, cash on hand, a credit card. Carries a balance.
+A place where money is held or owed — a bank account, cash on hand, a credit card. Carries a
+signed balance: positive when it holds value for the person, negative when the person owes value.
 _Avoid_: Wallet, login, user account
+
+**Account type**:
+The permanent classification chosen when an Account is opened. It never changes afterwards.
+_Avoid_: Account kind, nature
 
 **Opened**:
 How an Account comes into existence. `Account.Open` builds it with its initial balance already in place, so its current balance is fully explained from the first moment. Not the opposite of Retired: an Account is opened once, and may be retired and brought back many times afterward.
 _Avoid_: Created, registered
 
 **Initial balance**:
-What an Account held before Pitaka started watching it. It is a recorded fact about the past — the money that was already there — rather than a figure the person maintains. Set when the Account is opened and never revised.
+What an Account was worth to the person before Pitaka started watching — money already there, or
+money already owed. It is a recorded fact about the past, set when the Account is opened and never
+revised.
 _Avoid_: Opening balance, starting amount
 
 **Current balance**:
-What an Account holds now. Not a figure anyone states: it is the initial balance plus every Transaction the Account has recorded, and it stays fully explained by that history. Correcting it against the real world is done by recording the difference as a Transaction, never by editing the number.
+What an Account is worth to the person now: positive for value held and negative for value owed.
+Not a figure anyone states, it is the initial balance plus every Transaction the Account has
+recorded and stays fully explained by that history. Correcting it against the real world is done
+by recording the difference as a Transaction, never by editing the number.
 _Avoid_: Running total, actual balance
+
+**Net worth**:
+What the person is worth across every Account — the sum of every current balance, money held less
+money owed. Retired Accounts count; a retired Account still holds what it holds or owes what it
+owes.
+_Avoid_: Total cash, total balance, total, net value, assets
 
 **Retired**:
 An Account or a Category the person has stopped using. It keeps everything it recorded — an Account its balance, a Category the Transactions filed under it — and can be brought back. Retiring is how one of them leaves everyday use without being deleted, which stays refused once there is something to lose: an Account with history, a Category in use. The two part only in what happens next. A retired Account stays in the account list among the active ones; a retired Category drops out of the pickers but is still returned by `GET /api/categories`, because old Transactions resolve their category name from that collection. That is what each list is for, not a difference in the state.
