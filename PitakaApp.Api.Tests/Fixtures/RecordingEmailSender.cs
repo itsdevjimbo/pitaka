@@ -14,9 +14,14 @@ public class RecordingEmailSender : IEmailSender
 {
     private readonly ConcurrentQueue<RecordedEmail> _sent = new();
 
-    public Task SendAsync(string toAddress, string subject, string body, CancellationToken cancellationToken = default)
+    public Task SendAsync(
+        string toAddress,
+        string subject,
+        string textBody,
+        string htmlBody,
+        CancellationToken cancellationToken = default)
     {
-        _sent.Enqueue(new RecordedEmail(toAddress, subject, body));
+        _sent.Enqueue(new RecordedEmail(toAddress, subject, textBody, htmlBody));
         return Task.CompletedTask;
     }
 
@@ -24,4 +29,4 @@ public class RecordingEmailSender : IEmailSender
         _sent.Where(m => m.ToAddress == address).ToList();
 }
 
-public record RecordedEmail(string ToAddress, string Subject, string Body);
+public record RecordedEmail(string ToAddress, string Subject, string TextBody, string HtmlBody);

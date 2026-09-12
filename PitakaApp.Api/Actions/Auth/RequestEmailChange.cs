@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
 using PitakaApp.Api.Inputs;
@@ -96,11 +97,13 @@ public class RequestEmailChange
         // Identity's DataProtectorTokenProvider output is base64, not base64url — same
         // escaping as SendEmailConfirmation.
         var encodedToken = Uri.EscapeDataString(token);
+        var url = $"{_option.ConfirmUrl}?userId={managed.Id}&token={encodedToken}";
 
         await _emailSender.SendAsync(
             input.NewEmail,
             "Confirm your new Pitaka Profile email",
-            ComposeBody(managed.Id, encodedToken));
+            ComposeTextBody(url),
+            ComposeHtmlBody(url));
 
         // The only warning the real owner gets if someone with a live session tries to
         // redirect their Profile (ADR 0014). Notice only: it names the requested address
@@ -110,7 +113,8 @@ public class RequestEmailChange
         await _emailSender.SendAsync(
             managed.Email!,
             "A change was requested for your Pitaka Profile email",
-            ComposeNoticeBody(input.NewEmail));
+            ComposeNoticeTextBody(input.NewEmail),
+            ComposeNoticeHtmlBody(input.NewEmail));
 
         return RequestEmailChangeOutcome.Succeeded;
     }
@@ -119,13 +123,13 @@ public class RequestEmailChange
     // configured client confirm-email-change URL with the Profile id and token appended,
     // same shape as SendEmailConfirmation. States that ignoring it leaves the address
     // unchanged.
-    private string ComposeBody(int userId, string encodedToken) =>
+    private static string ComposeTextBody(string url) =>
         $"""
         Hi,
 
         We received a request to move your Pitaka Profile to this email address.
         Confirm it to finish the change:
-        {_option.ConfirmUrl}?userId={userId}&token={encodedToken}
+        {url}
 
         If you ignore this message, your Profile keeps its current address — nothing
         changes until this link is used.
@@ -133,11 +137,23 @@ public class RequestEmailChange
         — Pitaka
         """;
 
+    private static string ComposeHtmlBody(string url)
+    {
+        var encodedUrl = WebUtility.HtmlEncode(url);
+
+        return $"""
+            <p>Hi,</p>
+            <p>We received a request to move your Pitaka Profile to this email address. Confirm it to finish the change: <a href="{encodedUrl}">{encodedUrl}</a></p>
+            <p>If you ignore this message, your Profile keeps its current address — nothing changes until this link is used.</p>
+            <p>— Pitaka</p>
+            """;
+    }
+
     // The courtesy notice to the address being left behind. Plain text, says Profile
     // (CONTEXT.md), names the requested address, and deliberately carries no link — not
     // the confirmation link and no undo control. Tells the person what to do if they did
     // not ask for this: act from the Profile they can still sign in to.
-    private static string ComposeNoticeBody(string requestedEmail) =>
+    private static string ComposeNoticeTextBody(string requestedEmail) =>
         $"""
         Hi,
 
@@ -152,4 +168,17 @@ public class RequestEmailChange
 
         — Pitaka
         """;
+
+    private static string ComposeNoticeHtmlBody(string requestedEmail)
+    {
+        var encodedEmail = WebUtility.HtmlEncode(requestedEmail);
+
+        return $"""
+            <p>Hi,</p>
+            <p>Someone asked to move your Pitaka Profile to a new email address: {encodedEmail}</p>
+            <p>The change is not finished — it only completes when that address is confirmed from the link we sent there. Your Profile keeps its current address until then.</p>
+            <p>If this was you, no action is needed. If it was not, sign in to your Profile and cancel the pending change.</p>
+            <p>— Pitaka</p>
+            """;
+    }
 }

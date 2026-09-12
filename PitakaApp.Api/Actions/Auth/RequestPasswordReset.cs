@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
 using PitakaApp.Api.Inputs;
@@ -36,26 +37,44 @@ public class RequestPasswordReset
         // Identity's DataProtectorTokenProvider output is base64, not base64url — it can
         // contain characters a query string does not carry unescaped.
         var encodedToken = Uri.EscapeDataString(token);
+        var url = $"{_option.ResetUrl}?userId={user.Id}&token={encodedToken}";
 
         // Email is never null here — same guarantee as SendEmailConfirmation.ExecuteAsync.
-        await _emailSender.SendAsync(user.Email!, "Reset your Pitaka password", ComposeBody(user.Id, encodedToken));
+        await _emailSender.SendAsync(
+            user.Email!,
+            "Reset your Pitaka password",
+            ComposeTextBody(url),
+            ComposeHtmlBody(url));
     }
 
     // Plain text. Says Profile, never "user" or "account", per CONTEXT.md. States that
     // ignoring the message leaves the password unchanged. Carries the configured client
     // reset URL with the Profile id and token appended.
-    private string ComposeBody(int userId, string encodedToken) =>
+    private static string ComposeTextBody(string url) =>
         $"""
         Hi,
 
         We received a request to reset the password for your Pitaka Profile.
 
         Choose a new password here:
-        {_option.ResetUrl}?userId={userId}&token={encodedToken}
+        {url}
 
         If you did not ask for this, you can ignore this message — your password
         will not change.
 
         — Pitaka
         """;
+
+    private static string ComposeHtmlBody(string url)
+    {
+        var encodedUrl = WebUtility.HtmlEncode(url);
+
+        return $"""
+            <p>Hi,</p>
+            <p>We received a request to reset the password for your Pitaka Profile.</p>
+            <p>Choose a new password here: <a href="{encodedUrl}">{encodedUrl}</a></p>
+            <p>If you did not ask for this, you can ignore this message — your password will not change.</p>
+            <p>— Pitaka</p>
+            """;
+    }
 }

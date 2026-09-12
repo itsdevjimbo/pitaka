@@ -4,9 +4,15 @@ namespace PitakaApp.Api.Services;
 // suite must observe what was sent without an SMTP server, and asserting on a
 // concrete sender's internals is the coupling the tests are meant to avoid.
 //
-// One method, shaped for its single caller: a plain-text message to one address
-// with a subject and a body. It widens when a second caller appears.
+// One method carrying both representations of a message explicitly. The interface
+// widened when callers needed HTML alongside plain text; requiring both keeps a caller
+// from silently falling back to the old text-only delivery.
 public interface IEmailSender
 {
-    Task SendAsync(string toAddress, string subject, string body, CancellationToken cancellationToken = default);
+    Task SendAsync(
+        string toAddress,
+        string subject,
+        string textBody,
+        string htmlBody,
+        CancellationToken cancellationToken = default);
 }

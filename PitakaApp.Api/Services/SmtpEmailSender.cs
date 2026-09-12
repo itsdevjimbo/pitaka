@@ -18,13 +18,22 @@ public class SmtpEmailSender : IEmailSender
         _emailOption = emailOption.Value;
     }
 
-    public async Task SendAsync(string toAddress, string subject, string body, CancellationToken cancellationToken = default)
+    public async Task SendAsync(
+        string toAddress,
+        string subject,
+        string textBody,
+        string htmlBody,
+        CancellationToken cancellationToken = default)
     {
         var message = new MimeMessage();
         message.From.Add(new MailboxAddress(_emailOption.FromName, _emailOption.FromAddress));
         message.To.Add(MailboxAddress.Parse(toAddress));
         message.Subject = subject;
-        message.Body = new TextPart("plain") { Text = body };
+        message.Body = new BodyBuilder
+        {
+            TextBody = textBody,
+            HtmlBody = htmlBody,
+        }.ToMessageBody();
 
         using var client = new SmtpClient();
         // None: the dev target is smtp4dev on a trusted local network. Delivery

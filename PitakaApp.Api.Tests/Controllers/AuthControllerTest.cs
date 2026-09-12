@@ -140,8 +140,9 @@ public class AuthControllerTest : IDisposable
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
         var message = Assert.Single(_emailSender.To(email));
-        Assert.Contains(ConfiguredConfirmUrl, message.Body);
-        Assert.Contains("Profile", message.Body);
+        Assert.Contains(ConfiguredConfirmUrl, message.TextBody);
+        Assert.Contains("Profile", message.TextBody);
+        AssertClickableLinkMatchesTextBody(message);
     }
 
     [Fact]
@@ -281,8 +282,9 @@ public class AuthControllerTest : IDisposable
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
 
         var message = Assert.Single(_emailSender.To(email));
-        Assert.Contains(ConfiguredResetUrl, message.Body);
-        Assert.Contains("Profile", message.Body);
+        Assert.Contains(ConfiguredResetUrl, message.TextBody);
+        Assert.Contains("Profile", message.TextBody);
+        AssertClickableLinkMatchesTextBody(message);
     }
 
     [Fact]
@@ -413,8 +415,8 @@ public class AuthControllerTest : IDisposable
 
         var delivered = _emailSender.To(email);
         Assert.Equal(2, delivered.Count);
-        var (firstUserId, firstToken) = ExtractUserIdAndToken(delivered[0].Body);
-        var (secondUserId, secondToken) = ExtractUserIdAndToken(delivered[1].Body);
+        var (firstUserId, firstToken) = ExtractUserIdAndToken(delivered[0].TextBody);
+        var (secondUserId, secondToken) = ExtractUserIdAndToken(delivered[1].TextBody);
 
         var usingSecond = await _client.PostAsJsonAsync("/api/auth/reset-password",
             new { userId = secondUserId, token = secondToken, password = "the-winning-password" });
@@ -575,14 +577,28 @@ public class AuthControllerTest : IDisposable
     {
         var messages = _emailSender.To(email);
         Assert.NotEmpty(messages);
-        return ExtractUserIdAndToken(messages[^1].Body);
+        return ExtractUserIdAndToken(messages[^1].TextBody);
     }
 
     private (int UserId, string Token) ConfirmationDeliveredTo(string email)
     {
         var messages = _emailSender.To(email);
         Assert.NotEmpty(messages);
-        return ExtractUserIdAndToken(messages[^1].Body);
+        return ExtractUserIdAndToken(messages[^1].TextBody);
+    }
+
+    private static void AssertClickableLinkMatchesTextBody(RecordedEmail message)
+    {
+        var textLink = Regex.Match(message.TextBody, @"https?://\S+");
+        Assert.True(textLink.Success, $"No link found in text email body:\n{message.TextBody}");
+
+        var anchor = Regex.Match(message.HtmlBody, "<a href=\"(?<href>[^\"]+)\">(?<label>[^<]+)</a>");
+        Assert.True(anchor.Success, $"No anchor found in HTML email body:\n{message.HtmlBody}");
+
+        var href = WebUtility.HtmlDecode(anchor.Groups["href"].Value);
+        var label = WebUtility.HtmlDecode(anchor.Groups["label"].Value);
+        Assert.Equal(textLink.Value, href);
+        Assert.Equal(href, label);
     }
 
     private static (int UserId, string Token) ExtractUserIdAndToken(string body)
