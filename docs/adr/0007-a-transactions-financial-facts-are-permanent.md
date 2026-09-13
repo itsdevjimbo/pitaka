@@ -50,12 +50,11 @@ Three readers, all shipped, all persisting their conclusion. This is not the ADR
 
 - **The correction path for a wrong figure is destructive, and stays that way.** A person who typed `100` instead of `105` deletes the Transaction and enters it again. `TransactionService.DeleteAsync` reverses the balance effect and removes any `GoalContribution` attached (`:160`), so the delete is correct — but the tags, the description and the earmark are gone and must be re-entered. This is accepted rather than solved. The state being prevented is a silent, permanent disagreement between a balance and its history; the cost is visible retyping. Those are not equivalent risks.
 
-- **`Account.Type` looked like it belonged here and did not yet.** At the time, it was written at
-  create, carried on the wire by `AccountResource`, and read by no branch, query, or calculation
-  in the API, so nothing had banked a conclusion on it. ADR 0015 has since chosen signed credit-card
-  balances: the person signs the stored balance according to the type, so flipping the type now
-  silently changes what that number means. That is the trigger this paragraph anticipated.
-  `Account.Type` is therefore permanent and takes `init` in the follow-on build.
+- **`Account.Type` still does not belong here.** It is written at create, carried on the wire by
+  `AccountResource`, and read by no branch, query, or calculation in the API, so nothing has banked
+  a conclusion on it. ADR 0015 briefly fired the anticipated credit-card trigger, but ADR 0016
+  removed that unsupported account type before its follow-on build. If a future supported type
+  changes how balances or another stored result are interpreted, this question returns then.
 
 - **`UserId` on both entities stays settable for the same reason.** Ownership never transfers, so it is permanent in the ordinary sense. But authorization is re-checked from scratch on every request — no stored decision assumes it held still — so the rule does not reach it, and `init` on an ownership FK would put EF's relationship fixup in play for no gain.
 

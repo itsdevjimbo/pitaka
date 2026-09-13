@@ -16,7 +16,7 @@ Enforcement is structural rather than guarded, in two layers. `CategoryRequest` 
 
 Only the first of those two layers has precedent here. `UpdateTransactionRequest` has no `Type` and `UpdateAccountRequest` carries `Name` alone — an immutable field is not rejected, it is not accepted. `Category.Type` is the first field in this codebase that the compiler defends.
 
-The criterion that put it there generalises, and ADR 0007 states it: a field takes `init` when something has already acted on its value and stored a result that still claims to describe the current value. `Category.Type` qualifies because `VerifyBudgetCategory` reads it and a Budget's narrowing is that decision written to a row. That ADR applies the same test to `Transaction` and `Account`, and it is the place to look for what does and does not qualify. `Account.Type` did not qualify when this decision was recorded because nothing in the API read it; ADR 0015 has since made it permanent because the type informs how the person signs a credit-card balance.
+The criterion that put it there generalises, and ADR 0007 states it: a field takes `init` when something has already acted on its value and stored a result that still claims to describe the current value. `Category.Type` qualifies because `VerifyBudgetCategory` reads it and a Budget's narrowing is that decision written to a row. That ADR applies the same test to `Transaction` and `Account`, and it is the place to look for what does and does not qualify. `Account.Type` does not currently qualify because nothing in the API reads it; ADR 0016 removed the unsupported credit-card type that briefly supplied such a meaning in superseded ADR 0015.
 
 ## Considered options
 

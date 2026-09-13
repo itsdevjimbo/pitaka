@@ -8,7 +8,7 @@ public record CreateAccountRequest (
     [Required, MaxLength(255)]
     string Name,
 
-    [Required]
+    [Required, EnumDataType(typeof(AccountType))]
     AccountType Type,
 
     decimal InitialBalance = 0
