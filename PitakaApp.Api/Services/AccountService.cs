@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PitakaApp.Api.Data;
+using PitakaApp.Api.Enums;
 using PitakaApp.Api.Inputs;
 using PitakaApp.Api.Models;
 
@@ -14,12 +15,26 @@ public class AccountService
         _context = context;
     }
     
-    public async Task<List<Account>> GetAllForUser(User user) =>
-        await _context.Accounts
+    public async Task<List<Account>> GetAllForUser(User user, AccountQueryInput input)
+    {
+        var query = _context.Accounts
             .AsNoTracking()
-            .Where(a => a.UserId == user.Id)
+            .Where(a => a.UserId == user.Id);
+
+        if (input.Type is AccountType type)
+        {
+            query = query.Where(a => a.Type == type);
+        }
+
+        if (input.IsActive is bool isActive)
+        {
+            query = query.Where(a => a.IsActive == isActive);
+        }
+
+        return await query
             .OrderBy(a => a.Name)
             .ToListAsync();
+    }
 
     public async Task<Account?> GetByIdForUser(User user, int id) =>
         await _context.Accounts
