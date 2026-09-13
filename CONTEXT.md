@@ -15,12 +15,14 @@ The same person, named the way they are addressed. Every user-facing string the 
 _Avoid_: Account, user account, my account, user settings
 
 **Account**:
-A place where money is held or owed — a bank account, cash on hand, a credit card. Carries a
-signed balance: positive when it holds value for the person, negative when the person owes value.
+A supported place where money is held — a bank account, cash on hand, a wallet, or an investment.
+Carries a signed balance; a negative balance means that place is overdrawn, not that Pitaka models
+a separate liability.
 _Avoid_: Wallet, login, user account
 
 **Account type**:
-The permanent classification chosen when an Account is opened. It never changes afterwards.
+The fixed, permanent classification chosen when an Account is opened. It never changes afterwards;
+credit cards are not a supported type until their full behaviour is designed.
 _Avoid_: Account kind, nature
 
 **Opened**:
@@ -28,22 +30,21 @@ How an Account comes into existence. `Account.Open` builds it with its initial b
 _Avoid_: Created, registered
 
 **Initial balance**:
-What an Account was worth to the person before Pitaka started watching — money already there, or
-money already owed. It is a recorded fact about the past, set when the Account is opened and never
+What an Account held before Pitaka started watching, including a negative amount when it was
+already overdrawn. It is a recorded fact about the past, set when the Account is opened and never
 revised.
 _Avoid_: Opening balance, starting amount
 
 **Current balance**:
-What an Account is worth to the person now: positive for value held and negative for value owed.
+What an Account holds now: positive for value held and negative when it is overdrawn.
 Not a figure anyone states, it is the initial balance plus every Transaction the Account has
 recorded and stays fully explained by that history. Correcting it against the real world is done
 by recording the difference as a Transaction, never by editing the number.
 _Avoid_: Running total, actual balance
 
 **Net worth**:
-What the person is worth across every Account — the sum of every current balance, money held less
-money owed. Retired Accounts count; a retired Account still holds what it holds or owes what it
-owes.
+The sum of every current balance across Pitaka's supported Accounts. Retired Accounts count; a
+retired Account still holds what it holds.
 _Avoid_: Total cash, total balance, total, net value, assets
 
 **Retired**:

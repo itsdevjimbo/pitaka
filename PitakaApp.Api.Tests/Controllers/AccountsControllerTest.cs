@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text;
 using Bogus;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -202,8 +203,8 @@ public class AccountsControllerTest : IDisposable
 
         var request = new
         {
-            Name = "Rewards card",
-            Type = AccountType.CreditCard,
+            Name = "Overdrawn account",
+            Type = AccountType.Bank,
             InitialBalance = -1200,
         };
 
@@ -212,6 +213,30 @@ public class AccountsControllerTest : IDisposable
 
         var body = await response.Content.ReadFromJsonAsync<AccountResource>(TestJsonOptions.Default);
         Assert.Equal(-1200, body!.InitialBalance);
+    }
+
+    [Theory]
+    [InlineData("\"CreditCard\"")]
+    [InlineData("2")]
+    public async Task Create_WithRemovedCreditCardType_ReturnsBadRequestAndCreatesNothing(string typeJson)
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(user);
+
+        var json = $$"""
+                     {
+                       "name": "Rewards card",
+                       "type": {{typeJson}},
+                       "initialBalance": 0
+                     }
+                     """;
+
+        var response = await _client.PostAsync(
+            "/api/accounts",
+            new StringContent(json, Encoding.UTF8, "application/json"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.False(await _context.Accounts.AsNoTracking().AnyAsync(a => a.UserId == user.Id));
     }
 
     [Fact]
