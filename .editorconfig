@@ -1,0 +1,6 @@
+root = true
+
+[*.cs]
+# Forces 'dotnet format style' to add braces to single-line conditions
+csharp_prefer_braces = true:suggestion
+dotnet_diagnostic.IDE0011.severity = suggestion

@@ -2,10 +2,17 @@
    "$schema": "https://alirezanet.github.io/Husky.Net/schema.json",
    "tasks": [
       {
+         "name": "add-braces",
+         "group": "pre-commit",
+         "command": "dotnet",
+         "args": ["format", "style", "--severity", "info", "--include", "${staged}"],
+         "include": ["**/*.cs"]
+      },
+      {
          "name": "CSharpier Formatter",
          "group": "pre-commit",
          "command": "dotnet",
-         "args": ["tool", "run", "csharpier", "${staged}"],
+         "args": ["tool", "run", "csharpier", "format", "${staged}"],
          "include": ["**/*.cs"],
          "output": "Always"
       }
