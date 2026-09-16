@@ -7,16 +7,13 @@ namespace PitakaApp.Api.Actions;
 // that count against it inside that window, and assembles the resource. The one place the cycle
 // rule and the sum rule are wired together, so GET /api/budgets/{id} and GET /api/budgets report
 // an identical AmountSpent for the same Budget. See .scratch/budget-cycle-spend/spec.md.
-public class GetBudgetWithSpend
+public class GetBudgetWithSpend(
+    GetBudgetCycle getBudgetCycle,
+    GetBudgetAmountSpent getBudgetAmountSpent
+)
 {
-    private readonly GetBudgetCycle _getBudgetCycle;
-    private readonly GetBudgetAmountSpent _getBudgetAmountSpent;
-
-    public GetBudgetWithSpend(GetBudgetCycle getBudgetCycle, GetBudgetAmountSpent getBudgetAmountSpent)
-    {
-        _getBudgetCycle = getBudgetCycle;
-        _getBudgetAmountSpent = getBudgetAmountSpent;
-    }
+    private readonly GetBudgetCycle _getBudgetCycle = getBudgetCycle;
+    private readonly GetBudgetAmountSpent _getBudgetAmountSpent = getBudgetAmountSpent;
 
     public async Task<BudgetWithSpendResource> ForBudgetAsync(Budget budget)
     {

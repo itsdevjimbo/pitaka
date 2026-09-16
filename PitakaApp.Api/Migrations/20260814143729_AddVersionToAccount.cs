@@ -15,15 +15,14 @@ namespace PitakaApp.Api.Migrations
                 table: "accounts",
                 type: "int unsigned",
                 nullable: false,
-                defaultValue: 0u);
+                defaultValue: 0u
+            );
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropColumn(
-                name: "version",
-                table: "accounts");
+            migrationBuilder.DropColumn(name: "version", table: "accounts");
         }
     }
 }

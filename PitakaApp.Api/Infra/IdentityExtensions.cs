@@ -25,11 +25,14 @@ public static class IdentityExtensions
     // most likely to be "fixed" into a regression by a later contributor.
     public static IServiceCollection AddPitakaIdentity(this IServiceCollection services)
     {
-        services.AddIdentityCore<User>(ConfigureIdentityOptions)
+        services
+            .AddIdentityCore<User>(ConfigureIdentityOptions)
             .AddSignInManager()
             .AddEntityFrameworkStores<PitakaDbContext>()
             .AddDefaultTokenProviders()
-            .AddTokenProvider<ChangeEmailTokenProvider>(ChangeEmailTokenProviderOptions.ProviderName);
+            .AddTokenProvider<ChangeEmailTokenProvider>(
+                ChangeEmailTokenProviderOptions.ProviderName
+            );
 
         // Route only the change-email token through the provider above. Set here rather
         // than in ConfigureIdentityOptions because that method is shared with
@@ -37,15 +40,19 @@ public static class IdentityExtensions
         // providers — pointing it at a name it cannot resolve would be a trap for a
         // future test that reaches GenerateChangeEmailTokenAsync through it.
         services.Configure<IdentityOptions>(o =>
-            o.Tokens.ChangeEmailTokenProvider = ChangeEmailTokenProviderOptions.ProviderName);
+            o.Tokens.ChangeEmailTokenProvider = ChangeEmailTokenProviderOptions.ProviderName
+        );
 
         // The change-email link's lifespan is EmailChangeOption's to set (ADR 0014), not
         // the shared one below. Lazy Configure — same shape as JwtBearerOptions reading
         // IOptions<JwtOption> — so it does not matter that AddEmailSender binds
         // EmailChangeOption after this runs.
-        services.AddOptions<ChangeEmailTokenProviderOptions>()
-            .Configure<IOptions<EmailChangeOption>>((tokenOptions, emailChange) =>
-                tokenOptions.TokenLifespan = emailChange.Value.TokenLifespan);
+        services
+            .AddOptions<ChangeEmailTokenProviderOptions>()
+            .Configure<IOptions<EmailChangeOption>>(
+                (tokenOptions, emailChange) =>
+                    tokenOptions.TokenLifespan = emailChange.Value.TokenLifespan
+            );
 
         // The default key ring lives at ~/.aspnet/DataProtection-Keys — per-machine, and
         // wiped on every container redeploy, which would take every outstanding
@@ -57,7 +64,8 @@ public static class IdentityExtensions
         // wires for password-reset and email-confirmation tokens (change-email now has
         // its own, above). ADR 0014 was the reason to split.
         services.Configure<DataProtectionTokenProviderOptions>(o =>
-            o.TokenLifespan = RegistrationConfirmationTokenLifespan);
+            o.TokenLifespan = RegistrationConfirmationTokenLifespan
+        );
 
         return services;
     }

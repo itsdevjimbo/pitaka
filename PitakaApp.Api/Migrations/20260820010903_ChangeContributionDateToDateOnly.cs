@@ -17,7 +17,8 @@ namespace PitakaApp.Api.Migrations
                 type: "date",
                 nullable: false,
                 oldClrType: typeof(DateTime),
-                oldType: "datetime(6)");
+                oldType: "datetime(6)"
+            );
         }
 
         /// <inheritdoc />
@@ -29,7 +30,8 @@ namespace PitakaApp.Api.Migrations
                 type: "datetime(6)",
                 nullable: false,
                 oldClrType: typeof(DateOnly),
-                oldType: "date");
+                oldType: "date"
+            );
         }
     }
 }

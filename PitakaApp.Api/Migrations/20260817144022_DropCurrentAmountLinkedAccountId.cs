@@ -12,29 +12,23 @@ namespace PitakaApp.Api.Migrations
         {
             migrationBuilder.DropForeignKey(
                 name: "fk_goals_accounts_linked_account_id",
-                table: "goals");
+                table: "goals"
+            );
 
-            migrationBuilder.DropIndex(
-                name: "ix_goals_linked_account_id",
-                table: "goals");
+            migrationBuilder.DropIndex(name: "ix_goals_linked_account_id", table: "goals");
 
-            migrationBuilder.DropColumn(
-                name: "current_amount",
-                table: "goals");
+            migrationBuilder.DropColumn(name: "current_amount", table: "goals");
 
-            migrationBuilder.DropColumn(
-                name: "linked_account_id",
-                table: "goals");
+            migrationBuilder.DropColumn(name: "linked_account_id", table: "goals");
 
             migrationBuilder.CreateIndex(
                 name: "ix_goals_user_id_name",
                 table: "goals",
-                columns: new[] { "user_id", "name" },
-                unique: true);
+                columns: ["user_id", "name"],
+                unique: true
+            );
 
-            migrationBuilder.DropIndex(
-                name: "ix_goals_user_id",
-                table: "goals");
+            migrationBuilder.DropIndex(name: "ix_goals_user_id", table: "goals");
         }
 
         /// <inheritdoc />
@@ -43,36 +37,39 @@ namespace PitakaApp.Api.Migrations
             migrationBuilder.CreateIndex(
                 name: "ix_goals_user_id",
                 table: "goals",
-                column: "user_id");
+                column: "user_id"
+            );
 
-            migrationBuilder.DropIndex(
-                name: "ix_goals_user_id_name",
-                table: "goals");
+            migrationBuilder.DropIndex(name: "ix_goals_user_id_name", table: "goals");
 
             migrationBuilder.AddColumn<decimal>(
                 name: "current_amount",
                 table: "goals",
                 type: "decimal(14,2)",
                 nullable: false,
-                defaultValue: 0m);
+                defaultValue: 0m
+            );
 
             migrationBuilder.AddColumn<int>(
                 name: "linked_account_id",
                 table: "goals",
                 type: "int",
-                nullable: true);
+                nullable: true
+            );
 
             migrationBuilder.CreateIndex(
                 name: "ix_goals_linked_account_id",
                 table: "goals",
-                column: "linked_account_id");
+                column: "linked_account_id"
+            );
 
             migrationBuilder.AddForeignKey(
                 name: "fk_goals_accounts_linked_account_id",
                 table: "goals",
                 column: "linked_account_id",
                 principalTable: "accounts",
-                principalColumn: "id");
+                principalColumn: "id"
+            );
         }
     }
 }

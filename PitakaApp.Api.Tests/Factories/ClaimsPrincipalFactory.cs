@@ -13,9 +13,12 @@ public static class ClaimsPrincipalFactory
     }
 
     public static ClaimsPrincipal WithInvalidUserIdClaim() =>
-        new(new ClaimsIdentity(
-            new[] { new Claim(ClaimTypes.NameIdentifier, "not-a-number") },
-            "TestAuthType"));
+        new(
+            new ClaimsIdentity(
+                [new Claim(ClaimTypes.NameIdentifier, "not-a-number")],
+                "TestAuthType"
+            )
+        );
 
     public static ClaimsPrincipal WithNoClaims() => new(new ClaimsIdentity());
 }

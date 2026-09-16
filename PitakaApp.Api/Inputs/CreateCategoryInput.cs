@@ -2,7 +2,7 @@ using PitakaApp.Api.Enums;
 
 namespace PitakaApp.Api.Inputs;
 
-public record CreateCategoryInput (
+public record CreateCategoryInput(
     string Name,
     CategoryType Type,
     string? Description = null,

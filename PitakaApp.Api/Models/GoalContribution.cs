@@ -11,15 +11,13 @@ public class GoalContribution : TimestampedEntity
     public int? TransactionId { get; set; }
 
     [Column(TypeName = "decimal(14, 2)")]
-
     public required decimal Amount { get; set; }
 
     public required DateOnly ContributionDate { get; set; }
 
     public string? Note { get; set; }
 
-
-    public Account Account {get; set; } = null!;
+    public Account Account { get; set; } = null!;
 
     public Goal Goal { get; set; } = null!;
 

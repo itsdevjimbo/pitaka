@@ -7,8 +7,12 @@ namespace PitakaApp.Api.Tests.Factories;
 public class GoalContributionFactory
 {
     public static GoalContribution Make(
-        int goalId, int accountId, int? transactionId = null, decimal? amount = null, 
-        DateOnly? contributionDate = null, string? note = null
+        int goalId,
+        int accountId,
+        int? transactionId = null,
+        decimal? amount = null,
+        DateOnly? contributionDate = null,
+        string? note = null
     )
     {
         return new GoalContribution
@@ -23,11 +27,23 @@ public class GoalContributionFactory
     }
 
     public static async Task<GoalContribution> CreateAsync(
-        PitakaDbContext context, int goalId, int accountId, int? transactionId = null, 
-        decimal? amount = null, DateOnly? contributionDate = null, string? note = null
+        PitakaDbContext context,
+        int goalId,
+        int accountId,
+        int? transactionId = null,
+        decimal? amount = null,
+        DateOnly? contributionDate = null,
+        string? note = null
     )
     {
-        var goalContribution = Make(goalId, accountId, transactionId, amount, contributionDate, note);
+        var goalContribution = Make(
+            goalId,
+            accountId,
+            transactionId,
+            amount,
+            contributionDate,
+            note
+        );
         context.GoalContributions.Add(goalContribution);
         await context.SaveChangesAsync();
         return goalContribution;

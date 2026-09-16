@@ -5,14 +5,9 @@ using PitakaApp.Api.Models;
 
 namespace PitakaApp.Api.Actions.Auth;
 
-public class GetCurrentUser
+public class GetCurrentUser(PitakaDbContext context)
 {
-    private readonly PitakaDbContext _context;
-
-    public GetCurrentUser(PitakaDbContext context)
-    {
-        _context = context;
-    }
+    private readonly PitakaDbContext _context = context;
 
     public async Task<User?> ExecuteAsync(ClaimsPrincipal principal)
     {
@@ -23,8 +18,6 @@ public class GetCurrentUser
             return null;
         }
 
-        return await _context.Users
-            .AsNoTracking()
-            .FirstOrDefaultAsync(u => u.Id == userId);
+        return await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
     }
 }

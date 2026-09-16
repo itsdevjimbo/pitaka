@@ -1,2 +1,3 @@
 namespace PitakaApp.Api.Inputs;
-public record UpdateAccountInput (string Name );
+
+public record UpdateAccountInput(string Name);

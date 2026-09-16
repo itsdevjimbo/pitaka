@@ -33,9 +33,7 @@ public class User : IdentityUser<int>, ITimestamped
     // out, so redemption and the Profile read agree. Takes the instant rather than
     // reading a clock so the entity stays persistence- and time-source-ignorant.
     public string? PendingEmailAsOf(DateTime utcNow) =>
-        PendingEmail is { } pending
-        && PendingEmailExpiresAt is { } expiresAt
-        && expiresAt > utcNow
+        PendingEmail is { } pending && PendingEmailExpiresAt is { } expiresAt && expiresAt > utcNow
             ? pending
             : null;
 
@@ -43,17 +41,17 @@ public class User : IdentityUser<int>, ITimestamped
 
     public DateTime? UpdatedAt { get; set; }
 
-    public ICollection<Account> Accounts { get; set; } = new List<Account>();
+    public ICollection<Account> Accounts { get; set; } = [];
 
-    public ICollection<Category> Categories { get; set; } = new List<Category>();
+    public ICollection<Category> Categories { get; set; } = [];
 
-    public ICollection<Transaction> Transactions { get; set; } = new List<Transaction>();
+    public ICollection<Transaction> Transactions { get; set; } = [];
 
-    public ICollection<RecurringTransaction> RecurringTransactions { get; set; } = new List<RecurringTransaction>();
+    public ICollection<RecurringTransaction> RecurringTransactions { get; set; } = [];
 
-    public ICollection<Goal> Goals { get; set; } = new List<Goal>();
+    public ICollection<Goal> Goals { get; set; } = [];
 
-    public ICollection<Budget> Budgets { get; set; } = new List<Budget>();
+    public ICollection<Budget> Budgets { get; set; } = [];
 
-    public ICollection<Tag> Tags { get; set; } = new List<Tag>();
+    public ICollection<Tag> Tags { get; set; } = [];
 }

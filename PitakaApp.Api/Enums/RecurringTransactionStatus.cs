@@ -5,5 +5,5 @@ public enum RecurringTransactionStatus
     Active,
     Paused,
     Completed,
-    Cancelled
+    Cancelled,
 }

@@ -9,6 +9,6 @@ public static class TestJsonOptions
     {
         Converters = { new JsonStringEnumConverter() },
 
-        PropertyNameCaseInsensitive = true
+        PropertyNameCaseInsensitive = true,
     };
 }

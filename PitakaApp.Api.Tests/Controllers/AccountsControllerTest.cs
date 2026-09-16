@@ -15,7 +15,6 @@ namespace PitakaApp.Api.Tests.Controllers;
 [Collection("Database collection")]
 public class AccountsControllerTest : IDisposable
 {
-    
     private readonly Faker _faker = new();
     private readonly IServiceScope _scope;
     private readonly PitakaDbContext _context;
@@ -27,7 +26,7 @@ public class AccountsControllerTest : IDisposable
         _context = _scope.ServiceProvider.GetRequiredService<PitakaDbContext>();
         _client = factory.CreateClient();
     }
-    
+
     [Fact]
     public async Task Get_WithoutLoggedInUser_ReturnsUnauthorized()
     {
@@ -45,13 +44,15 @@ public class AccountsControllerTest : IDisposable
         await AccountFactory.CreateAsync(_context, userA.Id);
         await AccountFactory.CreateAsync(_context, userA.Id);
         await AccountFactory.CreateAsync(_context, userA.Id);
-        
+
         _client.ActAsUser(userA);
 
         var response = await _client.GetAsync("/api/accounts");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<List<AccountResource>>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<List<AccountResource>>(
+            TestJsonOptions.Default
+        );
         Assert.All(body!, a => Assert.True(a.UserId == userA.Id));
     }
 
@@ -68,7 +69,9 @@ public class AccountsControllerTest : IDisposable
         var response = await _client.GetAsync("/api/accounts?type=Bank");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<List<AccountResource>>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<List<AccountResource>>(
+            TestJsonOptions.Default
+        );
         Assert.Equal(["Checking"], body!.Select(a => a.Name));
     }
 
@@ -85,7 +88,9 @@ public class AccountsControllerTest : IDisposable
         var response = await _client.GetAsync("/api/accounts?isActive=true");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<List<AccountResource>>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<List<AccountResource>>(
+            TestJsonOptions.Default
+        );
         Assert.Equal(["Active"], body!.Select(a => a.Name));
     }
 
@@ -102,7 +107,9 @@ public class AccountsControllerTest : IDisposable
         var response = await _client.GetAsync("/api/accounts?isActive=false");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<List<AccountResource>>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<List<AccountResource>>(
+            TestJsonOptions.Default
+        );
         Assert.Equal(["Retired"], body!.Select(a => a.Name));
     }
 
@@ -111,16 +118,36 @@ public class AccountsControllerTest : IDisposable
     {
         var user = await UserFactory.CreateAsync(_context);
 
-        await AccountFactory.CreateAsync(_context, user.Id, "Active bank", AccountType.Bank, isActive: true);
-        await AccountFactory.CreateAsync(_context, user.Id, "Retired bank", AccountType.Bank, isActive: false);
-        await AccountFactory.CreateAsync(_context, user.Id, "Active cash", AccountType.Cash, isActive: true);
+        await AccountFactory.CreateAsync(
+            _context,
+            user.Id,
+            "Active bank",
+            AccountType.Bank,
+            isActive: true
+        );
+        await AccountFactory.CreateAsync(
+            _context,
+            user.Id,
+            "Retired bank",
+            AccountType.Bank,
+            isActive: false
+        );
+        await AccountFactory.CreateAsync(
+            _context,
+            user.Id,
+            "Active cash",
+            AccountType.Cash,
+            isActive: true
+        );
 
         _client.ActAsUser(user);
 
         var response = await _client.GetAsync("/api/accounts?type=Bank&isActive=true");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<List<AccountResource>>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<List<AccountResource>>(
+            TestJsonOptions.Default
+        );
         Assert.Equal(["Active bank"], body!.Select(a => a.Name));
     }
 
@@ -135,7 +162,9 @@ public class AccountsControllerTest : IDisposable
         var response = await _client.GetAsync("/api/accounts?type=Investment");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<List<AccountResource>>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<List<AccountResource>>(
+            TestJsonOptions.Default
+        );
         Assert.Empty(body!);
     }
 
@@ -152,7 +181,9 @@ public class AccountsControllerTest : IDisposable
         var response = await _client.GetAsync("/api/accounts");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<List<AccountResource>>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<List<AccountResource>>(
+            TestJsonOptions.Default
+        );
         Assert.Equal(["Active", "Retired"], body!.Select(a => a.Name));
     }
 
@@ -170,7 +201,9 @@ public class AccountsControllerTest : IDisposable
         var response = await _client.GetAsync("/api/accounts?type=Bank");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<List<AccountResource>>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<List<AccountResource>>(
+            TestJsonOptions.Default
+        );
         Assert.Equal(["Apricot", "Zephyr"], body!.Select(a => a.Name));
     }
 
@@ -180,15 +213,29 @@ public class AccountsControllerTest : IDisposable
         var userA = await UserFactory.CreateAsync(_context);
         var userB = await UserFactory.CreateAsync(_context);
 
-        await AccountFactory.CreateAsync(_context, userA.Id, "Mine", AccountType.Bank, isActive: true);
-        await AccountFactory.CreateAsync(_context, userB.Id, "Theirs", AccountType.Bank, isActive: true);
+        await AccountFactory.CreateAsync(
+            _context,
+            userA.Id,
+            "Mine",
+            AccountType.Bank,
+            isActive: true
+        );
+        await AccountFactory.CreateAsync(
+            _context,
+            userB.Id,
+            "Theirs",
+            AccountType.Bank,
+            isActive: true
+        );
 
         _client.ActAsUser(userA);
 
         var response = await _client.GetAsync("/api/accounts?type=Bank&isActive=true");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<List<AccountResource>>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<List<AccountResource>>(
+            TestJsonOptions.Default
+        );
         Assert.Equal(["Mine"], body!.Select(a => a.Name));
     }
 
@@ -228,8 +275,10 @@ public class AccountsControllerTest : IDisposable
         var response = await _client.GetAsync("/api/accounts");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<List<AccountResource>>(TestJsonOptions.Default);
-        Assert.Equal(new[] { "Apricot", "Mango", "Zephyr" }, body!.Select(a => a.Name));
+        var body = await response.Content.ReadFromJsonAsync<List<AccountResource>>(
+            TestJsonOptions.Default
+        );
+        Assert.Equal(["Apricot", "Mango", "Zephyr"], body!.Select(a => a.Name));
     }
 
     [Fact]
@@ -246,21 +295,22 @@ public class AccountsControllerTest : IDisposable
         var response = await _client.GetAsync("/api/accounts");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<List<AccountResource>>(TestJsonOptions.Default);
-        Assert.Equal(new[] { "Alpha", "Bravo", "Charlie" }, body!.Select(a => a.Name));
+        var body = await response.Content.ReadFromJsonAsync<List<AccountResource>>(
+            TestJsonOptions.Default
+        );
+        Assert.Equal(["Alpha", "Bravo", "Charlie"], body!.Select(a => a.Name));
         Assert.False(body!.Single(a => a.Name == "Bravo").IsActive);
     }
 
     [Fact]
     public async Task Create_ValidRequest_ReturnsCreated()
     {
-
         var user = await UserFactory.CreateAsync(_context);
         _client.ActAsUser(user);
-        
+
         var request = new
         {
-            Name =  "Savings account",
+            Name = "Savings account",
             Type = AccountType.Bank,
             InitialBalance = 5000,
         };
@@ -302,10 +352,10 @@ public class AccountsControllerTest : IDisposable
         await AccountFactory.CreateAsync(_context, user.Id, "Savings account");
 
         _client.ActAsUser(user);
-        
+
         var request = new
         {
-            Name =  "Savings account",
+            Name = "Savings account",
             Type = AccountType.Bank,
             InitialBalance = 5000,
         };
@@ -330,7 +380,9 @@ public class AccountsControllerTest : IDisposable
         var response = await _client.PostAsJsonAsync("/api/accounts", request);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<AccountResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<AccountResource>(
+            TestJsonOptions.Default
+        );
         Assert.Equal(5000, body!.InitialBalance);
     }
 
@@ -340,16 +392,14 @@ public class AccountsControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         _client.ActAsUser(user);
 
-        var request = new
-        {
-            Name = "Wallet",
-            Type = AccountType.Cash,
-        };
+        var request = new { Name = "Wallet", Type = AccountType.Cash };
 
         var response = await _client.PostAsJsonAsync("/api/accounts", request);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<AccountResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<AccountResource>(
+            TestJsonOptions.Default
+        );
         Assert.Equal(0, body!.InitialBalance);
         Assert.Equal(0, body.CurrentBalance);
     }
@@ -370,29 +420,34 @@ public class AccountsControllerTest : IDisposable
         var response = await _client.PostAsJsonAsync("/api/accounts", request);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<AccountResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<AccountResource>(
+            TestJsonOptions.Default
+        );
         Assert.Equal(-1200, body!.InitialBalance);
     }
 
     [Theory]
     [InlineData("\"CreditCard\"")]
     [InlineData("2")]
-    public async Task Create_WithRemovedCreditCardType_ReturnsBadRequestAndCreatesNothing(string typeJson)
+    public async Task Create_WithRemovedCreditCardType_ReturnsBadRequestAndCreatesNothing(
+        string typeJson
+    )
     {
         var user = await UserFactory.CreateAsync(_context);
         _client.ActAsUser(user);
 
         var json = $$"""
-                     {
-                       "name": "Rewards card",
-                       "type": {{typeJson}},
-                       "initialBalance": 0
-                     }
-                     """;
+            {
+              "name": "Rewards card",
+              "type": {{typeJson}},
+              "initialBalance": 0
+            }
+            """;
 
         var response = await _client.PostAsync(
             "/api/accounts",
-            new StringContent(json, Encoding.UTF8, "application/json"));
+            new StringContent(json, Encoding.UTF8, "application/json")
+        );
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.False(await _context.Accounts.AsNoTracking().AnyAsync(a => a.UserId == user.Id));
@@ -412,7 +467,9 @@ public class AccountsControllerTest : IDisposable
         var response = await _client.GetAsync("/api/accounts/" + account.Id);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<AccountResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<AccountResource>(
+            TestJsonOptions.Default
+        );
         Assert.Equal(5000, body!.InitialBalance);
         Assert.Equal(3500, body.CurrentBalance);
     }
@@ -421,20 +478,23 @@ public class AccountsControllerTest : IDisposable
     public async Task Update_WithInitialBalanceInBody_DoesNotChangeIt()
     {
         var user = await UserFactory.CreateAsync(_context);
-        var account = await AccountFactory.CreateAsync(_context, user.Id, "Allowance account", initialBalance: 5000);
+        var account = await AccountFactory.CreateAsync(
+            _context,
+            user.Id,
+            "Allowance account",
+            initialBalance: 5000
+        );
 
         _client.ActAsUser(user);
 
-        var request = new
-        {
-            Name = "Savings account",
-            InitialBalance = 999,
-        };
+        var request = new { Name = "Savings account", InitialBalance = 999 };
 
         var response = await _client.PutAsJsonAsync("/api/accounts/" + account.Id, request);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<AccountResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<AccountResource>(
+            TestJsonOptions.Default
+        );
         Assert.Equal("Savings account", body!.Name);
         Assert.Equal(5000, body.InitialBalance);
 
@@ -484,10 +544,7 @@ public class AccountsControllerTest : IDisposable
         await AccountFactory.CreateAsync(_context, user.Id);
 
         _client.ActAsUser(user);
-        var request = new 
-        {
-            Name = "Savings account"
-        };
+        var request = new { Name = "Savings account" };
 
         var response = await _client.PutAsJsonAsync("/api/accounts/9999", request);
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -502,10 +559,7 @@ public class AccountsControllerTest : IDisposable
         var account = await AccountFactory.CreateAsync(_context, userB.Id, "Allowance account");
 
         _client.ActAsUser(userA);
-        var request = new
-        {
-            Name = "Savings account"
-        };
+        var request = new { Name = "Savings account" };
 
         var response = await _client.PutAsJsonAsync("/api/accounts/" + account.Id, request);
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -523,10 +577,7 @@ public class AccountsControllerTest : IDisposable
 
         _client.ActAsUser(user);
 
-        var request = new 
-        {
-            Name = "Savings account"
-        };
+        var request = new { Name = "Savings account" };
 
         var response = await _client.PutAsJsonAsync("/api/accounts/" + account.Id, request);
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
@@ -540,31 +591,29 @@ public class AccountsControllerTest : IDisposable
 
         _client.ActAsUser(user);
 
-        var request = new 
-        {
-            Name = "Savings account"
-        };
+        var request = new { Name = "Savings account" };
 
         var response = await _client.PutAsJsonAsync("/api/accounts/" + account.Id, request);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<AccountResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<AccountResource>(
+            TestJsonOptions.Default
+        );
         Assert.Equal("Savings account", body!.Name);
     }
 
     [Fact]
     public async Task Patch_ActiveStatusWithoutLoggedInUser_ReturnsUnauthorized()
     {
-        
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
 
-        var request = new
-        {
-            IsActive = false
-        };
+        var request = new { IsActive = false };
 
-        var response = await _client.PatchAsJsonAsync("/api/accounts/" + account.Id + "/status", request);
+        var response = await _client.PatchAsJsonAsync(
+            "/api/accounts/" + account.Id + "/status",
+            request
+        );
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
@@ -574,10 +623,7 @@ public class AccountsControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         _client.ActAsUser(user);
 
-        var request = new
-        {
-            IsActive = false
-        };
+        var request = new { IsActive = false };
 
         var response = await _client.PatchAsJsonAsync("/api/accounts/999999/status", request);
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -592,12 +638,12 @@ public class AccountsControllerTest : IDisposable
 
         _client.ActAsUser(userA);
 
-        var request = new
-        {
-            IsActive = false
-        };
+        var request = new { IsActive = false };
 
-        var response = await _client.PatchAsJsonAsync("/api/accounts/" + accountB.Id + "/status", request);
+        var response = await _client.PatchAsJsonAsync(
+            "/api/accounts/" + accountB.Id + "/status",
+            request
+        );
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
 
         var stored = await _context.Accounts.AsNoTracking().SingleAsync(a => a.Id == accountB.Id);
@@ -612,15 +658,17 @@ public class AccountsControllerTest : IDisposable
 
         _client.ActAsUser(user);
 
-        var request = new
-        {
-            IsActive = false
-        };
+        var request = new { IsActive = false };
 
-        var response = await _client.PatchAsJsonAsync("/api/accounts/" + account.Id + "/status", request);
+        var response = await _client.PatchAsJsonAsync(
+            "/api/accounts/" + account.Id + "/status",
+            request
+        );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<AccountResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<AccountResource>(
+            TestJsonOptions.Default
+        );
         Assert.False(body!.IsActive);
     }
 
@@ -632,13 +680,21 @@ public class AccountsControllerTest : IDisposable
 
         _client.ActAsUser(user);
 
-        var response = await _client.PatchAsJsonAsync("/api/accounts/" + account.Id + "/status", new { IsActive = false });
+        var response = await _client.PatchAsJsonAsync(
+            "/api/accounts/" + account.Id + "/status",
+            new { IsActive = false }
+        );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<AccountResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<AccountResource>(
+            TestJsonOptions.Default
+        );
         Assert.False(body!.IsActive);
 
-        response = await _client.PatchAsJsonAsync("/api/accounts/" + account.Id + "/status", new { IsActive = true });
+        response = await _client.PatchAsJsonAsync(
+            "/api/accounts/" + account.Id + "/status",
+            new { IsActive = true }
+        );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         body = await response.Content.ReadFromJsonAsync<AccountResource>(TestJsonOptions.Default);
@@ -655,7 +711,10 @@ public class AccountsControllerTest : IDisposable
 
         // An empty body leaves IsActive unspecified. Before RespectRequiredConstructorParameters
         // it bound to default(bool) == false and retired the account. See issue #82.
-        var response = await _client.PatchAsJsonAsync("/api/accounts/" + account.Id + "/status", new { });
+        var response = await _client.PatchAsJsonAsync(
+            "/api/accounts/" + account.Id + "/status",
+            new { }
+        );
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
         var stored = await _context.Accounts.AsNoTracking().SingleAsync(a => a.Id == account.Id);
@@ -726,7 +785,14 @@ public class AccountsControllerTest : IDisposable
         var userB = await UserFactory.CreateAsync(_context);
         var accountA = await AccountFactory.CreateAsync(_context, userA.Id);
         var accountB = await AccountFactory.CreateAsync(_context, userB.Id);
-        await TransactionFactory.CreateAsync(_context, userB.Id, accountB.Id, TransactionType.Transfer, amount: 100, transferToAccountId: accountA.Id);
+        await TransactionFactory.CreateAsync(
+            _context,
+            userB.Id,
+            accountB.Id,
+            TransactionType.Transfer,
+            amount: 100,
+            transferToAccountId: accountA.Id
+        );
 
         _client.ActAsUser(userA);
 
@@ -812,8 +878,10 @@ public class AccountsControllerTest : IDisposable
 
         var response = await _client.GetAsync("/api/accounts/" + account.Id + "/transactions");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        
-        var body = await response.Content.ReadFromJsonAsync<List<TransactionResource>>(TestJsonOptions.Default);
+
+        var body = await response.Content.ReadFromJsonAsync<List<TransactionResource>>(
+            TestJsonOptions.Default
+        );
         Assert.Equal(3, body!.Count);
     }
 
@@ -825,7 +893,12 @@ public class AccountsControllerTest : IDisposable
         var destination = await AccountFactory.CreateAsync(_context, user.Id);
 
         var transfer = await TransactionFactory.CreateAsync(
-            _context, user.Id, source.Id, TransactionType.Transfer, amount: 500, transferToAccountId: destination.Id
+            _context,
+            user.Id,
+            source.Id,
+            TransactionType.Transfer,
+            amount: 500,
+            transferToAccountId: destination.Id
         );
 
         _client.ActAsUser(user);
@@ -833,7 +906,9 @@ public class AccountsControllerTest : IDisposable
         var response = await _client.GetAsync("/api/accounts/" + destination.Id + "/transactions");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<List<TransactionResource>>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<List<TransactionResource>>(
+            TestJsonOptions.Default
+        );
         var received = Assert.Single(body!);
         Assert.Equal(transfer.Id, received.Id);
         Assert.Equal(source.Id, received.AccountId);
@@ -848,7 +923,12 @@ public class AccountsControllerTest : IDisposable
         var destination = await AccountFactory.CreateAsync(_context, user.Id);
 
         var transfer = await TransactionFactory.CreateAsync(
-            _context, user.Id, source.Id, TransactionType.Transfer, amount: 500, transferToAccountId: destination.Id
+            _context,
+            user.Id,
+            source.Id,
+            TransactionType.Transfer,
+            amount: 500,
+            transferToAccountId: destination.Id
         );
 
         _client.ActAsUser(user);
@@ -856,7 +936,9 @@ public class AccountsControllerTest : IDisposable
         var response = await _client.GetAsync("/api/accounts/" + source.Id + "/transactions");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<List<TransactionResource>>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<List<TransactionResource>>(
+            TestJsonOptions.Default
+        );
         var sent = Assert.Single(body!);
         Assert.Equal(transfer.Id, sent.Id);
     }
@@ -870,7 +952,12 @@ public class AccountsControllerTest : IDisposable
         var bystander = await AccountFactory.CreateAsync(_context, user.Id);
 
         await TransactionFactory.CreateAsync(
-            _context, user.Id, source.Id, TransactionType.Transfer, amount: 500, transferToAccountId: destination.Id
+            _context,
+            user.Id,
+            source.Id,
+            TransactionType.Transfer,
+            amount: 500,
+            transferToAccountId: destination.Id
         );
 
         _client.ActAsUser(user);
@@ -878,7 +965,9 @@ public class AccountsControllerTest : IDisposable
         var response = await _client.GetAsync("/api/accounts/" + bystander.Id + "/transactions");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<List<TransactionResource>>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<List<TransactionResource>>(
+            TestJsonOptions.Default
+        );
         Assert.Empty(body!);
     }
 

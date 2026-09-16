@@ -3,17 +3,11 @@ using PitakaApp.Api.Inputs;
 
 namespace PitakaApp.Api.Requests;
 
-public record UpdateCategoryRequest (
-    [Required, MaxLength(255)]
-    string Name,
-
+public record UpdateCategoryRequest(
+    [Required, MaxLength(255)] string Name,
     string? Description = null,
-
-    [MaxLength(100)]
-    string? Icon = null,
-
-    [MaxLength(100)]
-    string? Color = null
+    [MaxLength(100)] string? Icon = null,
+    [MaxLength(100)] string? Color = null
 )
 {
     public UpdateCategoryInput ToInput() =>

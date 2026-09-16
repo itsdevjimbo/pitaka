@@ -1,6 +1,3 @@
 namespace PitakaApp.Api.Inputs;
 
-public record LoginInput (
-    string Email,
-    string Password
-);
+public record LoginInput(string Email, string Password);

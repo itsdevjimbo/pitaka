@@ -16,18 +16,19 @@ public enum RegisterOutcome
 // User is populated only when Outcome is Succeeded; Errors only when Failed. EmailTaken
 // carries no errors — the controller's wording for that path predates the store and
 // does not come from it.
-public record RegisterResult(RegisterOutcome Outcome, User? User = null, IEnumerable<IdentityError>? Errors = null);
+public record RegisterResult(
+    RegisterOutcome Outcome,
+    User? User = null,
+    IEnumerable<IdentityError>? Errors = null
+);
 
-public class RegisterUser
+public class RegisterUser(
+    UserManager<User> userManager,
+    SendEmailConfirmation sendEmailConfirmation
+)
 {
-    private readonly UserManager<User> _userManager;
-    private readonly SendEmailConfirmation _sendEmailConfirmation;
-
-    public RegisterUser(UserManager<User> userManager, SendEmailConfirmation sendEmailConfirmation)
-    {
-        _userManager = userManager;
-        _sendEmailConfirmation = sendEmailConfirmation;
-    }
+    private readonly UserManager<User> _userManager = userManager;
+    private readonly SendEmailConfirmation _sendEmailConfirmation = sendEmailConfirmation;
 
     public async Task<RegisterResult> ExecuteAsync(RegisterInput input)
     {
@@ -48,7 +49,9 @@ public class RegisterUser
                 // Anything else the store rejects — a validator added after this
                 // comment included — comes back as its own errors instead of silently
                 // reusing "email already exists".
-                var isDuplicate = result.Errors.Any(e => e.Code is "DuplicateUserName" or "DuplicateEmail");
+                var isDuplicate = result.Errors.Any(e =>
+                    e.Code is "DuplicateUserName" or "DuplicateEmail"
+                );
 
                 return isDuplicate
                     ? new RegisterResult(RegisterOutcome.EmailTaken)

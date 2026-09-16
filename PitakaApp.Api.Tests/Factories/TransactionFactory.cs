@@ -7,8 +7,8 @@ namespace PitakaApp.Api.Tests.Factories;
 public class TransactionFactory
 {
     public static Transaction Make(
-        int userId, 
-        int accountId, 
+        int userId,
+        int accountId,
         TransactionType type = TransactionType.Income,
         decimal amount = 100,
         int? categoryId = null,
@@ -16,7 +16,8 @@ public class TransactionFactory
         string? description = null,
         DateTime? transactionDate = null,
         int? recurringTransactionId = null
-    ) => new Transaction
+    ) =>
+        new()
         {
             UserId = userId,
             AccountId = accountId,
@@ -26,13 +27,13 @@ public class TransactionFactory
             TransferToAccountId = transferToAccountId,
             Description = description,
             TransactionDate = transactionDate ?? DateTime.UtcNow,
-            RecurringTransactionId = recurringTransactionId
+            RecurringTransactionId = recurringTransactionId,
         };
 
     public static async Task<Transaction> CreateAsync(
         PitakaDbContext context,
-        int userId, 
-        int accountId, 
+        int userId,
+        int accountId,
         TransactionType type = TransactionType.Income,
         decimal amount = 100,
         int? categoryId = null,
@@ -43,10 +44,17 @@ public class TransactionFactory
     )
     {
         var transaction = Make(
-            userId, accountId, type, amount, categoryId, transferToAccountId, 
-            description, transactionDate, recurringTransactionId
+            userId,
+            accountId,
+            type,
+            amount,
+            categoryId,
+            transferToAccountId,
+            description,
+            transactionDate,
+            recurringTransactionId
         );
-        
+
         context.Transactions.Add(transaction);
         await context.SaveChangesAsync();
 

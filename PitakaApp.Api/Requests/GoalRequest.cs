@@ -3,16 +3,11 @@ using PitakaApp.Api.Inputs;
 
 namespace PitakaApp.Api.Requests;
 
-public record GoalRequest (
-    [Required, MaxLength(255)]
-    string Name,
-
-    [Required, Range(typeof(decimal), "0.01", "999999999999.99")]
-    decimal TargetAmount,
-    
+public record GoalRequest(
+    [Required, MaxLength(255)] string Name,
+    [Required, Range(typeof(decimal), "0.01", "999999999999.99")] decimal TargetAmount,
     DateOnly? TargetDate = null
 )
 {
-    public GoalInput ToInput() =>
-        new(Name, TargetAmount, TargetDate);
+    public GoalInput ToInput() => new(Name, TargetAmount, TargetDate);
 }

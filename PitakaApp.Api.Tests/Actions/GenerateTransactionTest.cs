@@ -3,12 +3,17 @@ using PitakaApp.Api.Enums;
 using PitakaApp.Api.Tests.Factories;
 
 namespace PitakaApp.Api.Tests.Actions;
+
 public class GenerateTransactionTest
 {
     [Fact]
     public void Generate_TypeIncome_MapsToTransactionTypeIncome()
     {
-        var recurringTransaction = RecurringTransactionFactory.Make(1, 2, type: RecurringTransactionType.Income);
+        var recurringTransaction = RecurringTransactionFactory.Make(
+            1,
+            2,
+            type: RecurringTransactionType.Income
+        );
 
         var transactionDate = recurringTransaction.NextRunDate.ToDateTime(TimeOnly.MinValue);
         var transaction = GenerateTransaction.GetTransaction(recurringTransaction, transactionDate);
@@ -19,7 +24,11 @@ public class GenerateTransactionTest
     [Fact]
     public void Generate_TypeExpense_MapsToTransactionTypeExpense()
     {
-        var recurringTransaction = RecurringTransactionFactory.Make(1, 2, type: RecurringTransactionType.Expense);
+        var recurringTransaction = RecurringTransactionFactory.Make(
+            1,
+            2,
+            type: RecurringTransactionType.Expense
+        );
 
         var transactionDate = recurringTransaction.NextRunDate.ToDateTime(TimeOnly.MinValue);
         var transaction = GenerateTransaction.GetTransaction(recurringTransaction, transactionDate);
@@ -31,12 +40,14 @@ public class GenerateTransactionTest
     public void Generate_WithInvalidType_ThrowsInvalidOperationException()
     {
         var recurringTransaction = RecurringTransactionFactory.Make(
-            1, 2, type: (RecurringTransactionType)999
+            1,
+            2,
+            type: (RecurringTransactionType)999
         );
 
         var transactionDate = recurringTransaction.NextRunDate.ToDateTime(TimeOnly.MinValue);
-        Assert.Throws<InvalidOperationException>(
-            () => GenerateTransaction.GetTransaction(recurringTransaction, transactionDate)
+        Assert.Throws<InvalidOperationException>(() =>
+            GenerateTransaction.GetTransaction(recurringTransaction, transactionDate)
         );
     }
 

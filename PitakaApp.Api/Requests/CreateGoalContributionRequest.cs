@@ -7,21 +7,12 @@ namespace PitakaApp.Api.Requests;
 // default: with RespectRequiredConstructorParameters on, a parameter without a default
 // is mandatory in the body. GoalId, AccountId, Amount and ContributionDate are the
 // four a contribution cannot be recorded without. See ADR 0009.
-public record CreateGoalContributionRequest (
-    [Required]
-    int GoalId,
-
-    [Required]
-    int AccountId,
-
-    [Required, Range(typeof(decimal), "0.01", "999999999999.99")]
-    decimal Amount,
-
-    [Required]
-    DateOnly ContributionDate,
-
+public record CreateGoalContributionRequest(
+    [Required] int GoalId,
+    [Required] int AccountId,
+    [Required, Range(typeof(decimal), "0.01", "999999999999.99")] decimal Amount,
+    [Required] DateOnly ContributionDate,
     int? TransactionId = null,
-
     string? Note = null
 )
 {

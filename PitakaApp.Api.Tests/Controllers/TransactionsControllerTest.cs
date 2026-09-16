@@ -25,7 +25,7 @@ public class TransactionsControllerTest : IDisposable
         _context = _scope.ServiceProvider.GetRequiredService<PitakaDbContext>();
         _client = factory.CreateClient();
     }
-    
+
     [Fact]
     public async Task Get_WithoutLoggedInUser_ReturnsUnauthorized()
     {
@@ -45,13 +45,15 @@ public class TransactionsControllerTest : IDisposable
         await TransactionFactory.CreateAsync(_context, userA.Id, accountA.Id);
         await TransactionFactory.CreateAsync(_context, userA.Id, accountA.Id);
         await TransactionFactory.CreateAsync(_context, userA.Id, accountA.Id);
-        
+
         _client.ActAsUser(userA);
 
         var response = await _client.GetAsync("/api/transactions");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(
+            TestJsonOptions.Default
+        );
         Assert.Equal(3, body!.Data.Count);
         Assert.Equal(3, body!.TotalCount);
     }
@@ -62,19 +64,37 @@ public class TransactionsControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
 
-        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: new DateTime(2026, 4, 2));
-        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: new DateTime(2026, 9, 15));
-        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: new DateTime(2026, 2, 20));
+        await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            transactionDate: new DateTime(2026, 4, 2)
+        );
+        await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            transactionDate: new DateTime(2026, 9, 15)
+        );
+        await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            transactionDate: new DateTime(2026, 2, 20)
+        );
 
         _client.ActAsUser(user);
 
         var response = await _client.GetAsync("/api/transactions");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(
+            TestJsonOptions.Default
+        );
         Assert.Equal(
-            new[] { new DateTime(2026, 9, 15), new DateTime(2026, 4, 2), new DateTime(2026, 2, 20) },
-            body!.Data.Select(t => t.TransactionDate.Date));
+            [new DateTime(2026, 9, 15), new DateTime(2026, 4, 2), new DateTime(2026, 2, 20)],
+            body!.Data.Select(t => t.TransactionDate.Date)
+        );
     }
 
     [Fact]
@@ -83,18 +103,35 @@ public class TransactionsControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
 
-        var later = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: new DateTime(2026, 6, 3));
-        var earlier = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: new DateTime(2026, 5, 31));
+        var later = await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            transactionDate: new DateTime(2026, 6, 3)
+        );
+        var earlier = await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            transactionDate: new DateTime(2026, 5, 31)
+        );
         // Entered last, but dated between the two above — it must not land at the bottom.
-        var backDated = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: new DateTime(2026, 6, 1));
+        var backDated = await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            transactionDate: new DateTime(2026, 6, 1)
+        );
 
         _client.ActAsUser(user);
 
         var response = await _client.GetAsync("/api/transactions");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
-        Assert.Equal(new[] { later.Id, backDated.Id, earlier.Id }, body!.Data.Select(t => t.Id));
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(
+            TestJsonOptions.Default
+        );
+        Assert.Equal([later.Id, backDated.Id, earlier.Id], body!.Data.Select(t => t.Id));
     }
 
     [Fact]
@@ -104,16 +141,28 @@ public class TransactionsControllerTest : IDisposable
         var account = await AccountFactory.CreateAsync(_context, user.Id);
 
         var sameDate = new DateTime(2026, 7, 7);
-        var first = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: sameDate);
-        var second = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: sameDate);
+        var first = await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            transactionDate: sameDate
+        );
+        var second = await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            transactionDate: sameDate
+        );
 
         _client.ActAsUser(user);
 
         var response = await _client.GetAsync("/api/transactions");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
-        Assert.Equal(new[] { second.Id, first.Id }, body!.Data.Select(t => t.Id));
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(
+            TestJsonOptions.Default
+        );
+        Assert.Equal([second.Id, first.Id], body!.Data.Select(t => t.Id));
     }
 
     [Fact]
@@ -124,23 +173,51 @@ public class TransactionsControllerTest : IDisposable
         var otherAccount = await AccountFactory.CreateAsync(_context, user.Id);
 
         // Noise on another account — must not appear in the scoped list.
-        await TransactionFactory.CreateAsync(_context, user.Id, otherAccount.Id, transactionDate: new DateTime(2026, 12, 1));
+        await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            otherAccount.Id,
+            transactionDate: new DateTime(2026, 12, 1)
+        );
 
         var sharedDate = new DateTime(2026, 8, 8);
-        var middle = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: new DateTime(2026, 6, 15));
-        var newestLowId = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: sharedDate);
-        var oldest = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: new DateTime(2026, 1, 20));
-        var newestHighId = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: sharedDate);
+        var middle = await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            transactionDate: new DateTime(2026, 6, 15)
+        );
+        var newestLowId = await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            transactionDate: sharedDate
+        );
+        var oldest = await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            transactionDate: new DateTime(2026, 1, 20)
+        );
+        var newestHighId = await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            transactionDate: sharedDate
+        );
 
         _client.ActAsUser(user);
 
         var response = await _client.GetAsync("/api/accounts/" + account.Id + "/transactions");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<List<TransactionResource>>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<List<TransactionResource>>(
+            TestJsonOptions.Default
+        );
         Assert.Equal(
-            new[] { newestHighId.Id, newestLowId.Id, middle.Id, oldest.Id },
-            body!.Select(t => t.Id));
+            [newestHighId.Id, newestLowId.Id, middle.Id, oldest.Id],
+            body!.Select(t => t.Id)
+        );
     }
 
     [Fact]
@@ -159,7 +236,9 @@ public class TransactionsControllerTest : IDisposable
         var response = await _client.GetAsync("/api/transactions");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(
+            TestJsonOptions.Default
+        );
         Assert.Equal(1, body!.Page);
         Assert.Equal(50, body!.PageSize);
         Assert.Equal(3, body!.TotalCount);
@@ -180,7 +259,9 @@ public class TransactionsControllerTest : IDisposable
         _client.ActAsUser(user);
 
         var response = await _client.GetAsync("/api/transactions?pageSize=2");
-        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(
+            TestJsonOptions.Default
+        );
 
         Assert.Equal(2, body!.Data.Count);
         Assert.Equal(4, body!.TotalCount);
@@ -196,26 +277,54 @@ public class TransactionsControllerTest : IDisposable
         // Seeded oldest-first so insertion order is the opposite of the expected order.
         // midA and midB share a date, so only the Id tiebreak orders them — and with
         // pageSize 2 they straddle the page-1/page-2 boundary.
-        var oldest = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: new DateTime(2026, 1, 1));
-        var older = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: new DateTime(2026, 2, 1));
-        var midA = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: shared);
-        var midB = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: shared);
-        var newest = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: new DateTime(2026, 5, 1));
+        var oldest = await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            transactionDate: new DateTime(2026, 1, 1)
+        );
+        var older = await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            transactionDate: new DateTime(2026, 2, 1)
+        );
+        var midA = await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            transactionDate: shared
+        );
+        var midB = await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            transactionDate: shared
+        );
+        var newest = await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            transactionDate: new DateTime(2026, 5, 1)
+        );
 
         _client.ActAsUser(user);
 
-        var page1 = await (await _client.GetAsync("/api/transactions?page=1&pageSize=2"))
-            .Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
-        var page2 = await (await _client.GetAsync("/api/transactions?page=2&pageSize=2"))
-            .Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
-        var page3 = await (await _client.GetAsync("/api/transactions?page=3&pageSize=2"))
-            .Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+        var page1 = await (
+            await _client.GetAsync("/api/transactions?page=1&pageSize=2")
+        ).Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+        var page2 = await (
+            await _client.GetAsync("/api/transactions?page=2&pageSize=2")
+        ).Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+        var page3 = await (
+            await _client.GetAsync("/api/transactions?page=3&pageSize=2")
+        ).Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
 
         // Full order: newest, midB (higher Id), midA, older, oldest.
-        Assert.Equal(new[] { newest.Id, midB.Id }, page1!.Data.Select(t => t.Id));
-        Assert.Equal(new[] { midA.Id, older.Id }, page2!.Data.Select(t => t.Id));
-        Assert.Equal(new[] { oldest.Id }, page3!.Data.Select(t => t.Id));
-        Assert.All(new[] { page1, page2, page3 }, p => Assert.Equal(5, p!.TotalCount));
+        Assert.Equal([newest.Id, midB.Id], page1!.Data.Select(t => t.Id));
+        Assert.Equal([midA.Id, older.Id], page2!.Data.Select(t => t.Id));
+        Assert.Equal([oldest.Id], page3!.Data.Select(t => t.Id));
+        Assert.All([page1, page2, page3], p => Assert.Equal(5, p!.TotalCount));
     }
 
     [Fact]
@@ -232,7 +341,9 @@ public class TransactionsControllerTest : IDisposable
         _client.ActAsUser(user);
 
         var response = await _client.GetAsync("/api/transactions");
-        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(
+            TestJsonOptions.Default
+        );
 
         Assert.Equal(50, body!.Data.Count);
         Assert.Equal(50, body!.PageSize);
@@ -252,7 +363,9 @@ public class TransactionsControllerTest : IDisposable
         var response = await _client.GetAsync("/api/transactions?page=2000000000&pageSize=200");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(
+            TestJsonOptions.Default
+        );
         Assert.Empty(body!.Data);
         Assert.Equal(1, body!.TotalCount);
     }
@@ -270,7 +383,9 @@ public class TransactionsControllerTest : IDisposable
         var response = await _client.GetAsync("/api/transactions?page=5&pageSize=10");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(
+            TestJsonOptions.Default
+        );
         Assert.Empty(body!.Data);
         Assert.Equal(1, body!.TotalCount);
     }
@@ -284,17 +399,26 @@ public class TransactionsControllerTest : IDisposable
 
         var onAccount = await TransactionFactory.CreateAsync(_context, user.Id, wanted.Id);
         var transferIn = await TransactionFactory.CreateAsync(
-            _context, user.Id, other.Id, type: TransactionType.Transfer, transferToAccountId: wanted.Id);
+            _context,
+            user.Id,
+            other.Id,
+            type: TransactionType.Transfer,
+            transferToAccountId: wanted.Id
+        );
         // Noise: entirely on the other account.
         await TransactionFactory.CreateAsync(_context, user.Id, other.Id);
 
         _client.ActAsUser(user);
 
         var response = await _client.GetAsync("/api/transactions?accountId=" + wanted.Id);
-        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(
+            TestJsonOptions.Default
+        );
 
-        Assert.Equal(new[] { transferIn.Id, onAccount.Id }.OrderByDescending(x => x),
-            body!.Data.Select(t => t.Id).OrderByDescending(x => x));
+        Assert.Equal(
+            new[] { transferIn.Id, onAccount.Id }.OrderByDescending(x => x),
+            body!.Data.Select(t => t.Id).OrderByDescending(x => x)
+        );
         Assert.Equal(2, body!.TotalCount);
         Assert.Single(body!.Data, t => t.Id == transferIn.Id);
     }
@@ -307,17 +431,29 @@ public class TransactionsControllerTest : IDisposable
         var other = await AccountFactory.CreateAsync(_context, user.Id);
         var category = await CategoryFactory.CreateAsync(_context, user.Id);
 
-        var matched = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, categoryId: category.Id);
+        var matched = await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            categoryId: category.Id
+        );
         await TransactionFactory.CreateAsync(_context, user.Id, account.Id);
         await TransactionFactory.CreateAsync(
-            _context, user.Id, account.Id, type: TransactionType.Transfer, transferToAccountId: other.Id);
+            _context,
+            user.Id,
+            account.Id,
+            type: TransactionType.Transfer,
+            transferToAccountId: other.Id
+        );
 
         _client.ActAsUser(user);
 
         var response = await _client.GetAsync("/api/transactions?categoryId=" + category.Id);
-        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(
+            TestJsonOptions.Default
+        );
 
-        Assert.Equal(new[] { matched.Id }, body!.Data.Select(t => t.Id));
+        Assert.Equal([matched.Id], body!.Data.Select(t => t.Id));
         Assert.Equal(1, body!.TotalCount);
     }
 
@@ -327,15 +463,27 @@ public class TransactionsControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
 
-        var expense = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, type: TransactionType.Expense);
-        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, type: TransactionType.Income);
+        var expense = await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            type: TransactionType.Expense
+        );
+        await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            type: TransactionType.Income
+        );
 
         _client.ActAsUser(user);
 
         var response = await _client.GetAsync("/api/transactions?type=Expense");
-        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(
+            TestJsonOptions.Default
+        );
 
-        Assert.Equal(new[] { expense.Id }, body!.Data.Select(t => t.Id));
+        Assert.Equal([expense.Id], body!.Data.Select(t => t.Id));
         Assert.Equal(1, body!.TotalCount);
     }
 
@@ -347,16 +495,33 @@ public class TransactionsControllerTest : IDisposable
         var other = await AccountFactory.CreateAsync(_context, user.Id);
 
         var transfer = await TransactionFactory.CreateAsync(
-            _context, user.Id, account.Id, type: TransactionType.Transfer, transferToAccountId: other.Id);
-        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, type: TransactionType.Income);
-        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, type: TransactionType.Expense);
+            _context,
+            user.Id,
+            account.Id,
+            type: TransactionType.Transfer,
+            transferToAccountId: other.Id
+        );
+        await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            type: TransactionType.Income
+        );
+        await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            type: TransactionType.Expense
+        );
 
         _client.ActAsUser(user);
 
         var response = await _client.GetAsync("/api/transactions?type=Transfer");
-        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(
+            TestJsonOptions.Default
+        );
 
-        Assert.Equal(new[] { transfer.Id }, body!.Data.Select(t => t.Id));
+        Assert.Equal([transfer.Id], body!.Data.Select(t => t.Id));
         Assert.Equal(1, body!.TotalCount);
     }
 
@@ -366,16 +531,33 @@ public class TransactionsControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
 
-        var before = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: new DateTime(2026, 4, 30));
-        var atBoundary = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: new DateTime(2026, 5, 1));
-        var after = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: new DateTime(2026, 5, 2));
+        var before = await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            transactionDate: new DateTime(2026, 4, 30)
+        );
+        var atBoundary = await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            transactionDate: new DateTime(2026, 5, 1)
+        );
+        var after = await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            transactionDate: new DateTime(2026, 5, 2)
+        );
 
         _client.ActAsUser(user);
 
         var response = await _client.GetAsync("/api/transactions?from=2026-05-01T00:00:00Z");
-        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(
+            TestJsonOptions.Default
+        );
 
-        Assert.Equal(new[] { after.Id, atBoundary.Id }, body!.Data.Select(t => t.Id));
+        Assert.Equal([after.Id, atBoundary.Id], body!.Data.Select(t => t.Id));
         Assert.Equal(2, body!.TotalCount);
     }
 
@@ -385,16 +567,33 @@ public class TransactionsControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
 
-        var before = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: new DateTime(2026, 5, 31));
-        var atBoundary = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: new DateTime(2026, 6, 1));
-        var after = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: new DateTime(2026, 6, 2));
+        var before = await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            transactionDate: new DateTime(2026, 5, 31)
+        );
+        var atBoundary = await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            transactionDate: new DateTime(2026, 6, 1)
+        );
+        var after = await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            transactionDate: new DateTime(2026, 6, 2)
+        );
 
         _client.ActAsUser(user);
 
         var response = await _client.GetAsync("/api/transactions?to=2026-06-01T00:00:00Z");
-        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(
+            TestJsonOptions.Default
+        );
 
-        Assert.Equal(new[] { before.Id }, body!.Data.Select(t => t.Id));
+        Assert.Equal([before.Id], body!.Data.Select(t => t.Id));
         Assert.Equal(1, body!.TotalCount);
     }
 
@@ -404,17 +603,41 @@ public class TransactionsControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
 
-        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: new DateTime(2026, 4, 15));
-        var inMay1 = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: new DateTime(2026, 5, 1));
-        var inMay2 = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: new DateTime(2026, 5, 20));
-        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, transactionDate: new DateTime(2026, 6, 1));
+        await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            transactionDate: new DateTime(2026, 4, 15)
+        );
+        var inMay1 = await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            transactionDate: new DateTime(2026, 5, 1)
+        );
+        var inMay2 = await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            transactionDate: new DateTime(2026, 5, 20)
+        );
+        await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            transactionDate: new DateTime(2026, 6, 1)
+        );
 
         _client.ActAsUser(user);
 
-        var response = await _client.GetAsync("/api/transactions?from=2026-05-01T00:00:00Z&to=2026-06-01T00:00:00Z");
-        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+        var response = await _client.GetAsync(
+            "/api/transactions?from=2026-05-01T00:00:00Z&to=2026-06-01T00:00:00Z"
+        );
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(
+            TestJsonOptions.Default
+        );
 
-        Assert.Equal(new[] { inMay2.Id, inMay1.Id }, body!.Data.Select(t => t.Id));
+        Assert.Equal([inMay2.Id, inMay1.Id], body!.Data.Select(t => t.Id));
         Assert.Equal(2, body!.TotalCount);
     }
 
@@ -425,16 +648,35 @@ public class TransactionsControllerTest : IDisposable
         var account = await AccountFactory.CreateAsync(_context, user.Id);
         var other = await AccountFactory.CreateAsync(_context, user.Id);
 
-        var wanted = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, type: TransactionType.Expense);
-        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, type: TransactionType.Income); // wrong type
-        await TransactionFactory.CreateAsync(_context, user.Id, other.Id, type: TransactionType.Expense);  // wrong account
+        var wanted = await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            type: TransactionType.Expense
+        );
+        await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            type: TransactionType.Income
+        ); // wrong type
+        await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            other.Id,
+            type: TransactionType.Expense
+        ); // wrong account
 
         _client.ActAsUser(user);
 
-        var response = await _client.GetAsync("/api/transactions?accountId=" + account.Id + "&type=Expense");
-        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+        var response = await _client.GetAsync(
+            "/api/transactions?accountId=" + account.Id + "&type=Expense"
+        );
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(
+            TestJsonOptions.Default
+        );
 
-        Assert.Equal(new[] { wanted.Id }, body!.Data.Select(t => t.Id));
+        Assert.Equal([wanted.Id], body!.Data.Select(t => t.Id));
         Assert.Equal(1, body!.TotalCount);
     }
 
@@ -446,17 +688,29 @@ public class TransactionsControllerTest : IDisposable
 
         for (var i = 0; i < 3; i++)
         {
-            await TransactionFactory.CreateAsync(_context, user.Id, account.Id, type: TransactionType.Expense);
+            await TransactionFactory.CreateAsync(
+                _context,
+                user.Id,
+                account.Id,
+                type: TransactionType.Expense
+            );
         }
         for (var i = 0; i < 5; i++)
         {
-            await TransactionFactory.CreateAsync(_context, user.Id, account.Id, type: TransactionType.Income);
+            await TransactionFactory.CreateAsync(
+                _context,
+                user.Id,
+                account.Id,
+                type: TransactionType.Income
+            );
         }
 
         _client.ActAsUser(user);
 
         var response = await _client.GetAsync("/api/transactions?type=Expense&pageSize=2");
-        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(
+            TestJsonOptions.Default
+        );
 
         Assert.Equal(2, body!.Data.Count);
         Assert.Equal(3, body!.TotalCount);
@@ -478,7 +732,9 @@ public class TransactionsControllerTest : IDisposable
         var response = await _client.GetAsync("/api/transactions?accountId=" + strangerAccount.Id);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(
+            TestJsonOptions.Default
+        );
         Assert.Empty(body!.Data);
         Assert.Equal(0, body!.TotalCount);
     }
@@ -489,17 +745,36 @@ public class TransactionsControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
 
-        var upper = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, description: "Weekly COFFEE run");
-        var lower = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, description: "office coffee beans");
-        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, description: "train ticket");
+        var upper = await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            description: "Weekly COFFEE run"
+        );
+        var lower = await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            description: "office coffee beans"
+        );
+        await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            description: "train ticket"
+        );
 
         _client.ActAsUser(user);
 
         var response = await _client.GetAsync("/api/transactions?description=coffee");
-        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(
+            TestJsonOptions.Default
+        );
 
-        Assert.Equal(new[] { lower.Id, upper.Id }.OrderByDescending(x => x),
-            body!.Data.Select(t => t.Id).OrderByDescending(x => x));
+        Assert.Equal(
+            new[] { lower.Id, upper.Id }.OrderByDescending(x => x),
+            body!.Data.Select(t => t.Id).OrderByDescending(x => x)
+        );
         Assert.Equal(2, body!.TotalCount);
     }
 
@@ -509,15 +784,22 @@ public class TransactionsControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
 
-        var noted = await TransactionFactory.CreateAsync(_context, user.Id, account.Id, description: "lunch with Sam");
+        var noted = await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            description: "lunch with Sam"
+        );
         await TransactionFactory.CreateAsync(_context, user.Id, account.Id, description: null);
 
         _client.ActAsUser(user);
 
         var response = await _client.GetAsync("/api/transactions?description=lunch");
-        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(
+            TestJsonOptions.Default
+        );
 
-        Assert.Equal(new[] { noted.Id }, body!.Data.Select(t => t.Id));
+        Assert.Equal([noted.Id], body!.Data.Select(t => t.Id));
         Assert.Equal(1, body!.TotalCount);
     }
 
@@ -529,17 +811,29 @@ public class TransactionsControllerTest : IDisposable
         var category = await CategoryFactory.CreateAsync(_context, user.Id, name: "Groceries");
 
         var matched = await TransactionFactory.CreateAsync(
-            _context, user.Id, account.Id, categoryId: category.Id, description: "weekly groceries");
+            _context,
+            user.Id,
+            account.Id,
+            categoryId: category.Id,
+            description: "weekly groceries"
+        );
         // Same category and account — whose names contain the needle — but a description that does not.
         await TransactionFactory.CreateAsync(
-            _context, user.Id, account.Id, categoryId: category.Id, description: "parking");
+            _context,
+            user.Id,
+            account.Id,
+            categoryId: category.Id,
+            description: "parking"
+        );
 
         _client.ActAsUser(user);
 
         var response = await _client.GetAsync("/api/transactions?description=groceries");
-        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(
+            TestJsonOptions.Default
+        );
 
-        Assert.Equal(new[] { matched.Id }, body!.Data.Select(t => t.Id));
+        Assert.Equal([matched.Id], body!.Data.Select(t => t.Id));
         Assert.Equal(1, body!.TotalCount);
     }
 
@@ -552,19 +846,38 @@ public class TransactionsControllerTest : IDisposable
         for (var i = 0; i < 3; i++)
         {
             await TransactionFactory.CreateAsync(
-                _context, user.Id, account.Id, type: TransactionType.Expense, description: "taxi home");
+                _context,
+                user.Id,
+                account.Id,
+                type: TransactionType.Expense,
+                description: "taxi home"
+            );
         }
         // Right description, wrong type.
         await TransactionFactory.CreateAsync(
-            _context, user.Id, account.Id, type: TransactionType.Income, description: "taxi refund");
+            _context,
+            user.Id,
+            account.Id,
+            type: TransactionType.Income,
+            description: "taxi refund"
+        );
         // Right type, wrong description.
         await TransactionFactory.CreateAsync(
-            _context, user.Id, account.Id, type: TransactionType.Expense, description: "groceries");
+            _context,
+            user.Id,
+            account.Id,
+            type: TransactionType.Expense,
+            description: "groceries"
+        );
 
         _client.ActAsUser(user);
 
-        var response = await _client.GetAsync("/api/transactions?description=taxi&type=Expense&pageSize=2");
-        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+        var response = await _client.GetAsync(
+            "/api/transactions?description=taxi&type=Expense&pageSize=2"
+        );
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(
+            TestJsonOptions.Default
+        );
 
         Assert.Equal(2, body!.Data.Count);
         Assert.Equal(3, body!.TotalCount);
@@ -587,7 +900,9 @@ public class TransactionsControllerTest : IDisposable
         var response = await _client.GetAsync("/api/transactions?" + query);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(
+            TestJsonOptions.Default
+        );
         Assert.Equal(2, body!.TotalCount);
     }
 
@@ -604,7 +919,9 @@ public class TransactionsControllerTest : IDisposable
         var response = await _client.GetAsync("/api/transactions?description=nothingmatchesthis");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(
+            TestJsonOptions.Default
+        );
         Assert.Empty(body!.Data);
         Assert.Equal(0, body!.TotalCount);
     }
@@ -643,7 +960,10 @@ public class TransactionsControllerTest : IDisposable
 
         var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>();
         var messages = problem!.Errors.SelectMany(e => e.Value);
-        Assert.Contains(messages, m => m.Contains("zone designator", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(
+            messages,
+            m => m.Contains("zone designator", StringComparison.OrdinalIgnoreCase)
+        );
     }
 
     // The guard is a model binder wired up by one line in Program.cs. Detach it — delete the
@@ -654,7 +974,9 @@ public class TransactionsControllerTest : IDisposable
     [InlineData("from=2026-09-01T00:00:00")]
     [InlineData("to=2026-09-01T00:00:00")]
     [InlineData("from=2026-09-01T00:00:00&to=2026-10-01T00:00:00")]
-    public async Task Get_FilterBoundWithoutADesignator_IsNeverBoundAsTheServersLocalTime(string query)
+    public async Task Get_FilterBoundWithoutADesignator_IsNeverBoundAsTheServersLocalTime(
+        string query
+    )
     {
         var user = await UserFactory.CreateAsync(_context);
         _client.ActAsUser(user);
@@ -675,8 +997,14 @@ public class TransactionsControllerTest : IDisposable
 
         var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>();
         var messages = problem!.Errors.SelectMany(e => e.Value).ToList();
-        Assert.Contains(messages, m => m.Contains("ISO-8601 timestamp", StringComparison.OrdinalIgnoreCase));
-        Assert.DoesNotContain(messages, m => m.Contains("zone designator", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(
+            messages,
+            m => m.Contains("ISO-8601 timestamp", StringComparison.OrdinalIgnoreCase)
+        );
+        Assert.DoesNotContain(
+            messages,
+            m => m.Contains("zone designator", StringComparison.OrdinalIgnoreCase)
+        );
     }
 
     [Fact]
@@ -686,12 +1014,16 @@ public class TransactionsControllerTest : IDisposable
         _client.ActAsUser(user);
 
         var response = await _client.GetAsync(
-            "/api/transactions?from=2026-09-01T00:00:00%2B08:00&to=2026-09-30T00:00:00-05:00");
+            "/api/transactions?from=2026-09-01T00:00:00%2B08:00&to=2026-09-30T00:00:00-05:00"
+        );
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
         var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>();
         var messages = problem!.Errors.SelectMany(e => e.Value);
-        Assert.Contains(messages, m => m.Contains("name the same zone", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(
+            messages,
+            m => m.Contains("name the same zone", StringComparison.OrdinalIgnoreCase)
+        );
     }
 
     [Fact]
@@ -704,13 +1036,20 @@ public class TransactionsControllerTest : IDisposable
         // Only the zone mismatch is worth saying: the range cannot be ordered until it is in
         // one zone. See ADR 0005.
         var response = await _client.GetAsync(
-            "/api/transactions?from=2026-05-02T00:00:00%2B08:00&to=2026-05-01T00:00:00-05:00");
+            "/api/transactions?from=2026-05-02T00:00:00%2B08:00&to=2026-05-01T00:00:00-05:00"
+        );
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
         var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>();
         var messages = problem!.Errors.SelectMany(e => e.Value).ToList();
-        Assert.Contains(messages, m => m.Contains("name the same zone", StringComparison.OrdinalIgnoreCase));
-        Assert.DoesNotContain(messages, m => m.Contains("strictly earlier", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(
+            messages,
+            m => m.Contains("name the same zone", StringComparison.OrdinalIgnoreCase)
+        );
+        Assert.DoesNotContain(
+            messages,
+            m => m.Contains("strictly earlier", StringComparison.OrdinalIgnoreCase)
+        );
     }
 
     [Fact]
@@ -720,13 +1059,20 @@ public class TransactionsControllerTest : IDisposable
         _client.ActAsUser(user);
 
         var response = await _client.GetAsync(
-            "/api/transactions?from=2026-06-01T00:00:00Z&to=2026-05-01T00:00:00Z");
+            "/api/transactions?from=2026-06-01T00:00:00Z&to=2026-05-01T00:00:00Z"
+        );
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
         var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>();
         var messages = problem!.Errors.SelectMany(e => e.Value).ToList();
-        Assert.Contains(messages, m => m.Contains("strictly earlier", StringComparison.OrdinalIgnoreCase));
-        Assert.DoesNotContain(messages, m => m.Contains("zone designator", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(
+            messages,
+            m => m.Contains("strictly earlier", StringComparison.OrdinalIgnoreCase)
+        );
+        Assert.DoesNotContain(
+            messages,
+            m => m.Contains("zone designator", StringComparison.OrdinalIgnoreCase)
+        );
     }
 
     // --- from/to carry their own offset; each frame is filtered in its own terms (issue #72, ADR 0005) ---
@@ -746,20 +1092,29 @@ public class TransactionsControllerTest : IDisposable
 
         // 02:00 on 1 Sep local (UTC+8) — belongs to local September, stored the previous day in UTC.
         var earlyMorning = await TransactionFactory.CreateAsync(
-            _context, user.Id, account.Id,
-            transactionDate: new DateTime(2026, 8, 31, 18, 0, 0, DateTimeKind.Utc));
+            _context,
+            user.Id,
+            account.Id,
+            transactionDate: new DateTime(2026, 8, 31, 18, 0, 0, DateTimeKind.Utc)
+        );
         // 18:00 on 31 Aug local (UTC+8) — genuinely local August, must not be pulled in.
         await TransactionFactory.CreateAsync(
-            _context, user.Id, account.Id,
-            transactionDate: new DateTime(2026, 8, 31, 10, 0, 0, DateTimeKind.Utc));
+            _context,
+            user.Id,
+            account.Id,
+            transactionDate: new DateTime(2026, 8, 31, 10, 0, 0, DateTimeKind.Utc)
+        );
 
         _client.ActAsUser(user);
 
         var response = await _client.GetAsync(
-            "/api/transactions?from=2026-09-01T00:00:00%2B08:00&to=2026-10-01T00:00:00%2B08:00");
-        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+            "/api/transactions?from=2026-09-01T00:00:00%2B08:00&to=2026-10-01T00:00:00%2B08:00"
+        );
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(
+            TestJsonOptions.Default
+        );
 
-        Assert.Equal(new[] { earlyMorning.Id }, body!.Data.Select(t => t.Id));
+        Assert.Equal([earlyMorning.Id], body!.Data.Select(t => t.Id));
         Assert.Equal(1, body!.TotalCount);
     }
 
@@ -771,53 +1126,76 @@ public class TransactionsControllerTest : IDisposable
 
         // 23:00 on 30 Sep local (UTC-5) — belongs to local September, stored the next day in UTC.
         var lateEvening = await TransactionFactory.CreateAsync(
-            _context, user.Id, account.Id,
-            transactionDate: new DateTime(2026, 10, 1, 4, 0, 0, DateTimeKind.Utc));
+            _context,
+            user.Id,
+            account.Id,
+            transactionDate: new DateTime(2026, 10, 1, 4, 0, 0, DateTimeKind.Utc)
+        );
         // 01:00 on 1 Oct local (UTC-5) — genuinely local October, must not be pulled in.
         await TransactionFactory.CreateAsync(
-            _context, user.Id, account.Id,
-            transactionDate: new DateTime(2026, 10, 1, 6, 0, 0, DateTimeKind.Utc));
+            _context,
+            user.Id,
+            account.Id,
+            transactionDate: new DateTime(2026, 10, 1, 6, 0, 0, DateTimeKind.Utc)
+        );
 
         _client.ActAsUser(user);
 
         var response = await _client.GetAsync(
-            "/api/transactions?from=2026-09-01T00:00:00-05:00&to=2026-10-01T00:00:00-05:00");
-        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+            "/api/transactions?from=2026-09-01T00:00:00-05:00&to=2026-10-01T00:00:00-05:00"
+        );
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(
+            TestJsonOptions.Default
+        );
 
-        Assert.Equal(new[] { lateEvening.Id }, body!.Data.Select(t => t.Id));
+        Assert.Equal([lateEvening.Id], body!.Data.Select(t => t.Id));
         Assert.Equal(1, body!.TotalCount);
     }
 
     [Theory]
     [InlineData("%2B08:00")]
     [InlineData("-05:00")]
-    public async Task Get_FilterRange_GeneratedTransaction_FallsOnTheDayItIsDated_RegardlessOfOffset(string offset)
+    public async Task Get_FilterRange_GeneratedTransaction_FallsOnTheDayItIsDated_RegardlessOfOffset(
+        string offset
+    )
     {
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
         var schedule = await RecurringTransactionFactory.CreateAsync(_context, user.Id, account.Id);
 
         var datedSep1 = await TransactionFactory.CreateAsync(
-            _context, user.Id, account.Id,
+            _context,
+            user.Id,
+            account.Id,
             transactionDate: new DateTime(2026, 9, 1),
-            recurringTransactionId: schedule.Id);
+            recurringTransactionId: schedule.Id
+        );
         // Dated the last day of August and the first of October — neither may leak in.
         await TransactionFactory.CreateAsync(
-            _context, user.Id, account.Id,
+            _context,
+            user.Id,
+            account.Id,
             transactionDate: new DateTime(2026, 8, 31),
-            recurringTransactionId: schedule.Id);
+            recurringTransactionId: schedule.Id
+        );
         await TransactionFactory.CreateAsync(
-            _context, user.Id, account.Id,
+            _context,
+            user.Id,
+            account.Id,
             transactionDate: new DateTime(2026, 10, 1),
-            recurringTransactionId: schedule.Id);
+            recurringTransactionId: schedule.Id
+        );
 
         _client.ActAsUser(user);
 
         var response = await _client.GetAsync(
-            $"/api/transactions?from=2026-09-01T00:00:00{offset}&to=2026-10-01T00:00:00{offset}");
-        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+            $"/api/transactions?from=2026-09-01T00:00:00{offset}&to=2026-10-01T00:00:00{offset}"
+        );
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(
+            TestJsonOptions.Default
+        );
 
-        Assert.Equal(new[] { datedSep1.Id }, body!.Data.Select(t => t.Id));
+        Assert.Equal([datedSep1.Id], body!.Data.Select(t => t.Id));
         Assert.Equal(1, body!.TotalCount);
     }
 
@@ -830,23 +1208,33 @@ public class TransactionsControllerTest : IDisposable
 
         // Recorded at 02:00 on 1 Sep local (UTC+8); stored 31 Aug 18:00 UTC.
         var recorded = await TransactionFactory.CreateAsync(
-            _context, user.Id, account.Id,
-            transactionDate: new DateTime(2026, 8, 31, 18, 0, 0, DateTimeKind.Utc));
+            _context,
+            user.Id,
+            account.Id,
+            transactionDate: new DateTime(2026, 8, 31, 18, 0, 0, DateTimeKind.Utc)
+        );
         // Generated, dated 1 Sep, wall-clock midnight with no offset.
         var generated = await TransactionFactory.CreateAsync(
-            _context, user.Id, account.Id,
+            _context,
+            user.Id,
+            account.Id,
             transactionDate: new DateTime(2026, 9, 1),
-            recurringTransactionId: schedule.Id);
+            recurringTransactionId: schedule.Id
+        );
 
         _client.ActAsUser(user);
 
         var response = await _client.GetAsync(
-            "/api/transactions?from=2026-09-01T00:00:00%2B08:00&to=2026-10-01T00:00:00%2B08:00");
-        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+            "/api/transactions?from=2026-09-01T00:00:00%2B08:00&to=2026-10-01T00:00:00%2B08:00"
+        );
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(
+            TestJsonOptions.Default
+        );
 
         Assert.Equal(
             new[] { generated.Id, recorded.Id }.OrderByDescending(id => id),
-            body!.Data.Select(t => t.Id).OrderByDescending(id => id));
+            body!.Data.Select(t => t.Id).OrderByDescending(id => id)
+        );
         Assert.Equal(2, body!.TotalCount);
     }
 
@@ -858,14 +1246,20 @@ public class TransactionsControllerTest : IDisposable
 
         // 31 Aug 18:00 UTC. With a UTC bound the instant is 31 Aug, so a UTC-September filter excludes it.
         await TransactionFactory.CreateAsync(
-            _context, user.Id, account.Id,
-            transactionDate: new DateTime(2026, 8, 31, 18, 0, 0, DateTimeKind.Utc));
+            _context,
+            user.Id,
+            account.Id,
+            transactionDate: new DateTime(2026, 8, 31, 18, 0, 0, DateTimeKind.Utc)
+        );
 
         _client.ActAsUser(user);
 
         var response = await _client.GetAsync(
-            "/api/transactions?from=2026-09-01T00:00:00Z&to=2026-10-01T00:00:00Z");
-        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(TestJsonOptions.Default);
+            "/api/transactions?from=2026-09-01T00:00:00Z&to=2026-10-01T00:00:00Z"
+        );
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(
+            TestJsonOptions.Default
+        );
 
         Assert.Empty(body!.Data);
         Assert.Equal(0, body!.TotalCount);
@@ -881,7 +1275,7 @@ public class TransactionsControllerTest : IDisposable
         {
             AccountId = account.Id,
             Type = TransactionType.Income,
-            Amount = 5000
+            Amount = 5000,
         };
 
         var response = await _client.PostAsJsonAsync("/api/transactions", request);
@@ -894,12 +1288,12 @@ public class TransactionsControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
 
         _client.ActAsUser(user);
-        
+
         var request = new
         {
             AccountId = 99999,
             Type = TransactionType.Income,
-            Amount = 5000
+            Amount = 5000,
         };
 
         var response = await _client.PostAsJsonAsync("/api/transactions", request);
@@ -922,7 +1316,7 @@ public class TransactionsControllerTest : IDisposable
         {
             AccountId = account.Id,
             Type = TransactionType.Income,
-            Amount = 5000
+            Amount = 5000,
         };
 
         var response = await _client.PostAsJsonAsync("/api/transactions", request);
@@ -942,13 +1336,13 @@ public class TransactionsControllerTest : IDisposable
         var accountB = await AccountFactory.CreateAsync(_context, userB.Id, initialBalance: 3000);
 
         _client.ActAsUser(userA);
-        
+
         var request = new
         {
             AccountId = accountA.Id,
             Type = TransactionType.Transfer,
             Amount = 1500,
-            TransferToAccountId = accountB.Id
+            TransferToAccountId = accountB.Id,
         };
 
         var response = await _client.PostAsJsonAsync("/api/transactions", request);
@@ -966,13 +1360,13 @@ public class TransactionsControllerTest : IDisposable
         var account = await AccountFactory.CreateAsync(_context, user.Id);
 
         _client.ActAsUser(user);
-        
+
         var request = new
         {
             AccountId = account.Id,
             Type = TransactionType.Income,
             Amount = 5000,
-            CategoryId = 99999
+            CategoryId = 99999,
         };
 
         var response = await _client.PostAsJsonAsync("/api/transactions", request);
@@ -998,7 +1392,7 @@ public class TransactionsControllerTest : IDisposable
             AccountId = account.Id,
             Type = TransactionType.Income,
             Amount = 5000,
-            CategoryId = category.Id
+            CategoryId = category.Id,
         };
 
         var response = await _client.PostAsJsonAsync("/api/transactions", request);
@@ -1022,7 +1416,7 @@ public class TransactionsControllerTest : IDisposable
             AccountId = account.Id,
             Type = TransactionType.Transfer,
             Amount = 5000,
-            TransferToAccountId = 99999
+            TransferToAccountId = 99999,
         };
 
         var response = await _client.PostAsJsonAsync("/api/transactions", request);
@@ -1031,7 +1425,7 @@ public class TransactionsControllerTest : IDisposable
         var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
         Assert.Equal("Transfer destination is not a valid account", problem!.Detail);
     }
-    
+
     [Fact]
     public async Task Create_WithInActiveAccount_ReturnsBadRequest()
     {
@@ -1039,7 +1433,7 @@ public class TransactionsControllerTest : IDisposable
         var account = await AccountFactory.CreateAsync(_context, user.Id, isActive: false);
 
         _client.ActAsUser(user);
-        
+
         var request = new
         {
             AccountId = account.Id,
@@ -1062,13 +1456,13 @@ public class TransactionsControllerTest : IDisposable
         var accountB = await AccountFactory.CreateAsync(_context, user.Id, isActive: false);
 
         _client.ActAsUser(user);
-        
+
         var request = new
         {
             AccountId = accountA.Id,
             Type = TransactionType.Transfer,
             Amount = 5000,
-            TransferToAccountId = accountB.Id
+            TransferToAccountId = accountB.Id,
         };
 
         var response = await _client.PostAsJsonAsync("/api/transactions", request);
@@ -1086,7 +1480,7 @@ public class TransactionsControllerTest : IDisposable
         var account = await AccountFactory.CreateAsync(_context, user.Id);
 
         _client.ActAsUser(user);
-        
+
         var request = new
         {
             AccountId = account.Id,
@@ -1141,13 +1535,16 @@ public class TransactionsControllerTest : IDisposable
         {
             AccountId = account.Id,
             Type = TransactionType.Income,
-            Amount = 5000
+            Amount = 5000,
         };
 
         var response = await _client.PostAsJsonAsync("/api/transactions", request);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-        var updateAccount = await _context.Accounts.AsNoTracking().Where(a => a.Id == account.Id).FirstOrDefaultAsync();
+        var updateAccount = await _context
+            .Accounts.AsNoTracking()
+            .Where(a => a.Id == account.Id)
+            .FirstOrDefaultAsync();
         Assert.Equal(5000, updateAccount!.CurrentBalance);
     }
 
@@ -1163,13 +1560,16 @@ public class TransactionsControllerTest : IDisposable
         {
             AccountId = account.Id,
             Type = TransactionType.Expense,
-            Amount = 2000
+            Amount = 2000,
         };
 
         var response = await _client.PostAsJsonAsync("/api/transactions", request);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-        var updateAccount = await _context.Accounts.AsNoTracking().Where(a => a.Id == account.Id).FirstOrDefaultAsync();
+        var updateAccount = await _context
+            .Accounts.AsNoTracking()
+            .Where(a => a.Id == account.Id)
+            .FirstOrDefaultAsync();
         Assert.Equal(1000, updateAccount!.CurrentBalance);
     }
 
@@ -1177,8 +1577,16 @@ public class TransactionsControllerTest : IDisposable
     public async Task Create_TransferTransaction_UpdatesBothAccountBalance()
     {
         var user = await UserFactory.CreateAsync(_context);
-        var sourceAccount = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 3000);
-        var targetAccount = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 5000);
+        var sourceAccount = await AccountFactory.CreateAsync(
+            _context,
+            user.Id,
+            initialBalance: 3000
+        );
+        var targetAccount = await AccountFactory.CreateAsync(
+            _context,
+            user.Id,
+            initialBalance: 5000
+        );
 
         _client.ActAsUser(user);
 
@@ -1187,16 +1595,22 @@ public class TransactionsControllerTest : IDisposable
             AccountId = sourceAccount.Id,
             Type = TransactionType.Transfer,
             Amount = 2000,
-            TransferToAccountId = targetAccount.Id
+            TransferToAccountId = targetAccount.Id,
         };
 
         var response = await _client.PostAsJsonAsync("/api/transactions", request);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-        var updatedSourceAccount = await _context.Accounts.AsNoTracking().Where(a => a.Id == sourceAccount.Id).FirstOrDefaultAsync();
+        var updatedSourceAccount = await _context
+            .Accounts.AsNoTracking()
+            .Where(a => a.Id == sourceAccount.Id)
+            .FirstOrDefaultAsync();
         Assert.Equal(1000, updatedSourceAccount!.CurrentBalance);
 
-        var updatedTargetAccount = await _context.Accounts.AsNoTracking().Where(a => a.Id == targetAccount.Id).FirstOrDefaultAsync();
+        var updatedTargetAccount = await _context
+            .Accounts.AsNoTracking()
+            .Where(a => a.Id == targetAccount.Id)
+            .FirstOrDefaultAsync();
         Assert.Equal(7000, updatedTargetAccount!.CurrentBalance);
     }
 
@@ -1254,12 +1668,9 @@ public class TransactionsControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
         var transaction = await TransactionFactory.CreateAsync(_context, user.Id, account.Id);
-        
-        var request = new
-        {
-            CategoryId = 1
-        };
-        
+
+        var request = new { CategoryId = 1 };
+
         var response = await _client.PutAsJsonAsync("/api/transactions/" + transaction.Id, request);
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -1269,12 +1680,9 @@ public class TransactionsControllerTest : IDisposable
     {
         var user = await UserFactory.CreateAsync(_context);
         _client.ActAsUser(user);
-        
-        var request = new
-        {
-            CategoryId = 1
-        };
-        
+
+        var request = new { CategoryId = 1 };
+
         var response = await _client.PutAsJsonAsync("/api/transactions/9999", request);
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -1286,14 +1694,11 @@ public class TransactionsControllerTest : IDisposable
         var userB = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, userB.Id);
         var transaction = await TransactionFactory.CreateAsync(_context, userB.Id, account.Id);
-        
+
         _client.ActAsUser(userA);
 
-        var request = new
-        {
-            CategoryId = 1
-        };
-        
+        var request = new { CategoryId = 1 };
+
         var response = await _client.PutAsJsonAsync("/api/transactions/" + transaction.Id, request);
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
@@ -1304,13 +1709,10 @@ public class TransactionsControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
         var transaction = await TransactionFactory.CreateAsync(_context, user.Id, account.Id);
-        
+
         _client.ActAsUser(user);
 
-        var request = new
-        {
-            CategoryId = 9999
-        };
+        var request = new { CategoryId = 9999 };
 
         var response = await _client.PutAsJsonAsync("/api/transactions/" + transaction.Id, request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -1325,17 +1727,13 @@ public class TransactionsControllerTest : IDisposable
         var userA = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, userA.Id);
         var transaction = await TransactionFactory.CreateAsync(_context, userA.Id, account.Id);
-        
+
         var userB = await UserFactory.CreateAsync(_context);
         var category = await CategoryFactory.CreateAsync(_context, userB.Id);
 
         _client.ActAsUser(userA);
 
-        var request = new
-        {
-            CategoryId = category.Id,
-            Amount = 5000
-        };
+        var request = new { CategoryId = category.Id, Amount = 5000 };
 
         var response = await _client.PutAsJsonAsync("/api/transactions/" + transaction.Id, request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -1352,22 +1750,23 @@ public class TransactionsControllerTest : IDisposable
         var account = await AccountFactory.CreateAsync(_context, user.Id);
         var category = await CategoryFactory.CreateAsync(_context, user.Id);
         var transaction = await TransactionFactory.CreateAsync(_context, user.Id, account.Id);
-        
+
         _client.ActAsUser(user);
 
-        var request = new
-        {
-            CategoryId = category.Id,
-            Amount = 5000
-        };
-        
+        var request = new { CategoryId = category.Id, Amount = 5000 };
+
         var response = await _client.PutAsJsonAsync("/api/transactions/" + transaction.Id, request);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<TransactionResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<TransactionResource>(
+            TestJsonOptions.Default
+        );
         Assert.Equal(category.Id, body!.CategoryId);
 
-        var updateAccount = await _context.Accounts.AsNoTracking().Where(a => a.Id == account.Id).FirstOrDefaultAsync();
+        var updateAccount = await _context
+            .Accounts.AsNoTracking()
+            .Where(a => a.Id == account.Id)
+            .FirstOrDefaultAsync();
         Assert.Equal(0, updateAccount!.CurrentBalance);
     }
 
@@ -1412,14 +1811,18 @@ public class TransactionsControllerTest : IDisposable
     {
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 3000);
-        var targetAccount = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 2000);
-        
+        var targetAccount = await AccountFactory.CreateAsync(
+            _context,
+            user.Id,
+            initialBalance: 2000
+        );
+
         _client.ActAsUser(user);
 
         var transaction = await TransactionFactory.CreateAsync(
-            _context, 
-            userId: user.Id, 
-            accountId: account.Id, 
+            _context,
+            userId: user.Id,
+            accountId: account.Id,
             type: TransactionType.Transfer,
             transferToAccountId: targetAccount.Id
         );
@@ -1442,13 +1845,15 @@ public class TransactionsControllerTest : IDisposable
         {
             AccountId = account.Id,
             Type = TransactionType.Income,
-            Amount = 3000
+            Amount = 3000,
         };
 
         var postResponse = await _client.PostAsJsonAsync("/api/transactions", request);
         Assert.Equal(HttpStatusCode.Created, postResponse.StatusCode);
 
-        var body = await postResponse.Content.ReadFromJsonAsync<TransactionResource>(TestJsonOptions.Default);
+        var body = await postResponse.Content.ReadFromJsonAsync<TransactionResource>(
+            TestJsonOptions.Default
+        );
 
         var response = await _client.DeleteAsync("/api/transactions/" + body!.Id);
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
@@ -1456,7 +1861,10 @@ public class TransactionsControllerTest : IDisposable
         var exists = await _context.Transactions.AsNoTracking().AnyAsync(a => a.Id == body!.Id);
         Assert.False(exists);
 
-        var updateAccount = await _context.Accounts.AsNoTracking().Where(a => a.Id == account.Id).FirstOrDefaultAsync();
+        var updateAccount = await _context
+            .Accounts.AsNoTracking()
+            .Where(a => a.Id == account.Id)
+            .FirstOrDefaultAsync();
         Assert.Equal(1000, updateAccount!.CurrentBalance);
     }
 
@@ -1472,13 +1880,15 @@ public class TransactionsControllerTest : IDisposable
         {
             AccountId = account.Id,
             Type = TransactionType.Expense,
-            Amount = 3000
+            Amount = 3000,
         };
 
         var postResponse = await _client.PostAsJsonAsync("/api/transactions", request);
         Assert.Equal(HttpStatusCode.Created, postResponse.StatusCode);
 
-        var body = await postResponse.Content.ReadFromJsonAsync<TransactionResource>(TestJsonOptions.Default);
+        var body = await postResponse.Content.ReadFromJsonAsync<TransactionResource>(
+            TestJsonOptions.Default
+        );
 
         var response = await _client.DeleteAsync("/api/transactions/" + body!.Id);
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
@@ -1486,7 +1896,10 @@ public class TransactionsControllerTest : IDisposable
         var exists = await _context.Transactions.AsNoTracking().AnyAsync(a => a.Id == body!.Id);
         Assert.False(exists);
 
-        var updateAccount = await _context.Accounts.AsNoTracking().Where(a => a.Id == account.Id).FirstOrDefaultAsync();
+        var updateAccount = await _context
+            .Accounts.AsNoTracking()
+            .Where(a => a.Id == account.Id)
+            .FirstOrDefaultAsync();
         Assert.Equal(5000, updateAccount!.CurrentBalance);
     }
 
@@ -1495,8 +1908,12 @@ public class TransactionsControllerTest : IDisposable
     {
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 3000);
-        var targetAccount = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 2000);
-        
+        var targetAccount = await AccountFactory.CreateAsync(
+            _context,
+            user.Id,
+            initialBalance: 2000
+        );
+
         _client.ActAsUser(user);
 
         var request = new
@@ -1504,13 +1921,15 @@ public class TransactionsControllerTest : IDisposable
             AccountId = account.Id,
             Type = TransactionType.Transfer,
             Amount = 1000,
-            TransferToAccountId = targetAccount.Id
+            TransferToAccountId = targetAccount.Id,
         };
 
         var postResponse = await _client.PostAsJsonAsync("/api/transactions", request);
         Assert.Equal(HttpStatusCode.Created, postResponse.StatusCode);
 
-        var body = await postResponse.Content.ReadFromJsonAsync<TransactionResource>(TestJsonOptions.Default);
+        var body = await postResponse.Content.ReadFromJsonAsync<TransactionResource>(
+            TestJsonOptions.Default
+        );
 
         var response = await _client.DeleteAsync("/api/transactions/" + body!.Id);
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
@@ -1518,10 +1937,16 @@ public class TransactionsControllerTest : IDisposable
         var exists = await _context.Transactions.AsNoTracking().AnyAsync(a => a.Id == body!.Id);
         Assert.False(exists);
 
-        var updatedAccount = await _context.Accounts.AsNoTracking().Where(a => a.Id == account.Id).FirstOrDefaultAsync();
+        var updatedAccount = await _context
+            .Accounts.AsNoTracking()
+            .Where(a => a.Id == account.Id)
+            .FirstOrDefaultAsync();
         Assert.Equal(3000, updatedAccount!.CurrentBalance);
-        
-        var updatedTargetAccount = await _context.Accounts.AsNoTracking().Where(a => a.Id == targetAccount.Id).FirstOrDefaultAsync();
+
+        var updatedTargetAccount = await _context
+            .Accounts.AsNoTracking()
+            .Where(a => a.Id == targetAccount.Id)
+            .FirstOrDefaultAsync();
         Assert.Equal(2000, updatedTargetAccount!.CurrentBalance);
     }
 
@@ -1533,24 +1958,56 @@ public class TransactionsControllerTest : IDisposable
         var goal = await GoalFactory.CreateAsync(_context, user.Id);
         var transaction = await TransactionFactory.CreateAsync(_context, user.Id, account.Id);
 
-        await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id, transactionId: transaction.Id);
-        await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id, transactionId: transaction.Id);
-        await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id, transactionId: transaction.Id);
+        await GoalContributionFactory.CreateAsync(
+            _context,
+            goal.Id,
+            account.Id,
+            transactionId: transaction.Id
+        );
+        await GoalContributionFactory.CreateAsync(
+            _context,
+            goal.Id,
+            account.Id,
+            transactionId: transaction.Id
+        );
+        await GoalContributionFactory.CreateAsync(
+            _context,
+            goal.Id,
+            account.Id,
+            transactionId: transaction.Id
+        );
 
         _client.ActAsUser(user);
 
         var response = await _client.DeleteAsync("api/transactions/" + transaction.Id);
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
-        Assert.Empty(await _context.GoalContributions.AsNoTracking().Where(gc => gc.TransactionId == transaction.Id).ToListAsync());
-        Assert.Null(await _context.Transactions.AsNoTracking().FirstOrDefaultAsync(t => t.Id == transaction.Id));
+        Assert.Empty(
+            await _context
+                .GoalContributions.AsNoTracking()
+                .Where(gc => gc.TransactionId == transaction.Id)
+                .ToListAsync()
+        );
+        Assert.Null(
+            await _context
+                .Transactions.AsNoTracking()
+                .FirstOrDefaultAsync(t => t.Id == transaction.Id)
+        );
     }
 
     [Fact]
     public async Task Create_NormalTransactionWithTransferToAccountId_ReturnsBadRequest()
     {
         var user = await UserFactory.CreateAsync(_context);
-        var sourceAccount = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 3000);
-        var targetAccount = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 2000);
+        var sourceAccount = await AccountFactory.CreateAsync(
+            _context,
+            user.Id,
+            initialBalance: 3000
+        );
+        var targetAccount = await AccountFactory.CreateAsync(
+            _context,
+            user.Id,
+            initialBalance: 2000
+        );
 
         _client.ActAsUser(user);
 
@@ -1559,7 +2016,7 @@ public class TransactionsControllerTest : IDisposable
             AccountId = sourceAccount.Id,
             Type = TransactionType.Income,
             Amount = 2000,
-            TransferToAccountId = targetAccount.Id
+            TransferToAccountId = targetAccount.Id,
         };
 
         var response = await _client.PostAsJsonAsync("/api/transactions", request);
@@ -1579,7 +2036,7 @@ public class TransactionsControllerTest : IDisposable
             AccountId = account.Id,
             Type = TransactionType.Income,
             Amount = 5000,
-            TagIds = new int[] { 9999, 9998}
+            TagIds = new int[] { 9999, 9998 },
         };
 
         var response = await _client.PostAsJsonAsync("/api/transactions", request);
@@ -1605,7 +2062,7 @@ public class TransactionsControllerTest : IDisposable
             AccountId = account.Id,
             Type = TransactionType.Income,
             Amount = 5000,
-            TagIds = new int[] { tagA.Id, tagB.Id }
+            TagIds = new int[] { tagA.Id, tagB.Id },
         };
 
         var response = await _client.PostAsJsonAsync("/api/transactions", request);
@@ -1630,13 +2087,15 @@ public class TransactionsControllerTest : IDisposable
             AccountId = account.Id,
             Type = TransactionType.Income,
             Amount = 5000,
-            TagIds = new int[] { tag.Id, tag.Id }
+            TagIds = new int[] { tag.Id, tag.Id },
         };
 
         var response = await _client.PostAsJsonAsync("/api/transactions", request);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<TransactionResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<TransactionResource>(
+            TestJsonOptions.Default
+        );
         Assert.NotEmpty(body!.Tags);
         Assert.Single(body!.Tags);
         Assert.Contains(body!.Tags, tagResource => tagResource.Id == tag.Id);
@@ -1660,7 +2119,9 @@ public class TransactionsControllerTest : IDisposable
         var response = await _client.PostAsJsonAsync("/api/transactions", request);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<TransactionResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<TransactionResource>(
+            TestJsonOptions.Default
+        );
         Assert.Empty(body!.Tags);
     }
 
@@ -1670,10 +2131,13 @@ public class TransactionsControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
         var transaction = await TransactionFactory.CreateAsync(_context, user.Id, account.Id);
-        
+
         _client.ActAsUser(user);
-        
-        var response = await _client.PutAsJsonAsync("/api/transactions/" + transaction.Id, new { TagIds = new int[] { 9999, 9998 } });
+
+        var response = await _client.PutAsJsonAsync(
+            "/api/transactions/" + transaction.Id,
+            new { TagIds = new int[] { 9999, 9998 } }
+        );
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
         var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
@@ -1689,10 +2153,13 @@ public class TransactionsControllerTest : IDisposable
         var transaction = await TransactionFactory.CreateAsync(_context, user.Id, account.Id);
         var tagA = await TagFactory.CreateAsync(_context, user.Id);
         var tagB = await TagFactory.CreateAsync(_context, userB.Id);
-        
+
         _client.ActAsUser(user);
-        
-        var response = await _client.PutAsJsonAsync("/api/transactions/" + transaction.Id, new { TagIds = new int[] { tagA.Id, tagB.Id }});
+
+        var response = await _client.PutAsJsonAsync(
+            "/api/transactions/" + transaction.Id,
+            new { TagIds = new int[] { tagA.Id, tagB.Id } }
+        );
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
         // A tag that isn't the caller's folds into the same reason as absence.
@@ -1717,11 +2184,16 @@ public class TransactionsControllerTest : IDisposable
         await _context.SaveChangesAsync();
 
         _client.ActAsUser(user);
-        
-        var response = await _client.PutAsJsonAsync("/api/transactions/" + transaction.Id, new { TagIds = new int[] { tagA.Id, tagA.Id }});
+
+        var response = await _client.PutAsJsonAsync(
+            "/api/transactions/" + transaction.Id,
+            new { TagIds = new int[] { tagA.Id, tagA.Id } }
+        );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<TransactionResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<TransactionResource>(
+            TestJsonOptions.Default
+        );
         Assert.NotEmpty(body!.Tags);
         Assert.Single(body!.Tags);
         Assert.DoesNotContain(body!.Tags, tagResource => tagResource.Id == tagB.Id);
@@ -1745,11 +2217,16 @@ public class TransactionsControllerTest : IDisposable
         await _context.SaveChangesAsync();
 
         _client.ActAsUser(user);
-        
-        var response = await _client.PutAsJsonAsync("/api/transactions/" + transaction.Id, new { TagIds = new int[] { }});
+
+        var response = await _client.PutAsJsonAsync(
+            "/api/transactions/" + transaction.Id,
+            new { TagIds = new int[] { } }
+        );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<TransactionResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<TransactionResource>(
+            TestJsonOptions.Default
+        );
         Assert.Empty(body!.Tags);
         Assert.DoesNotContain(body!.Tags, tagResource => tagResource.Id == tagA.Id);
         Assert.DoesNotContain(body!.Tags, tagResource => tagResource.Id == tagB.Id);
@@ -1771,11 +2248,16 @@ public class TransactionsControllerTest : IDisposable
         await _context.SaveChangesAsync();
 
         _client.ActAsUser(user);
-        
-        var response = await _client.PutAsJsonAsync("/api/transactions/" + transaction.Id, new { Amount = 400});
+
+        var response = await _client.PutAsJsonAsync(
+            "/api/transactions/" + transaction.Id,
+            new { Amount = 400 }
+        );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<TransactionResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<TransactionResource>(
+            TestJsonOptions.Default
+        );
         Assert.Single(body!.Tags);
         Assert.Contains(body!.Tags, tagResource => tagResource.Id == tag.Id);
     }
@@ -1793,7 +2275,7 @@ public class TransactionsControllerTest : IDisposable
             AccountId = account.Id,
             Type = TransactionType.Transfer,
             Amount = 1500,
-            TransferToAccountId = account.Id
+            TransferToAccountId = account.Id,
         };
 
         var response = await _client.PostAsJsonAsync("/api/transactions", request);
@@ -1803,11 +2285,14 @@ public class TransactionsControllerTest : IDisposable
         Assert.Contains("TransferToAccountId", problem!.Errors.Keys);
         Assert.Contains(
             "A transfer's destination must be a different account from its source.",
-            problem!.Errors["TransferToAccountId"]);
+            problem!.Errors["TransferToAccountId"]
+        );
 
         var unchanged = await _context.Accounts.AsNoTracking().FirstAsync(a => a.Id == account.Id);
         Assert.Equal(5000, unchanged.CurrentBalance);
-        Assert.False(await _context.Transactions.AsNoTracking().AnyAsync(t => t.AccountId == account.Id));
+        Assert.False(
+            await _context.Transactions.AsNoTracking().AnyAsync(t => t.AccountId == account.Id)
+        );
     }
 
     [Fact]
@@ -1824,14 +2309,18 @@ public class TransactionsControllerTest : IDisposable
             AccountId = source.Id,
             Type = TransactionType.Transfer,
             Amount = 1200,
-            TransferToAccountId = destination.Id
+            TransferToAccountId = destination.Id,
         };
 
         var response = await _client.PostAsJsonAsync("/api/transactions", request);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-        var updatedSource = await _context.Accounts.AsNoTracking().FirstAsync(a => a.Id == source.Id);
-        var updatedDestination = await _context.Accounts.AsNoTracking().FirstAsync(a => a.Id == destination.Id);
+        var updatedSource = await _context
+            .Accounts.AsNoTracking()
+            .FirstAsync(a => a.Id == source.Id);
+        var updatedDestination = await _context
+            .Accounts.AsNoTracking()
+            .FirstAsync(a => a.Id == destination.Id);
         Assert.Equal(1800, updatedSource.CurrentBalance);
         Assert.Equal(2200, updatedDestination.CurrentBalance);
     }
@@ -1852,7 +2341,7 @@ public class TransactionsControllerTest : IDisposable
             Type = TransactionType.Transfer,
             Amount = 1000,
             TransferToAccountId = destination.Id,
-            CategoryId = category.Id
+            CategoryId = category.Id,
         };
 
         var response = await _client.PostAsJsonAsync("/api/transactions", request);
@@ -1861,7 +2350,9 @@ public class TransactionsControllerTest : IDisposable
         var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>();
         Assert.Contains("CategoryId", problem!.Errors.Keys);
         Assert.Contains("A transfer cannot be assigned a category.", problem!.Errors["CategoryId"]);
-        Assert.False(await _context.Transactions.AsNoTracking().AnyAsync(t => t.AccountId == source.Id));
+        Assert.False(
+            await _context.Transactions.AsNoTracking().AnyAsync(t => t.AccountId == source.Id)
+        );
     }
 
     [Fact]
@@ -1878,13 +2369,15 @@ public class TransactionsControllerTest : IDisposable
             AccountId = account.Id,
             Type = TransactionType.Income,
             Amount = 5000,
-            CategoryId = category.Id
+            CategoryId = category.Id,
         };
 
         var response = await _client.PostAsJsonAsync("/api/transactions", request);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<TransactionResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<TransactionResource>(
+            TestJsonOptions.Default
+        );
         Assert.Equal(category.Id, body!.CategoryId);
     }
 
@@ -1898,21 +2391,27 @@ public class TransactionsControllerTest : IDisposable
 
         _client.ActAsUser(userA);
 
-        var notOwned = await _client.PostAsJsonAsync("/api/transactions", new
-        {
-            AccountId = accountA.Id,
-            Type = TransactionType.Transfer,
-            Amount = 1500,
-            TransferToAccountId = accountB.Id
-        });
+        var notOwned = await _client.PostAsJsonAsync(
+            "/api/transactions",
+            new
+            {
+                AccountId = accountA.Id,
+                Type = TransactionType.Transfer,
+                Amount = 1500,
+                TransferToAccountId = accountB.Id,
+            }
+        );
 
-        var nonExistent = await _client.PostAsJsonAsync("/api/transactions", new
-        {
-            AccountId = accountA.Id,
-            Type = TransactionType.Transfer,
-            Amount = 1500,
-            TransferToAccountId = 99999
-        });
+        var nonExistent = await _client.PostAsJsonAsync(
+            "/api/transactions",
+            new
+            {
+                AccountId = accountA.Id,
+                Type = TransactionType.Transfer,
+                Amount = 1500,
+                TransferToAccountId = 99999,
+            }
+        );
 
         Assert.Equal(nonExistent.StatusCode, notOwned.StatusCode);
 
@@ -1931,19 +2430,25 @@ public class TransactionsControllerTest : IDisposable
 
         _client.ActAsUser(userA);
 
-        var notOwned = await _client.PostAsJsonAsync("/api/transactions", new
-        {
-            AccountId = otherAccount.Id,
-            Type = TransactionType.Income,
-            Amount = 5000
-        });
+        var notOwned = await _client.PostAsJsonAsync(
+            "/api/transactions",
+            new
+            {
+                AccountId = otherAccount.Id,
+                Type = TransactionType.Income,
+                Amount = 5000,
+            }
+        );
 
-        var nonExistent = await _client.PostAsJsonAsync("/api/transactions", new
-        {
-            AccountId = 99999,
-            Type = TransactionType.Income,
-            Amount = 5000
-        });
+        var nonExistent = await _client.PostAsJsonAsync(
+            "/api/transactions",
+            new
+            {
+                AccountId = 99999,
+                Type = TransactionType.Income,
+                Amount = 5000,
+            }
+        );
 
         Assert.Equal(HttpStatusCode.BadRequest, notOwned.StatusCode);
         Assert.Equal(nonExistent.StatusCode, notOwned.StatusCode);
@@ -1964,21 +2469,27 @@ public class TransactionsControllerTest : IDisposable
 
         _client.ActAsUser(userA);
 
-        var notOwned = await _client.PostAsJsonAsync("/api/transactions", new
-        {
-            AccountId = account.Id,
-            Type = TransactionType.Income,
-            Amount = 5000,
-            CategoryId = otherCategory.Id
-        });
+        var notOwned = await _client.PostAsJsonAsync(
+            "/api/transactions",
+            new
+            {
+                AccountId = account.Id,
+                Type = TransactionType.Income,
+                Amount = 5000,
+                CategoryId = otherCategory.Id,
+            }
+        );
 
-        var nonExistent = await _client.PostAsJsonAsync("/api/transactions", new
-        {
-            AccountId = account.Id,
-            Type = TransactionType.Income,
-            Amount = 5000,
-            CategoryId = 99999
-        });
+        var nonExistent = await _client.PostAsJsonAsync(
+            "/api/transactions",
+            new
+            {
+                AccountId = account.Id,
+                Type = TransactionType.Income,
+                Amount = 5000,
+                CategoryId = 99999,
+            }
+        );
 
         Assert.Equal(HttpStatusCode.BadRequest, notOwned.StatusCode);
         Assert.Equal(nonExistent.StatusCode, notOwned.StatusCode);
@@ -1997,14 +2508,19 @@ public class TransactionsControllerTest : IDisposable
         var destination = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 1000);
         var category = await CategoryFactory.CreateAsync(_context, user.Id);
         var transfer = await TransactionFactory.CreateAsync(
-            _context, user.Id, source.Id,
+            _context,
+            user.Id,
+            source.Id,
             type: TransactionType.Transfer,
-            transferToAccountId: destination.Id);
+            transferToAccountId: destination.Id
+        );
 
         _client.ActAsUser(user);
 
         var response = await _client.PutAsJsonAsync(
-            "/api/transactions/" + transfer.Id, new { CategoryId = category.Id });
+            "/api/transactions/" + transfer.Id,
+            new { CategoryId = category.Id }
+        );
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
         var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>();
@@ -2019,18 +2535,24 @@ public class TransactionsControllerTest : IDisposable
         var source = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 3000);
         var destination = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 1000);
         var transfer = await TransactionFactory.CreateAsync(
-            _context, user.Id, source.Id,
+            _context,
+            user.Id,
+            source.Id,
             type: TransactionType.Transfer,
-            transferToAccountId: destination.Id);
+            transferToAccountId: destination.Id
+        );
 
         _client.ActAsUser(user);
 
         var response = await _client.PutAsJsonAsync(
             "/api/transactions/" + transfer.Id,
-            new { Description = "Moved to savings", TransactionDate = "2026-05-01T00:00:00Z" });
+            new { Description = "Moved to savings", TransactionDate = "2026-05-01T00:00:00Z" }
+        );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<TransactionResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<TransactionResource>(
+            TestJsonOptions.Default
+        );
         Assert.Equal("Moved to savings", body!.Description);
         Assert.Equal(new DateTime(2026, 5, 1), body!.TransactionDate.Date);
     }
@@ -2066,7 +2588,11 @@ public class TransactionsControllerTest : IDisposable
     {
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 5000);
-        var incomeCategory = await CategoryFactory.CreateAsync(_context, user.Id, type: CategoryType.Income);
+        var incomeCategory = await CategoryFactory.CreateAsync(
+            _context,
+            user.Id,
+            type: CategoryType.Income
+        );
 
         _client.ActAsUser(user);
 
@@ -2082,7 +2608,10 @@ public class TransactionsControllerTest : IDisposable
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
         var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
-        Assert.Equal("A transaction's category must be of the same type as the transaction.", problem!.Detail);
+        Assert.Equal(
+            "A transaction's category must be of the same type as the transaction.",
+            problem!.Detail
+        );
     }
 
     [Fact]
@@ -2090,7 +2619,11 @@ public class TransactionsControllerTest : IDisposable
     {
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
-        var expenseCategory = await CategoryFactory.CreateAsync(_context, user.Id, type: CategoryType.Expense);
+        var expenseCategory = await CategoryFactory.CreateAsync(
+            _context,
+            user.Id,
+            type: CategoryType.Expense
+        );
 
         _client.ActAsUser(user);
 
@@ -2106,7 +2639,10 @@ public class TransactionsControllerTest : IDisposable
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
         var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
-        Assert.Equal("A transaction's category must be of the same type as the transaction.", problem!.Detail);
+        Assert.Equal(
+            "A transaction's category must be of the same type as the transaction.",
+            problem!.Detail
+        );
     }
 
     [Fact]
@@ -2114,7 +2650,11 @@ public class TransactionsControllerTest : IDisposable
     {
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 5000);
-        var salary = await CategoryFactory.CreateAsync(_context, name: "Salary", type: CategoryType.Income);
+        var salary = await CategoryFactory.CreateAsync(
+            _context,
+            name: "Salary",
+            type: CategoryType.Income
+        );
 
         _client.ActAsUser(user);
 
@@ -2130,7 +2670,10 @@ public class TransactionsControllerTest : IDisposable
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
         var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
-        Assert.Equal("A transaction's category must be of the same type as the transaction.", problem!.Detail);
+        Assert.Equal(
+            "A transaction's category must be of the same type as the transaction.",
+            problem!.Detail
+        );
     }
 
     [Fact]
@@ -2138,7 +2681,11 @@ public class TransactionsControllerTest : IDisposable
     {
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 5000);
-        var expenseCategory = await CategoryFactory.CreateAsync(_context, user.Id, type: CategoryType.Expense);
+        var expenseCategory = await CategoryFactory.CreateAsync(
+            _context,
+            user.Id,
+            type: CategoryType.Expense
+        );
 
         _client.ActAsUser(user);
 
@@ -2153,7 +2700,9 @@ public class TransactionsControllerTest : IDisposable
         var response = await _client.PostAsJsonAsync("/api/transactions", request);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<TransactionResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<TransactionResource>(
+            TestJsonOptions.Default
+        );
         Assert.Equal(expenseCategory.Id, body!.CategoryId);
     }
 
@@ -2163,22 +2712,30 @@ public class TransactionsControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 5000);
         var transaction = await TransactionFactory.CreateAsync(
-            _context, user.Id, account.Id, type: TransactionType.Expense);
-        var incomeCategory = await CategoryFactory.CreateAsync(_context, user.Id, type: CategoryType.Income);
+            _context,
+            user.Id,
+            account.Id,
+            type: TransactionType.Expense
+        );
+        var incomeCategory = await CategoryFactory.CreateAsync(
+            _context,
+            user.Id,
+            type: CategoryType.Income
+        );
 
         _client.ActAsUser(user);
 
         // The PUT never restates Type — it is read from the stored Expense transaction.
-        var request = new
-        {
-            CategoryId = incomeCategory.Id,
-        };
+        var request = new { CategoryId = incomeCategory.Id };
 
         var response = await _client.PutAsJsonAsync("/api/transactions/" + transaction.Id, request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
         var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
-        Assert.Equal("A transaction's category must be of the same type as the transaction.", problem!.Detail);
+        Assert.Equal(
+            "A transaction's category must be of the same type as the transaction.",
+            problem!.Detail
+        );
     }
 
     [Fact]
@@ -2187,20 +2744,27 @@ public class TransactionsControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 5000);
         var transaction = await TransactionFactory.CreateAsync(
-            _context, user.Id, account.Id, type: TransactionType.Expense);
-        var expenseCategory = await CategoryFactory.CreateAsync(_context, user.Id, type: CategoryType.Expense);
+            _context,
+            user.Id,
+            account.Id,
+            type: TransactionType.Expense
+        );
+        var expenseCategory = await CategoryFactory.CreateAsync(
+            _context,
+            user.Id,
+            type: CategoryType.Expense
+        );
 
         _client.ActAsUser(user);
 
-        var request = new
-        {
-            CategoryId = expenseCategory.Id,
-        };
+        var request = new { CategoryId = expenseCategory.Id };
 
         var response = await _client.PutAsJsonAsync("/api/transactions/" + transaction.Id, request);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<TransactionResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<TransactionResource>(
+            TestJsonOptions.Default
+        );
         Assert.Equal(expenseCategory.Id, body!.CategoryId);
     }
 

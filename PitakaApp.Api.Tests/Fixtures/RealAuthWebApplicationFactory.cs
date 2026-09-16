@@ -37,15 +37,19 @@ public class RealAuthWebApplicationFactory : WebApplicationFactory<Program>, IAs
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        builder.ConfigureAppConfiguration((_, config) =>
-        {
-            config.AddInMemoryCollection(new Dictionary<string, string?>
+        builder.ConfigureAppConfiguration(
+            (_, config) =>
             {
-                ["ConnectionStrings:DefaultConnection"] = TestConnectionString,
-                ["Jwt:Key"] = TestJwtKey,
-                ["RecurringTransaction:Enabled"] = "false"
-            });
-        });
+                config.AddInMemoryCollection(
+                    new Dictionary<string, string?>
+                    {
+                        ["ConnectionStrings:DefaultConnection"] = TestConnectionString,
+                        ["Jwt:Key"] = TestJwtKey,
+                        ["RecurringTransaction:Enabled"] = "false",
+                    }
+                );
+            }
+        );
 
         builder.ConfigureTestServices(services =>
         {

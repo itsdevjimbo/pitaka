@@ -39,7 +39,7 @@ public class RecurringTransactionFactory
     }
 
     public static async Task<RecurringTransaction> CreateAsync(
-        PitakaDbContext context, 
+        PitakaDbContext context,
         int userId,
         int accountId,
         int? categoryId = null,
@@ -54,7 +54,20 @@ public class RecurringTransactionFactory
         RecurringTransactionStatus? status = null
     )
     {
-        var recurringTransaction = Make(userId, accountId, categoryId, name, type, amount, description, frequency, startDate, endDate, nextRunDate, status);
+        var recurringTransaction = Make(
+            userId,
+            accountId,
+            categoryId,
+            name,
+            type,
+            amount,
+            description,
+            frequency,
+            startDate,
+            endDate,
+            nextRunDate,
+            status
+        );
         context.RecurringTransactions.Add(recurringTransaction);
         await context.SaveChangesAsync();
         return recurringTransaction;

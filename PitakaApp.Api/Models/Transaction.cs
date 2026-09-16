@@ -12,7 +12,7 @@ public class Transaction : TimestampedEntity
     public int? CategoryId { get; set; }
 
     public required TransactionType Type { get; init; }
-    
+
     [Column(TypeName = "decimal(14, 2)")]
     public required decimal Amount { get; init; }
 
@@ -24,7 +24,6 @@ public class Transaction : TimestampedEntity
 
     public int? RecurringTransactionId { get; init; }
 
-    
     public User User { get; set; } = null!;
 
     public Account Account { get; set; } = null!;
@@ -37,5 +36,5 @@ public class Transaction : TimestampedEntity
 
     public GoalContribution? GoalContribution { get; set; }
 
-    public ICollection<Tag> Tags {get; set; } = new List<Tag>();
+    public ICollection<Tag> Tags { get; set; } = [];
 }

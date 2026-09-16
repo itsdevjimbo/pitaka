@@ -19,14 +19,15 @@ public class RecordingEmailSender : IEmailSender
         string subject,
         string textBody,
         string htmlBody,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         _sent.Enqueue(new RecordedEmail(toAddress, subject, textBody, htmlBody));
         return Task.CompletedTask;
     }
 
     public IReadOnlyList<RecordedEmail> To(string address) =>
-        _sent.Where(m => m.ToAddress == address).ToList();
+        [.. _sent.Where(m => m.ToAddress == address)];
 }
 
 public record RecordedEmail(string ToAddress, string Subject, string TextBody, string HtmlBody);

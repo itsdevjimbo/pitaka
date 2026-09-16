@@ -35,7 +35,11 @@ public static class UserFactory
     // Identity's own store, exactly as RegisterUser does, and confirms the email by
     // default so the ~25 files that build a Profile and act as it are unaffected by S2's
     // confirmation gate landing later.
-    public static async Task<User> CreateAsync(PitakaDbContext context, string? email = null, string? password = null)
+    public static async Task<User> CreateAsync(
+        PitakaDbContext context,
+        string? email = null,
+        string? password = null
+    )
     {
         var user = Make(email);
         var userManager = BuildUserManager(context);
@@ -44,7 +48,8 @@ public static class UserFactory
         if (!result.Succeeded)
         {
             throw new InvalidOperationException(
-                $"UserFactory.CreateAsync failed: {string.Join(", ", result.Errors.Select(e => e.Description))}");
+                $"UserFactory.CreateAsync failed: {string.Join(", ", result.Errors.Select(e => e.Description))}"
+            );
         }
 
         user.EmailConfirmed = true;
@@ -69,11 +74,12 @@ public static class UserFactory
             store,
             options,
             new PasswordHasher<User>(),
-            new[] { new UserValidator<User>() },
-            new[] { new PasswordValidator<User>() },
+            [new UserValidator<User>()],
+            [new PasswordValidator<User>()],
             new UpperInvariantLookupNormalizer(),
             new IdentityErrorDescriber(),
             services: null!,
-            logger: NullLogger<UserManager<User>>.Instance);
+            logger: NullLogger<UserManager<User>>.Instance
+        );
     }
 }

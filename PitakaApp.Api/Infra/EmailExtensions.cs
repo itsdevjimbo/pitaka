@@ -12,7 +12,8 @@ public static class EmailExtensions
     // sends mail.
     public static WebApplicationBuilder AddEmailSender(this WebApplicationBuilder builder)
     {
-        builder.Services.AddOptions<EmailOption>()
+        builder
+            .Services.AddOptions<EmailOption>()
             .Bind(builder.Configuration.GetSection(EmailOption.SectionName))
             .ValidateDataAnnotations()
             .ValidateOnStart();
@@ -22,14 +23,16 @@ public static class EmailExtensions
         // settings: a missing reset URL fails on boot, not on the first person who
         // forgets their password. Token lifespan is Identity's DataProtectorTokenProvider
         // concern now, not this option's.
-        builder.Services.AddOptions<PasswordResetOption>()
+        builder
+            .Services.AddOptions<PasswordResetOption>()
             .Bind(builder.Configuration.GetSection(PasswordResetOption.SectionName))
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
         // Bound and validated alongside PasswordResetOption — same shape, same reason:
         // a missing confirm URL fails on boot, not on the first person who registers.
-        builder.Services.AddOptions<EmailConfirmationOption>()
+        builder
+            .Services.AddOptions<EmailConfirmationOption>()
             .Bind(builder.Configuration.GetSection(EmailConfirmationOption.SectionName))
             .ValidateDataAnnotations()
             .ValidateOnStart();
@@ -37,7 +40,8 @@ public static class EmailExtensions
         // The change-email flow's confirm URL and token lifespan (ADR 0014). Same
         // fail-on-boot treatment; the lifespan has a working default so only ConfirmUrl
         // is load-bearing in configuration.
-        builder.Services.AddOptions<EmailChangeOption>()
+        builder
+            .Services.AddOptions<EmailChangeOption>()
             .Bind(builder.Configuration.GetSection(EmailChangeOption.SectionName))
             .ValidateDataAnnotations()
             .ValidateOnStart();

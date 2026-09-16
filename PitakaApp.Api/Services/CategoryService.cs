@@ -5,44 +5,40 @@ using PitakaApp.Api.Models;
 
 namespace PitakaApp.Api.Services;
 
-public class CategoryService
+public class CategoryService(PitakaDbContext context)
 {
-    private readonly PitakaDbContext _context;
+    private readonly PitakaDbContext _context = context;
 
-    public CategoryService(PitakaDbContext context)
-    {
-        _context = context;
-    }
-    
     public async Task<List<Category>> GetAllForUser(User user) =>
-        await _context.Categories
-            .AsNoTracking()
+        await _context
+            .Categories.AsNoTracking()
             .Where(c => c.IsDefault || c.UserId == user.Id)
             .ToListAsync();
 
     public async Task<List<Category>> GetSystemDefaults() =>
-        await _context.Categories
-            .AsNoTracking()
-            .Where(c => c.IsDefault)
-            .ToListAsync();
+        await _context.Categories.AsNoTracking().Where(c => c.IsDefault).ToListAsync();
 
     public async Task<Category?> GetByIdForUser(User user, int id) =>
-        await _context.Categories
-            .AsNoTracking()
+        await _context
+            .Categories.AsNoTracking()
             .Where(c => c.Id == id && (c.UserId == user.Id || c.IsDefault))
             .FirstOrDefaultAsync();
 
     public async Task<Category?> GetTrackedByIdAsync(int id) =>
-        await _context.Categories
-            .Where(c => c.Id == id)
-            .FirstOrDefaultAsync();
+        await _context.Categories.Where(c => c.Id == id).FirstOrDefaultAsync();
 
     // excludeId lets Update check "does any OTHER category of mine already have this
     // name" without the category being renamed conflicting with itself.
-    public async Task<bool> NameExistsForUserAsync(int userId, string name, int? excludeId = null) =>
-        await _context.Categories
-            .AsNoTracking()
-            .AnyAsync(c => c.UserId == userId && c.Name == name && (excludeId == null || c.Id != excludeId));
+    public async Task<bool> NameExistsForUserAsync(
+        int userId,
+        string name,
+        int? excludeId = null
+    ) =>
+        await _context
+            .Categories.AsNoTracking()
+            .AnyAsync(c =>
+                c.UserId == userId && c.Name == name && (excludeId == null || c.Id != excludeId)
+            );
 
     public async Task<Category> CreateUserOwnedAsync(User user, CreateCategoryInput input)
     {
@@ -103,5 +99,7 @@ public class CategoryService
     public async Task<bool> IsInUseAsync(int categoryId) =>
         await _context.Transactions.AsNoTracking().AnyAsync(t => t.CategoryId == categoryId)
         || await _context.Budgets.AsNoTracking().AnyAsync(b => b.CategoryId == categoryId)
-        || await _context.RecurringTransactions.AsNoTracking().AnyAsync(rt => rt.CategoryId == categoryId);
+        || await _context
+            .RecurringTransactions.AsNoTracking()
+            .AnyAsync(rt => rt.CategoryId == categoryId);
 }

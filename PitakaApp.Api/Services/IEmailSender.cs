@@ -14,5 +14,6 @@ public interface IEmailSender
         string subject,
         string textBody,
         string htmlBody,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default
+    );
 }

@@ -1,5 +1,3 @@
 namespace PitakaApp.Api.Inputs;
 
-public record RequestPasswordResetInput(
-    string Email
-);
+public record RequestPasswordResetInput(string Email);

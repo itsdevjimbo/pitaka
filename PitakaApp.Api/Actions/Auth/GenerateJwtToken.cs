@@ -8,21 +8,16 @@ using PitakaApp.Api.Options;
 
 namespace PitakaApp.Api.Actions.Auth;
 
-public class GenerateJwtToken
+public class GenerateJwtToken(IOptions<JwtOption> jwtOptions)
 {
-    private readonly JwtOption _jwt;
-
-    public GenerateJwtToken(IOptions<JwtOption> jwtOptions)
-    {
-        _jwt = jwtOptions.Value;
-    }
+    private readonly JwtOption _jwt = jwtOptions.Value;
 
     public string Execute(User user)
     {
         var claims = new List<Claim>
         {
-            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new Claim(ClaimTypes.Email, user.Email),
+            new(ClaimTypes.NameIdentifier, user.Id.ToString()),
+            new(ClaimTypes.Email, user.Email),
         };
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwt.Key));

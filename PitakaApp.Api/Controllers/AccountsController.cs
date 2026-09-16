@@ -11,22 +11,15 @@ namespace PitakaApp.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/[controller]")]
-public class AccountsController : ControllerBase
+public class AccountsController(
+    AccountService accountService,
+    TransactionService transactionService,
+    CurrentUserAccessor currentUserAccessor
+) : ControllerBase
 {
-    private readonly AccountService _accountService;
-    private readonly TransactionService _transactionService;
-    private readonly CurrentUserAccessor _currentUserAccessor;
-
-    public AccountsController(
-        AccountService accountService,
-        TransactionService transactionService,
-        CurrentUserAccessor currentUserAccessor
-    )
-    {
-        _accountService = accountService;
-        _transactionService = transactionService;
-        _currentUserAccessor = currentUserAccessor;
-    }
+    private readonly AccountService _accountService = accountService;
+    private readonly TransactionService _transactionService = transactionService;
+    private readonly CurrentUserAccessor _currentUserAccessor = currentUserAccessor;
 
     [HttpGet]
     public async Task<IActionResult> Get([FromQuery] AccountQueryRequest request)
@@ -36,7 +29,7 @@ public class AccountsController : ControllerBase
 
         return Ok(AccountResource.Collection(accounts));
     }
-    
+
     [HttpPost]
     public async Task<IActionResult> Create(CreateAccountRequest request)
     {
@@ -44,14 +37,17 @@ public class AccountsController : ControllerBase
 
         if (await _accountService.NameExistsForUserAsync(user.Id, request.Name))
         {
-            return Problem(detail: "An account with this name already exists.", statusCode: StatusCodes.Status409Conflict);
+            return Problem(
+                detail: "An account with this name already exists.",
+                statusCode: StatusCodes.Status409Conflict
+            );
         }
 
         var account = await _accountService.CreateAsync(user, request.ToInput());
 
         return StatusCode(StatusCodes.Status201Created, AccountResource.FromModel(account));
     }
-    
+
     [HttpGet("{id}")]
     public async Task<IActionResult> Show(int id)
     {
@@ -79,9 +75,12 @@ public class AccountsController : ControllerBase
 
         if (await _accountService.NameExistsForUserAsync(user.Id, request.Name, excludeId: id))
         {
-            return Problem(detail: "An account with this name already exists.", statusCode: StatusCodes.Status409Conflict);
+            return Problem(
+                detail: "An account with this name already exists.",
+                statusCode: StatusCodes.Status409Conflict
+            );
         }
-        
+
         await _accountService.UpdateAsync(account, request.ToInput());
         return Ok(AccountResource.FromModel(account));
     }
@@ -101,7 +100,7 @@ public class AccountsController : ControllerBase
         return Ok(AccountResource.FromModel(account));
     }
 
-    [HttpDelete("{id}")] 
+    [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(int id)
     {
         var user = _currentUserAccessor.User!;
@@ -114,18 +113,24 @@ public class AccountsController : ControllerBase
 
         if (await _accountService.HasTransactionHistoryAsync(id))
         {
-            return Problem(detail: "This account has transaction history and cannot be deleted.", statusCode: StatusCodes.Status409Conflict);
+            return Problem(
+                detail: "This account has transaction history and cannot be deleted.",
+                statusCode: StatusCodes.Status409Conflict
+            );
         }
 
         if (await _accountService.HasGoalContributionsAsync(id))
         {
-            return Problem(detail: "This account contains funds allocated toward a specific goal.", statusCode: StatusCodes.Status409Conflict);
+            return Problem(
+                detail: "This account contains funds allocated toward a specific goal.",
+                statusCode: StatusCodes.Status409Conflict
+            );
         }
 
         await _accountService.DeleteAsync(account);
         return NoContent();
     }
-    
+
     [HttpGet("{id}/transactions")]
     public async Task<IActionResult> GetTransactions(int id)
     {
@@ -136,7 +141,7 @@ public class AccountsController : ControllerBase
         {
             return NotFound();
         }
-        
+
         var transactions = await _transactionService.GetAllForAccount(account);
         return Ok(TransactionResource.Collection(transactions));
     }

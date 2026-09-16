@@ -10,16 +10,14 @@ namespace PitakaApp.Api.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-
             migrationBuilder.CreateIndex(
                 name: "ix_accounts_user_id_name",
                 table: "accounts",
-                columns: new[] { "user_id", "name" },
-                unique: true);
+                columns: ["user_id", "name"],
+                unique: true
+            );
 
-            migrationBuilder.DropIndex(
-                name: "ix_accounts_user_id",
-                table: "accounts");
+            migrationBuilder.DropIndex(name: "ix_accounts_user_id", table: "accounts");
         }
 
         /// <inheritdoc />
@@ -28,11 +26,10 @@ namespace PitakaApp.Api.Migrations
             migrationBuilder.CreateIndex(
                 name: "ix_accounts_user_id",
                 table: "accounts",
-                column: "user_id");
+                column: "user_id"
+            );
 
-            migrationBuilder.DropIndex(
-                name: "ix_accounts_user_id_name",
-                table: "accounts");
+            migrationBuilder.DropIndex(name: "ix_accounts_user_id_name", table: "accounts");
         }
     }
 }

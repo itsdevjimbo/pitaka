@@ -12,7 +12,8 @@ namespace PitakaApp.Api.Migrations
         {
             migrationBuilder.DropForeignKey(
                 name: "fk_transactions_recurring_transactions_recurring_transaction_id",
-                table: "transactions");
+                table: "transactions"
+            );
 
             migrationBuilder.AddForeignKey(
                 name: "fk_transactions_recurring_transactions_recurring_transaction_id",
@@ -20,7 +21,8 @@ namespace PitakaApp.Api.Migrations
                 column: "recurring_transaction_id",
                 principalTable: "recurring_transactions",
                 principalColumn: "id",
-                onDelete: ReferentialAction.Restrict);
+                onDelete: ReferentialAction.Restrict
+            );
         }
 
         /// <inheritdoc />
@@ -28,7 +30,8 @@ namespace PitakaApp.Api.Migrations
         {
             migrationBuilder.DropForeignKey(
                 name: "fk_transactions_recurring_transactions_recurring_transaction_id",
-                table: "transactions");
+                table: "transactions"
+            );
 
             migrationBuilder.AddForeignKey(
                 name: "fk_transactions_recurring_transactions_recurring_transaction_id",
@@ -36,7 +39,8 @@ namespace PitakaApp.Api.Migrations
                 column: "recurring_transaction_id",
                 principalTable: "recurring_transactions",
                 principalColumn: "id",
-                onDelete: ReferentialAction.SetNull);
+                onDelete: ReferentialAction.SetNull
+            );
         }
     }
 }

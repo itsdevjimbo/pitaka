@@ -5,35 +5,32 @@ using PitakaApp.Api.Models;
 
 namespace PitakaApp.Api.Services;
 
-public class BudgetService
+public class BudgetService(PitakaDbContext context)
 {
-    private readonly PitakaDbContext _context;
+    private readonly PitakaDbContext _context = context;
 
-    public BudgetService(PitakaDbContext context)
-    {
-        _context = context;
-    }
-    
     public async Task<List<Budget>> GetAllForUser(User user) =>
-        await _context.Budgets
-            .AsNoTracking()
-            .Where(a => a.UserId == user.Id)
-            .ToListAsync();
+        await _context.Budgets.AsNoTracking().Where(a => a.UserId == user.Id).ToListAsync();
 
     public async Task<Budget?> GetByIdForUser(User user, int id) =>
-        await _context.Budgets
-            .AsNoTracking()
+        await _context
+            .Budgets.AsNoTracking()
             .Where(a => a.Id == id && a.UserId == user.Id)
             .FirstOrDefaultAsync();
 
     public async Task<Budget?> GetTrackedByIdAsync(int id) =>
-        await _context.Budgets
-            .Where(a => a.Id == id)
-            .FirstOrDefaultAsync();
-    public async Task<bool> NameExistsForUserAsync(int userId, string name, int? excludeId = null) =>
-        await _context.Budgets
-            .AsNoTracking()
-            .AnyAsync(a => a.UserId == userId && a.Name == name && (excludeId == null || a.Id != excludeId));
+        await _context.Budgets.Where(a => a.Id == id).FirstOrDefaultAsync();
+
+    public async Task<bool> NameExistsForUserAsync(
+        int userId,
+        string name,
+        int? excludeId = null
+    ) =>
+        await _context
+            .Budgets.AsNoTracking()
+            .AnyAsync(a =>
+                a.UserId == userId && a.Name == name && (excludeId == null || a.Id != excludeId)
+            );
 
     public async Task<Budget> CreateAsync(User user, BudgetInput input)
     {
@@ -46,13 +43,13 @@ public class BudgetService
             Period = input.Period,
             StartDate = input.StartDate,
             EndDate = input.EndDate,
-            Description = input.Description
+            Description = input.Description,
         };
 
         _context.Budgets.Add(budget);
 
         await _context.SaveChangesAsync();
-        return budget; 
+        return budget;
     }
 
     public async Task<Budget> UpdateAsync(Budget budget, BudgetInput input)

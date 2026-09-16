@@ -49,7 +49,8 @@ public class RedeemEmailChangeConcurrencyTest : IDisposable
         // winner has committed.
         var outcomes = await Task.WhenAll(
             redeemA.ExecuteAsync(inputA),
-            redeemB.ExecuteAsync(inputB));
+            redeemB.ExecuteAsync(inputB)
+        );
 
         Assert.Single(outcomes, o => o == RedeemEmailChangeOutcome.Succeeded);
         Assert.Single(outcomes, o => o == RedeemEmailChangeOutcome.EmailTaken);
@@ -62,12 +63,15 @@ public class RedeemEmailChangeConcurrencyTest : IDisposable
     // Put `userId` into the state a redeemable link implies — the address held as a
     // pending email with a live expiry — and mint the token the person would carry back,
     // all through the scope's own UserManager so the token's security stamp matches.
-    private static async Task<(RedeemEmailChange Redeem, RedeemEmailChangeInput Input)> ArrangePendingChange(
-        IServiceScope scope, int userId, string newEmail)
+    private static async Task<(
+        RedeemEmailChange Redeem,
+        RedeemEmailChangeInput Input
+    )> ArrangePendingChange(IServiceScope scope, int userId, string newEmail)
     {
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<User>>();
 
-        var user = await userManager.FindByIdAsync(userId.ToString())
+        var user =
+            await userManager.FindByIdAsync(userId.ToString())
             ?? throw new InvalidOperationException($"Profile {userId} not found.");
 
         user.PendingEmail = newEmail;
@@ -80,7 +84,8 @@ public class RedeemEmailChangeConcurrencyTest : IDisposable
         var redeem = new RedeemEmailChange(
             userManager,
             scope.ServiceProvider.GetRequiredService<PitakaDbContext>(),
-            scope.ServiceProvider.GetRequiredService<TimeProvider>());
+            scope.ServiceProvider.GetRequiredService<TimeProvider>()
+        );
 
         return (redeem, new RedeemEmailChangeInput(userId, token));
     }

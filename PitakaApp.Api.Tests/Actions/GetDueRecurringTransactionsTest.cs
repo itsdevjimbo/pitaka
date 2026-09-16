@@ -18,7 +18,8 @@ public class GetDueRecurringTransactionsTest : IDisposable
     {
         _scope = factory.Services.CreateScope();
         _context = _scope.ServiceProvider.GetRequiredService<PitakaDbContext>();
-        _getDueRecurringTransactions = _scope.ServiceProvider.GetRequiredService<GetDueRecurringTransactions>();
+        _getDueRecurringTransactions =
+            _scope.ServiceProvider.GetRequiredService<GetDueRecurringTransactions>();
     }
 
     [Fact]
@@ -29,7 +30,11 @@ public class GetDueRecurringTransactionsTest : IDisposable
 
         var startDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-3);
         var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
-            _context, user.Id, account.Id, startDate: startDate, nextRunDate: startDate
+            _context,
+            user.Id,
+            account.Id,
+            startDate: startDate,
+            nextRunDate: startDate
         );
 
         var dueRecurringTransactions = await _getDueRecurringTransactions.GetAsync();
@@ -45,7 +50,11 @@ public class GetDueRecurringTransactionsTest : IDisposable
 
         var startDate = DateOnly.FromDateTime(DateTime.UtcNow);
         var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
-            _context, user.Id, account.Id, startDate: startDate, nextRunDate: startDate
+            _context,
+            user.Id,
+            account.Id,
+            startDate: startDate,
+            nextRunDate: startDate
         );
 
         var dueRecurringTransactions = await _getDueRecurringTransactions.GetAsync();
@@ -68,13 +77,25 @@ public class GetDueRecurringTransactionsTest : IDisposable
         var startDate = DateOnly.FromDateTime(DateTime.UtcNow);
 
         var recurringTransactionA = await RecurringTransactionFactory.CreateAsync(
-            _context, userA.Id, accountA.Id, startDate: startDate, nextRunDate: startDate
+            _context,
+            userA.Id,
+            accountA.Id,
+            startDate: startDate,
+            nextRunDate: startDate
         );
         var recurringTransactionB = await RecurringTransactionFactory.CreateAsync(
-            _context, userB.Id, accountB.Id, startDate: startDate, nextRunDate: startDate
+            _context,
+            userB.Id,
+            accountB.Id,
+            startDate: startDate,
+            nextRunDate: startDate
         );
         var recurringTransactionC = await RecurringTransactionFactory.CreateAsync(
-            _context, userC.Id, accountC.Id, startDate: startDate, nextRunDate: startDate
+            _context,
+            userC.Id,
+            accountC.Id,
+            startDate: startDate,
+            nextRunDate: startDate
         );
 
         var dueRecurringTransactions = await _getDueRecurringTransactions.GetAsync();
@@ -92,7 +113,11 @@ public class GetDueRecurringTransactionsTest : IDisposable
 
         var startDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(1);
         var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
-            _context, user.Id, account.Id, startDate: startDate, nextRunDate: startDate
+            _context,
+            user.Id,
+            account.Id,
+            startDate: startDate,
+            nextRunDate: startDate
         );
 
         var dueRecurringTransactions = await _getDueRecurringTransactions.GetAsync();
@@ -108,7 +133,12 @@ public class GetDueRecurringTransactionsTest : IDisposable
 
         var startDate = DateOnly.FromDateTime(DateTime.UtcNow);
         var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
-            _context, user.Id, account.Id, startDate: startDate, nextRunDate: startDate, status: RecurringTransactionStatus.Paused
+            _context,
+            user.Id,
+            account.Id,
+            startDate: startDate,
+            nextRunDate: startDate,
+            status: RecurringTransactionStatus.Paused
         );
 
         var dueRecurringTransactions = await _getDueRecurringTransactions.GetAsync();
@@ -124,7 +154,12 @@ public class GetDueRecurringTransactionsTest : IDisposable
 
         var startDate = DateOnly.FromDateTime(DateTime.UtcNow);
         var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
-            _context, user.Id, account.Id, startDate: startDate, nextRunDate: startDate, status: RecurringTransactionStatus.Completed
+            _context,
+            user.Id,
+            account.Id,
+            startDate: startDate,
+            nextRunDate: startDate,
+            status: RecurringTransactionStatus.Completed
         );
 
         var dueRecurringTransactions = await _getDueRecurringTransactions.GetAsync();
@@ -140,7 +175,12 @@ public class GetDueRecurringTransactionsTest : IDisposable
 
         var startDate = DateOnly.FromDateTime(DateTime.UtcNow);
         var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
-            _context, user.Id, account.Id, startDate: startDate, nextRunDate: startDate, status: RecurringTransactionStatus.Cancelled
+            _context,
+            user.Id,
+            account.Id,
+            startDate: startDate,
+            nextRunDate: startDate,
+            status: RecurringTransactionStatus.Cancelled
         );
 
         var dueRecurringTransactions = await _getDueRecurringTransactions.GetAsync();
@@ -156,7 +196,11 @@ public class GetDueRecurringTransactionsTest : IDisposable
 
         var startDate = DateOnly.FromDateTime(DateTime.UtcNow);
         var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
-            _context, user.Id, account.Id, startDate: startDate, nextRunDate: startDate
+            _context,
+            user.Id,
+            account.Id,
+            startDate: startDate,
+            nextRunDate: startDate
         );
 
         var dueRecurringTransactions = await _getDueRecurringTransactions.GetAsync();

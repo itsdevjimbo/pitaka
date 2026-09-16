@@ -1,4 +1,3 @@
-
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
@@ -23,7 +22,7 @@ public class TagsControllerTest : IDisposable
         _context = _scope.ServiceProvider.GetRequiredService<PitakaDbContext>();
         _client = factory.CreateClient();
     }
-    
+
     [Fact]
     public async Task Get_WithoutLoggedInUser_ReturnsUnauthorized()
     {
@@ -52,11 +51,8 @@ public class TagsControllerTest : IDisposable
     [Fact]
     public async Task Create_WithNoLoggedInUser_ReturnsUnauthorized()
     {
-        var request = new
-        {
-            Name = "Test tag 1"
-        };
-        
+        var request = new { Name = "Test tag 1" };
+
         var response = await _client.PostAsJsonAsync("/api/tags", request);
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -69,11 +65,8 @@ public class TagsControllerTest : IDisposable
 
         _client.ActAsUser(user);
 
-        var request = new
-        {
-            Name = "Duplicate name"
-        };
-        
+        var request = new { Name = "Duplicate name" };
+
         var response = await _client.PostAsJsonAsync("/api/tags", request);
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
     }
@@ -87,11 +80,8 @@ public class TagsControllerTest : IDisposable
 
         _client.ActAsUser(user);
 
-        var request = new
-        {
-            Name = "Duplicate name"
-        };
-        
+        var request = new { Name = "Duplicate name" };
+
         var response = await _client.PostAsJsonAsync("/api/tags", request);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
     }
@@ -102,17 +92,14 @@ public class TagsControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         _client.ActAsUser(user);
 
-        var request = new
-        {
-            Name = "pitaka-app"
-        };
-        
+        var request = new { Name = "pitaka-app" };
+
         var response = await _client.PostAsJsonAsync("/api/tags", request);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
         var tag = await _context.Tags.SingleAsync(t => t.UserId == user.Id);
         var body = await response.Content.ReadFromJsonAsync<TagResource>();
-        
+
         Assert.Equal(tag.Id, body!.Id);
         Assert.Equal("pitaka-app", body!.Name);
     }
@@ -167,7 +154,10 @@ public class TagsControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         var tag = await TagFactory.CreateAsync(_context, user.Id);
 
-        var response = await _client.PutAsJsonAsync("/api/tags/" + tag.Id, new { Name = "Update tag" });
+        var response = await _client.PutAsJsonAsync(
+            "/api/tags/" + tag.Id,
+            new { Name = "Update tag" }
+        );
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
@@ -189,7 +179,10 @@ public class TagsControllerTest : IDisposable
 
         _client.ActAsUser(user);
 
-        var response = await _client.PutAsJsonAsync("/api/tags/" + tag.Id, new { Name = "Update tag" });
+        var response = await _client.PutAsJsonAsync(
+            "/api/tags/" + tag.Id,
+            new { Name = "Update tag" }
+        );
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
@@ -202,7 +195,10 @@ public class TagsControllerTest : IDisposable
 
         _client.ActAsUser(user);
 
-        var response = await _client.PutAsJsonAsync("/api/tags/" + tag.Id, new { Name = "Duplicate Name"});
+        var response = await _client.PutAsJsonAsync(
+            "/api/tags/" + tag.Id,
+            new { Name = "Duplicate Name" }
+        );
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
     }
 
@@ -214,7 +210,10 @@ public class TagsControllerTest : IDisposable
 
         _client.ActAsUser(user);
 
-        var response = await _client.PutAsJsonAsync("/api/tags/" + tag.Id, new { Name = "Update Name" });
+        var response = await _client.PutAsJsonAsync(
+            "/api/tags/" + tag.Id,
+            new { Name = "Update Name" }
+        );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         await _context.Entry(tag).ReloadAsync();

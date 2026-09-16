@@ -51,11 +51,10 @@ public class ProfileControllerRealAuthTest : IDisposable
         var email = _faker.Internet.Email();
         await UserFactory.CreateAsync(_context, email);
 
-        var loginResponse = await _client.PostAsJsonAsync("/api/auth/login", new
-        {
-            email,
-            password = UserFactory.DefaultPassword,
-        });
+        var loginResponse = await _client.PostAsJsonAsync(
+            "/api/auth/login",
+            new { email, password = UserFactory.DefaultPassword }
+        );
         Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
 
         var loginBody = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>();
@@ -80,33 +79,44 @@ public class ProfileControllerRealAuthTest : IDisposable
         // the delivered mail, confirm, log in, then a real bearer token reaches the read.
         var email = _faker.Internet.Email();
 
-        var registerResponse = await _client.PostAsJsonAsync("/api/auth/register", new
-        {
-            name = _faker.Person.FullName,
-            email,
-            password = "TestPass123!",
-        });
+        var registerResponse = await _client.PostAsJsonAsync(
+            "/api/auth/register",
+            new
+            {
+                name = _faker.Person.FullName,
+                email,
+                password = "TestPass123!",
+            }
+        );
         Assert.Equal(HttpStatusCode.Created, registerResponse.StatusCode);
 
         var registerBody = await registerResponse.Content.ReadFromJsonAsync<ProfileResponse>();
         Assert.NotNull(registerBody);
 
         var confirmMessage = Assert.Single(_emailSender.To(email));
-        var match = Regex.Match(confirmMessage.TextBody, @"userId=(?<userId>\d+)&token=(?<token>[^\s]+)");
-        Assert.True(match.Success, $"No confirm-email link found in email body:\n{confirmMessage.TextBody}");
+        var match = Regex.Match(
+            confirmMessage.TextBody,
+            @"userId=(?<userId>\d+)&token=(?<token>[^\s]+)"
+        );
+        Assert.True(
+            match.Success,
+            $"No confirm-email link found in email body:\n{confirmMessage.TextBody}"
+        );
 
-        var confirmResponse = await _client.PostAsJsonAsync("/api/auth/confirm-email", new
-        {
-            userId = int.Parse(match.Groups["userId"].Value),
-            token = Uri.UnescapeDataString(match.Groups["token"].Value),
-        });
+        var confirmResponse = await _client.PostAsJsonAsync(
+            "/api/auth/confirm-email",
+            new
+            {
+                userId = int.Parse(match.Groups["userId"].Value),
+                token = Uri.UnescapeDataString(match.Groups["token"].Value),
+            }
+        );
         Assert.Equal(HttpStatusCode.NoContent, confirmResponse.StatusCode);
 
-        var loginResponse = await _client.PostAsJsonAsync("/api/auth/login", new
-        {
-            email,
-            password = "TestPass123!",
-        });
+        var loginResponse = await _client.PostAsJsonAsync(
+            "/api/auth/login",
+            new { email, password = "TestPass123!" }
+        );
         Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
 
         var loginBody = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>();
@@ -129,11 +139,10 @@ public class ProfileControllerRealAuthTest : IDisposable
         var email = _faker.Internet.Email();
         await UserFactory.CreateAsync(_context, email);
 
-        var loginResponse = await _client.PostAsJsonAsync("/api/auth/login", new
-        {
-            email,
-            password = UserFactory.DefaultPassword,
-        });
+        var loginResponse = await _client.PostAsJsonAsync(
+            "/api/auth/login",
+            new { email, password = UserFactory.DefaultPassword }
+        );
         var loginBody = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>();
 
         // Flip the last character of the signature segment — same claims, invalid signature.
@@ -164,11 +173,12 @@ public class ProfileControllerRealAuthTest : IDisposable
         var newEmail = _faker.Internet.Email();
         var token = await RegisterConfirmAndLogInAsync(oldEmail, password);
 
-        var response = await Send(HttpMethod.Post, "/api/profile/email-change", token, new
-        {
-            newEmail,
-            currentPassword = password,
-        });
+        var response = await Send(
+            HttpMethod.Post,
+            "/api/profile/email-change",
+            token,
+            new { newEmail, currentPassword = password }
+        );
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
 
@@ -210,11 +220,12 @@ public class ProfileControllerRealAuthTest : IDisposable
         var newEmail = _faker.Internet.Email();
         var token = await RegisterConfirmAndLogInAsync(oldEmail, password);
 
-        var response = await Send(HttpMethod.Post, "/api/profile/email-change", token, new
-        {
-            newEmail,
-            currentPassword = "not-the-password",
-        });
+        var response = await Send(
+            HttpMethod.Post,
+            "/api/profile/email-change",
+            token,
+            new { newEmail, currentPassword = "not-the-password" }
+        );
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.Empty(_emailSender.To(newEmail));
@@ -230,11 +241,10 @@ public class ProfileControllerRealAuthTest : IDisposable
     {
         var newEmail = _faker.Internet.Email();
 
-        var response = await _client.PostAsJsonAsync("/api/profile/email-change", new
-        {
-            newEmail,
-            currentPassword = "TestPass123!",
-        });
+        var response = await _client.PostAsJsonAsync(
+            "/api/profile/email-change",
+            new { newEmail, currentPassword = "TestPass123!" }
+        );
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.Empty(_emailSender.To(newEmail));
@@ -247,11 +257,12 @@ public class ProfileControllerRealAuthTest : IDisposable
         var email = _faker.Internet.Email();
         var token = await RegisterConfirmAndLogInAsync(email, password);
 
-        var response = await Send(HttpMethod.Post, "/api/profile/email-change", token, new
-        {
-            newEmail = email,
-            currentPassword = password,
-        });
+        var response = await Send(
+            HttpMethod.Post,
+            "/api/profile/email-change",
+            token,
+            new { newEmail = email, currentPassword = password }
+        );
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         // Only the sign-up confirmation — no "confirm your new email" was sent.
@@ -268,11 +279,12 @@ public class ProfileControllerRealAuthTest : IDisposable
 
         var otherProfile = await UserFactory.CreateAsync(_context);
 
-        var response = await Send(HttpMethod.Post, "/api/profile/email-change", token, new
-        {
-            newEmail = otherProfile.Email,
-            currentPassword = password,
-        });
+        var response = await Send(
+            HttpMethod.Post,
+            "/api/profile/email-change",
+            token,
+            new { newEmail = otherProfile.Email, currentPassword = password }
+        );
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         Assert.Empty(_emailSender.To(otherProfile.Email!));
@@ -305,11 +317,12 @@ public class ProfileControllerRealAuthTest : IDisposable
         // the assertion below is about what this one request adds.
         var oldBefore = _emailSender.To(oldEmail).Count;
 
-        var response = await Send(HttpMethod.Post, "/api/profile/email-change", token, new
-        {
-            newEmail,
-            currentPassword = password,
-        });
+        var response = await Send(
+            HttpMethod.Post,
+            "/api/profile/email-change",
+            token,
+            new { newEmail, currentPassword = password }
+        );
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
 
         // One request, two sends: the confirmation link to the new address and a notice
@@ -347,7 +360,10 @@ public class ProfileControllerRealAuthTest : IDisposable
 
         var (userId, token) = await RequestChangeAndReadLink(bearer, newEmail, password);
 
-        var confirm = await _client.PostAsJsonAsync("/api/profile/email-change/confirm", new { userId, token });
+        var confirm = await _client.PostAsJsonAsync(
+            "/api/profile/email-change/confirm",
+            new { userId, token }
+        );
         Assert.Equal(HttpStatusCode.NoContent, confirm.StatusCode);
 
         // The new address signs in; the old one no longer does.
@@ -378,8 +394,10 @@ public class ProfileControllerRealAuthTest : IDisposable
 
         var (userId, _) = await RequestChangeAndReadLink(bearer, newEmail, password);
 
-        var response = await _client.PostAsJsonAsync("/api/profile/email-change/confirm",
-            new { userId, token = "this-token-was-never-issued" });
+        var response = await _client.PostAsJsonAsync(
+            "/api/profile/email-change/confirm",
+            new { userId, token = "this-token-was-never-issued" }
+        );
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
@@ -406,7 +424,10 @@ public class ProfileControllerRealAuthTest : IDisposable
         pending.PendingEmailExpiresAt = DateTime.UtcNow.AddMinutes(-1);
         await _context.SaveChangesAsync();
 
-        var response = await _client.PostAsJsonAsync("/api/profile/email-change/confirm", new { userId, token });
+        var response = await _client.PostAsJsonAsync(
+            "/api/profile/email-change/confirm",
+            new { userId, token }
+        );
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await LogIn(oldEmail, password)).StatusCode);
@@ -445,15 +466,19 @@ public class ProfileControllerRealAuthTest : IDisposable
         // story 7). It fails as the same 400 with problem+json that
         // ConfirmEmailChange_WithGarbageToken_ReturnsOneProblemDetails400 pins for any
         // other dead link; the spec forbids asserting on the body past that.
-        var stale = await _client.PostAsJsonAsync("/api/profile/email-change/confirm",
-            new { userId, token = firstToken });
+        var stale = await _client.PostAsJsonAsync(
+            "/api/profile/email-change/confirm",
+            new { userId, token = firstToken }
+        );
         Assert.Equal(HttpStatusCode.BadRequest, stale.StatusCode);
         Assert.Equal("application/problem+json", stale.Content.Headers.ContentType?.MediaType);
         Assert.Equal(HttpStatusCode.Unauthorized, (await LogIn(typoTarget, password)).StatusCode);
 
         // The corrected link redeems normally.
-        var fresh = await _client.PostAsJsonAsync("/api/profile/email-change/confirm",
-            new { userId, token = secondToken });
+        var fresh = await _client.PostAsJsonAsync(
+            "/api/profile/email-change/confirm",
+            new { userId, token = secondToken }
+        );
         Assert.Equal(HttpStatusCode.NoContent, fresh.StatusCode);
 
         // Only the address most recently asked for was applied: the corrected address
@@ -480,7 +505,10 @@ public class ProfileControllerRealAuthTest : IDisposable
         // is covered by RedeemEmailChangeConcurrencyTest.
         await UserFactory.CreateAsync(_context, newEmail);
 
-        var response = await _client.PostAsJsonAsync("/api/profile/email-change/confirm", new { userId, token });
+        var response = await _client.PostAsJsonAsync(
+            "/api/profile/email-change/confirm",
+            new { userId, token }
+        );
 
         // Its own 409 — distinct from the non-specific 400 every other redemption
         // failure collapses to — and worded to say what happened (the address was
@@ -501,11 +529,12 @@ public class ProfileControllerRealAuthTest : IDisposable
         Assert.Equal(newEmail, profile.PendingEmail);
 
         // And a fresh request to a different address is accepted.
-        var retry = await Send(HttpMethod.Post, "/api/profile/email-change", bearer, new
-        {
-            newEmail = _faker.Internet.Email(),
-            currentPassword = password,
-        });
+        var retry = await Send(
+            HttpMethod.Post,
+            "/api/profile/email-change",
+            bearer,
+            new { newEmail = _faker.Internet.Email(), currentPassword = password }
+        );
         Assert.Equal(HttpStatusCode.NoContent, retry.StatusCode);
     }
 
@@ -599,14 +628,22 @@ public class ProfileControllerRealAuthTest : IDisposable
 
         var (userId, token) = await RequestChangeAndReadLink(bearer, newEmail, password);
 
-        var cancel = await Send(HttpMethod.Post, "/api/profile/email-change/cancel", bearer, body: null);
+        var cancel = await Send(
+            HttpMethod.Post,
+            "/api/profile/email-change/cancel",
+            bearer,
+            body: null
+        );
         Assert.Equal(HttpStatusCode.NoContent, cancel.StatusCode);
 
         // Gone from the Profile, and the link that was mailed no longer redeems — it
         // fails with the same non-specific 400 as any other dead link.
         Assert.Null((await ReadProfile(bearer)).PendingEmail);
 
-        var redeem = await _client.PostAsJsonAsync("/api/profile/email-change/confirm", new { userId, token });
+        var redeem = await _client.PostAsJsonAsync(
+            "/api/profile/email-change/confirm",
+            new { userId, token }
+        );
         Assert.Equal(HttpStatusCode.BadRequest, redeem.StatusCode);
 
         Assert.Equal(HttpStatusCode.OK, (await LogIn(oldEmail, password)).StatusCode);
@@ -620,7 +657,12 @@ public class ProfileControllerRealAuthTest : IDisposable
         var email = _faker.Internet.Email();
         var bearer = await RegisterConfirmAndLogInAsync(email, password);
 
-        var cancel = await Send(HttpMethod.Post, "/api/profile/email-change/cancel", bearer, body: null);
+        var cancel = await Send(
+            HttpMethod.Post,
+            "/api/profile/email-change/cancel",
+            bearer,
+            body: null
+        );
 
         Assert.Equal(HttpStatusCode.NoContent, cancel.StatusCode);
     }
@@ -667,18 +709,29 @@ public class ProfileControllerRealAuthTest : IDisposable
 
         // No current password is supplied — the request has no field for one — and the
         // rename still succeeds.
-        var response = await Send(HttpMethod.Put, "/api/profile", bearer, new { name = _faker.Person.FullName });
+        var response = await Send(
+            HttpMethod.Put,
+            "/api/profile",
+            bearer,
+            new { name = _faker.Person.FullName }
+        );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         // The session that made the change still works after it, and still signs in.
-        Assert.Equal(HttpStatusCode.OK, (await Send(HttpMethod.Get, "/api/profile", bearer, body: null)).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await Send(HttpMethod.Get, "/api/profile", bearer, body: null)).StatusCode
+        );
         Assert.Equal(HttpStatusCode.OK, (await LogIn(email, password)).StatusCode);
     }
 
     [Fact]
     public async Task UpdateProfile_WithoutBearerToken_ReturnsUnauthorized()
     {
-        var response = await _client.PutAsJsonAsync("/api/profile", new { name = _faker.Person.FullName });
+        var response = await _client.PutAsJsonAsync(
+            "/api/profile",
+            new { name = _faker.Person.FullName }
+        );
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
@@ -692,11 +745,12 @@ public class ProfileControllerRealAuthTest : IDisposable
         var email = _faker.Internet.Email();
         var bearer = await RegisterConfirmAndLogInAsync(email, oldPassword);
 
-        var response = await Send(HttpMethod.Post, "/api/profile/password", bearer, new
-        {
-            oldPassword,
-            newPassword,
-        });
+        var response = await Send(
+            HttpMethod.Post,
+            "/api/profile/password",
+            bearer,
+            new { oldPassword, newPassword }
+        );
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
         Assert.Empty(await response.Content.ReadAsByteArrayAsync());
@@ -714,11 +768,12 @@ public class ProfileControllerRealAuthTest : IDisposable
         var email = _faker.Internet.Email();
         var bearer = await RegisterConfirmAndLogInAsync(email, oldPassword);
 
-        var response = await Send(HttpMethod.Post, "/api/profile/password", bearer, new
-        {
-            oldPassword,
-            newPassword,
-        });
+        var response = await Send(
+            HttpMethod.Post,
+            "/api/profile/password",
+            bearer,
+            new { oldPassword, newPassword }
+        );
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
 
         // The change rotates the security stamp but does not revoke issued JWTs
@@ -734,11 +789,12 @@ public class ProfileControllerRealAuthTest : IDisposable
         var email = _faker.Internet.Email();
         var bearer = await RegisterConfirmAndLogInAsync(email, password);
 
-        var response = await Send(HttpMethod.Post, "/api/profile/password", bearer, new
-        {
-            oldPassword = "not-the-password",
-            newPassword = "A-Fresh-Passphrase-9",
-        });
+        var response = await Send(
+            HttpMethod.Post,
+            "/api/profile/password",
+            bearer,
+            new { oldPassword = "not-the-password", newPassword = "A-Fresh-Passphrase-9" }
+        );
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
 
@@ -750,7 +806,10 @@ public class ProfileControllerRealAuthTest : IDisposable
         // Nothing about the Profile changed: the current password still signs in and the
         // one that was offered as a replacement does not.
         Assert.Equal(HttpStatusCode.OK, (await LogIn(email, password)).StatusCode);
-        Assert.Equal(HttpStatusCode.Unauthorized, (await LogIn(email, "A-Fresh-Passphrase-9")).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.Unauthorized,
+            (await LogIn(email, "A-Fresh-Passphrase-9")).StatusCode
+        );
     }
 
     [Fact]
@@ -764,11 +823,12 @@ public class ProfileControllerRealAuthTest : IDisposable
         // carries no lockout side effect, so none of these count against the Profile.
         for (var i = 0; i < 12; i++)
         {
-            var attempt = await Send(HttpMethod.Post, "/api/profile/password", bearer, new
-            {
-                oldPassword = "still-not-it",
-                newPassword = "A-Fresh-Passphrase-9",
-            });
+            var attempt = await Send(
+                HttpMethod.Post,
+                "/api/profile/password",
+                bearer,
+                new { oldPassword = "still-not-it", newPassword = "A-Fresh-Passphrase-9" }
+            );
             Assert.Equal(HttpStatusCode.Unauthorized, attempt.StatusCode);
         }
 
@@ -783,11 +843,12 @@ public class ProfileControllerRealAuthTest : IDisposable
         var email = _faker.Internet.Email();
         var bearer = await RegisterConfirmAndLogInAsync(email, password);
 
-        var response = await Send(HttpMethod.Post, "/api/profile/password", bearer, new
-        {
-            oldPassword = password,
-            newPassword = "short",
-        });
+        var response = await Send(
+            HttpMethod.Post,
+            "/api/profile/password",
+            bearer,
+            new { oldPassword = password, newPassword = "short" }
+        );
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>();
@@ -802,11 +863,10 @@ public class ProfileControllerRealAuthTest : IDisposable
     [Fact]
     public async Task ChangePassword_WithoutBearerToken_ReturnsUnauthorized()
     {
-        var response = await _client.PostAsJsonAsync("/api/profile/password", new
-        {
-            oldPassword = "TestPass123!",
-            newPassword = "A-Fresh-Passphrase-9",
-        });
+        var response = await _client.PostAsJsonAsync(
+            "/api/profile/password",
+            new { oldPassword = "TestPass123!", newPassword = "A-Fresh-Passphrase-9" }
+        );
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -824,20 +884,27 @@ public class ProfileControllerRealAuthTest : IDisposable
     // Request an email change with the given bearer and read the confirmation link back
     // out of the outbox — the userId and token the client would pull from the URL.
     private async Task<(int UserId, string Token)> RequestChangeAndReadLink(
-        string bearer, string newEmail, string currentPassword)
+        string bearer,
+        string newEmail,
+        string currentPassword
+    )
     {
-        var response = await Send(HttpMethod.Post, "/api/profile/email-change", bearer, new
-        {
-            newEmail,
-            currentPassword,
-        });
+        var response = await Send(
+            HttpMethod.Post,
+            "/api/profile/email-change",
+            bearer,
+            new { newEmail, currentPassword }
+        );
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
 
         var message = _emailSender.To(newEmail).Last();
         var match = Regex.Match(message.TextBody, @"userId=(?<userId>\d+)&token=(?<token>[^\s]+)");
         Assert.True(match.Success, $"No confirm-email-change link in:\n{message.TextBody}");
 
-        return (int.Parse(match.Groups["userId"].Value), Uri.UnescapeDataString(match.Groups["token"].Value));
+        return (
+            int.Parse(match.Groups["userId"].Value),
+            Uri.UnescapeDataString(match.Groups["token"].Value)
+        );
     }
 
     // Register, pull the confirmation link out of the outbox, confirm, then log in —
@@ -845,23 +912,32 @@ public class ProfileControllerRealAuthTest : IDisposable
     // get a real bearer token for a confirmed Profile.
     private async Task<string> RegisterConfirmAndLogInAsync(string email, string password)
     {
-        var registerResponse = await _client.PostAsJsonAsync("/api/auth/register", new
-        {
-            name = _faker.Person.FullName,
-            email,
-            password,
-        });
+        var registerResponse = await _client.PostAsJsonAsync(
+            "/api/auth/register",
+            new
+            {
+                name = _faker.Person.FullName,
+                email,
+                password,
+            }
+        );
         Assert.Equal(HttpStatusCode.Created, registerResponse.StatusCode);
 
         var confirmMessage = Assert.Single(_emailSender.To(email));
-        var match = Regex.Match(confirmMessage.TextBody, @"userId=(?<userId>\d+)&token=(?<token>[^\s]+)");
+        var match = Regex.Match(
+            confirmMessage.TextBody,
+            @"userId=(?<userId>\d+)&token=(?<token>[^\s]+)"
+        );
         Assert.True(match.Success, $"No confirm-email link in:\n{confirmMessage.TextBody}");
 
-        var confirmResponse = await _client.PostAsJsonAsync("/api/auth/confirm-email", new
-        {
-            userId = int.Parse(match.Groups["userId"].Value),
-            token = Uri.UnescapeDataString(match.Groups["token"].Value),
-        });
+        var confirmResponse = await _client.PostAsJsonAsync(
+            "/api/auth/confirm-email",
+            new
+            {
+                userId = int.Parse(match.Groups["userId"].Value),
+                token = Uri.UnescapeDataString(match.Groups["token"].Value),
+            }
+        );
         Assert.Equal(HttpStatusCode.NoContent, confirmResponse.StatusCode);
 
         var loginResponse = await LogIn(email, password);
@@ -874,7 +950,12 @@ public class ProfileControllerRealAuthTest : IDisposable
     private Task<HttpResponseMessage> LogIn(string email, string password) =>
         _client.PostAsJsonAsync("/api/auth/login", new { email, password });
 
-    private Task<HttpResponseMessage> Send(HttpMethod method, string uri, string bearerToken, object? body)
+    private Task<HttpResponseMessage> Send(
+        HttpMethod method,
+        string uri,
+        string bearerToken,
+        object? body
+    )
     {
         var request = new HttpRequestMessage(method, uri);
         if (body is not null)

@@ -7,38 +7,43 @@ using PitakaApp.Api.Models;
 
 namespace PitakaApp.Api.Services;
 
-public class GoalService
+public class GoalService(PitakaDbContext context)
 {
-    private readonly PitakaDbContext _context;
+    private readonly PitakaDbContext _context = context;
 
-    public GoalService(PitakaDbContext context)
-    {
-        _context = context;
-    }
-    
     public async Task<List<GoalWithCurrentAmount>> GetAllForUser(User user) =>
-        await _context.Goals
-            .AsNoTracking()
+        await _context
+            .Goals.AsNoTracking()
             .Where(g => g.UserId == user.Id)
-            .Select(goal => new GoalWithCurrentAmount (
-                goal.Id, goal.Name, goal.TargetAmount, goal.TargetDate, goal.Status, goal.Contributions.Sum(gc => gc.Amount)
+            .Select(goal => new GoalWithCurrentAmount(
+                goal.Id,
+                goal.Name,
+                goal.TargetAmount,
+                goal.TargetDate,
+                goal.Status,
+                goal.Contributions.Sum(gc => gc.Amount)
             ))
             .ToListAsync();
 
     public async Task<Goal?> GetByIdForUser(User user, int id) =>
-        await _context.Goals
-            .AsNoTracking()
+        await _context
+            .Goals.AsNoTracking()
             .Where(a => a.Id == id && a.UserId == user.Id)
             .FirstOrDefaultAsync();
 
     public async Task<Goal?> GetTrackedByIdAsync(int id) =>
-        await _context.Goals
-            .Where(a => a.Id == id)
-            .FirstOrDefaultAsync();
-    public async Task<bool> NameExistsForUserAsync(int userId, string name, int? excludeId = null) =>
-        await _context.Goals
-            .AsNoTracking()
-            .AnyAsync(a => a.UserId == userId && a.Name == name && (excludeId == null || a.Id != excludeId));
+        await _context.Goals.Where(a => a.Id == id).FirstOrDefaultAsync();
+
+    public async Task<bool> NameExistsForUserAsync(
+        int userId,
+        string name,
+        int? excludeId = null
+    ) =>
+        await _context
+            .Goals.AsNoTracking()
+            .AnyAsync(a =>
+                a.UserId == userId && a.Name == name && (excludeId == null || a.Id != excludeId)
+            );
 
     public async Task<Goal> CreateAsync(User user, GoalInput input)
     {
@@ -47,12 +52,12 @@ public class GoalService
             UserId = user.Id,
             Name = input.Name,
             TargetAmount = input.TargetAmount,
-            TargetDate = input.TargetDate
+            TargetDate = input.TargetDate,
         };
 
         _context.Goals.Add(goal);
         await _context.SaveChangesAsync();
-        return goal; 
+        return goal;
     }
 
     public async Task<Goal> UpdateAsync(Goal goal, GoalInput input)

@@ -11,7 +11,7 @@ public class RecurringTransaction : TimestampedEntity
     public required int AccountId { get; set; }
 
     public int? CategoryId { get; set; }
-    
+
     [MaxLength(255)]
     public required string Name { get; set; }
 
@@ -23,8 +23,8 @@ public class RecurringTransaction : TimestampedEntity
     public string? Description { get; set; }
 
     public required Frequency Frequency { get; set; }
-    
-    public required DateOnly StartDate { get; set;}
+
+    public required DateOnly StartDate { get; set; }
 
     public DateOnly? EndDate { get; set; }
 
@@ -32,8 +32,7 @@ public class RecurringTransaction : TimestampedEntity
 
     public RecurringTransactionStatus Status { get; set; } = RecurringTransactionStatus.Active;
 
-    
-    public User User { get; set;} = null!;
+    public User User { get; set; } = null!;
 
     public Account Account { get; set; } = null!;
 

@@ -9,18 +9,15 @@ namespace PitakaApp.Api.Actions.Auth;
 
 // Shared by RegisterUser (the first confirmation email) and ResendConfirmation (a fresh
 // one) so the token generation and the email body are written once.
-public class SendEmailConfirmation
+public class SendEmailConfirmation(
+    UserManager<User> userManager,
+    IEmailSender emailSender,
+    IOptions<EmailConfirmationOption> option
+)
 {
-    private readonly UserManager<User> _userManager;
-    private readonly IEmailSender _emailSender;
-    private readonly EmailConfirmationOption _option;
-
-    public SendEmailConfirmation(UserManager<User> userManager, IEmailSender emailSender, IOptions<EmailConfirmationOption> option)
-    {
-        _userManager = userManager;
-        _emailSender = emailSender;
-        _option = option.Value;
-    }
+    private readonly UserManager<User> _userManager = userManager;
+    private readonly IEmailSender _emailSender = emailSender;
+    private readonly EmailConfirmationOption _option = option.Value;
 
     public async Task ExecuteAsync(User user)
     {
@@ -36,7 +33,8 @@ public class SendEmailConfirmation
             user.Email!,
             "Confirm your Pitaka Profile",
             ComposeTextBody(url),
-            ComposeHtmlBody(url));
+            ComposeHtmlBody(url)
+        );
     }
 
     // Plain text. Says Profile, never "user" or "account", per CONTEXT.md. States that
@@ -44,16 +42,16 @@ public class SendEmailConfirmation
     // confirm URL with the Profile id and token appended.
     private static string ComposeTextBody(string url) =>
         $"""
-        Hi,
+            Hi,
 
-        Welcome to Pitaka. Confirm your Profile to finish signing up:
-        {url}
+            Welcome to Pitaka. Confirm your Profile to finish signing up:
+            {url}
 
-        If you ignore this message, your Profile stays unusable — you will not
-        be able to sign in until it is confirmed.
+            If you ignore this message, your Profile stays unusable — you will not
+            be able to sign in until it is confirmed.
 
-        — Pitaka
-        """;
+            — Pitaka
+            """;
 
     private static string ComposeHtmlBody(string url)
     {

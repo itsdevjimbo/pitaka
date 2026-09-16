@@ -1,5 +1,3 @@
 namespace PitakaApp.Api.Inputs;
 
-public record ChangeProfileNameInput(
-    string Name
-);
+public record ChangeProfileNameInput(string Name);

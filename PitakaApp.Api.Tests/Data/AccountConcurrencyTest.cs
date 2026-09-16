@@ -39,8 +39,8 @@ public class AccountConcurrencyTest : IDisposable
         await contextA.SaveChangesAsync(); // wins the race, Version increments
 
         accountB.Increase(50);
-        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(
-            () => contextB.SaveChangesAsync() // stale Version, should throw
+        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() =>
+            contextB.SaveChangesAsync() // stale Version, should throw
         );
     }
 

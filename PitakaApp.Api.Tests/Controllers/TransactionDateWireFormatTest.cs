@@ -41,13 +41,16 @@ public class TransactionDateWireFormatTest : IDisposable
         _client.ActAsUser(user);
 
         // Round-trips through TransactionService.CreateAsync, not a directly-written model.
-        var createResponse = await _client.PostAsJsonAsync("/api/transactions", new
-        {
-            AccountId = account.Id,
-            Type = TransactionType.Income,
-            Amount = 5000,
-            TransactionDate = "2026-08-31T23:30:00+08:00"
-        });
+        var createResponse = await _client.PostAsJsonAsync(
+            "/api/transactions",
+            new
+            {
+                AccountId = account.Id,
+                Type = TransactionType.Income,
+                Amount = 5000,
+                TransactionDate = "2026-08-31T23:30:00+08:00",
+            }
+        );
         Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
 
         using var createBody = JsonDocument.Parse(await createResponse.Content.ReadAsStringAsync());
@@ -72,13 +75,16 @@ public class TransactionDateWireFormatTest : IDisposable
 
         _client.ActAsUser(user);
 
-        var createResponse = await _client.PostAsJsonAsync("/api/transactions", new
-        {
-            AccountId = account.Id,
-            Type = TransactionType.Income,
-            Amount = 5000,
-            TransactionDate = "2026-08-31T23:30:00+08:00"
-        });
+        var createResponse = await _client.PostAsJsonAsync(
+            "/api/transactions",
+            new
+            {
+                AccountId = account.Id,
+                Type = TransactionType.Income,
+                Amount = 5000,
+                TransactionDate = "2026-08-31T23:30:00+08:00",
+            }
+        );
         Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
 
         var listResponse = await _client.GetAsync("/api/accounts/" + account.Id + "/transactions");
@@ -100,9 +106,12 @@ public class TransactionDateWireFormatTest : IDisposable
         // A generated transaction: a wall-clock midnight, with a RecurringTransactionId
         // and no instant behind it.
         await TransactionFactory.CreateAsync(
-            _context, user.Id, account.Id,
+            _context,
+            user.Id,
+            account.Id,
             transactionDate: new DateTime(2026, 8, 31),
-            recurringTransactionId: schedule.Id);
+            recurringTransactionId: schedule.Id
+        );
 
         _client.ActAsUser(user);
 
@@ -125,9 +134,12 @@ public class TransactionDateWireFormatTest : IDisposable
         var schedule = await RecurringTransactionFactory.CreateAsync(_context, user.Id, account.Id);
 
         await TransactionFactory.CreateAsync(
-            _context, user.Id, account.Id,
+            _context,
+            user.Id,
+            account.Id,
             transactionDate: new DateTime(2026, 8, 31),
-            recurringTransactionId: schedule.Id);
+            recurringTransactionId: schedule.Id
+        );
 
         _client.ActAsUser(user);
 

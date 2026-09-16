@@ -21,7 +21,7 @@ namespace PitakaApp.Api.Tests.Controllers;
 // evaluated before authorization, so the unauthenticated 401 these endpoints return does
 // not get in the way.
 [Collection("Database collection")]
-public class CorsPipelineTest
+public class CorsPipelineTest(PitakaWebApplicationFactory factory)
 {
     private const string AllowedOrigin = "http://localhost:4200";
     private const string UnlistedOrigin = "https://malicious.example.com";
@@ -31,14 +31,12 @@ public class CorsPipelineTest
     private const string AllowCredentials = "Access-Control-Allow-Credentials";
     private const string AllowHeaders = "Access-Control-Allow-Headers";
 
-    private static readonly WebApplicationFactoryClientOptions NoAutoRedirect = new() { AllowAutoRedirect = false };
-
-    private readonly HttpClient _client;
-
-    public CorsPipelineTest(PitakaWebApplicationFactory factory)
+    private static readonly WebApplicationFactoryClientOptions NoAutoRedirect = new()
     {
-        _client = factory.CreateClient();
-    }
+        AllowAutoRedirect = false,
+    };
+
+    private readonly HttpClient _client = factory.CreateClient();
 
     [Fact]
     public async Task Preflight_FromAllowedOrigin_IsAnsweredAndEchoesTheOrigin()
@@ -59,7 +57,10 @@ public class CorsPipelineTest
         var request = new HttpRequestMessage(HttpMethod.Options, Endpoint);
         request.Headers.TryAddWithoutValidation("Origin", AllowedOrigin);
         request.Headers.TryAddWithoutValidation("Access-Control-Request-Method", "POST");
-        request.Headers.TryAddWithoutValidation("Access-Control-Request-Headers", "authorization, content-type");
+        request.Headers.TryAddWithoutValidation(
+            "Access-Control-Request-Headers",
+            "authorization, content-type"
+        );
 
         var response = await _client.SendAsync(request);
 
@@ -160,10 +161,10 @@ public class CorsPipelineTest
     }
 
     [Theory]
-    [InlineData]                                 // empty origin list
-    [InlineData("http://localhost:4200/")]       // trailing slash
-    [InlineData("http://localhost:4200/app")]    // path
-    [InlineData("localhost:4200")]               // not a scheme-and-authority absolute URI
+    [InlineData] // empty origin list
+    [InlineData("http://localhost:4200/")] // trailing slash
+    [InlineData("http://localhost:4200/app")] // path
+    [InlineData("localhost:4200")] // not a scheme-and-authority absolute URI
     public void Startup_WithMalformedOriginConfiguration_FailsToStart(params string[] origins)
     {
         using var factory = FactoryWithConfiguredOrigins(origins);
@@ -184,27 +185,31 @@ public class CorsPipelineTest
     // to get as far as CORS validation are re-added.
     private static WebApplicationFactory<Program> FactoryWithConfiguredOrigins(string[] origins) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
-            builder.ConfigureAppConfiguration((_, config) =>
-            {
-                config.Sources.Clear();
-
-                var settings = new Dictionary<string, string?>
+            builder.ConfigureAppConfiguration(
+                (_, config) =>
                 {
-                    ["ConnectionStrings:DefaultConnection"] = PitakaWebApplicationFactory.TestConnectionString,
-                    ["Jwt:Key"] = PitakaWebApplicationFactory.TestJwtKey,
-                    ["Jwt:Issuer"] = "PitakaApp",
-                    ["Jwt:Audience"] = "PitakaAppUsers",
-                    ["Jwt:ExpiryMinutes"] = "60",
-                    ["RecurringTransaction:Enabled"] = "false",
-                };
+                    config.Sources.Clear();
 
-                for (var i = 0; i < origins.Length; i++)
-                {
-                    settings[$"Cors:AllowedOrigins:{i}"] = origins[i];
+                    var settings = new Dictionary<string, string?>
+                    {
+                        ["ConnectionStrings:DefaultConnection"] =
+                            PitakaWebApplicationFactory.TestConnectionString,
+                        ["Jwt:Key"] = PitakaWebApplicationFactory.TestJwtKey,
+                        ["Jwt:Issuer"] = "PitakaApp",
+                        ["Jwt:Audience"] = "PitakaAppUsers",
+                        ["Jwt:ExpiryMinutes"] = "60",
+                        ["RecurringTransaction:Enabled"] = "false",
+                    };
+
+                    for (var i = 0; i < origins.Length; i++)
+                    {
+                        settings[$"Cors:AllowedOrigins:{i}"] = origins[i];
+                    }
+
+                    config.AddInMemoryCollection(settings);
                 }
-
-                config.AddInMemoryCollection(settings);
-            }));
+            )
+        );
 
     // Same fresh-factory approach as FactoryWithConfiguredOrigins above, for the same
     // reason — never WithWebHostBuilder on the shared fixture. Pinned to a named
@@ -215,6 +220,7 @@ public class CorsPipelineTest
         {
             builder.UseEnvironment(environment);
             builder.ConfigureServices(services =>
-                services.Configure<HttpsRedirectionOptions>(options => options.HttpsPort = 5001));
+                services.Configure<HttpsRedirectionOptions>(options => options.HttpsPort = 5001)
+            );
         });
 }

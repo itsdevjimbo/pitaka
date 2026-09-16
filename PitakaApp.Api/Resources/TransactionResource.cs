@@ -19,8 +19,17 @@ public record TransactionResource(
 {
     public static TransactionResource FromModel(Transaction t) =>
         new(
-            t.Id, t.UserId, t.AccountId, t.Type, t.Amount, TransactionDateForWire(t),
-            t.CategoryId, t.RecurringTransactionId, t.TransferToAccountId, t.Description, TagResource.Collection(t.Tags)
+            t.Id,
+            t.UserId,
+            t.AccountId,
+            t.Type,
+            t.Amount,
+            TransactionDateForWire(t),
+            t.CategoryId,
+            t.RecurringTransactionId,
+            t.TransferToAccountId,
+            t.Description,
+            TagResource.Collection(t.Tags)
         );
 
     // A person-recorded Transaction is stored as a UTC instant, but a list read comes
@@ -37,5 +46,5 @@ public record TransactionResource(
             : t.TransactionDate;
 
     public static List<TransactionResource> Collection(IEnumerable<Transaction> transactions) =>
-        transactions.Select(FromModel).ToList();
-} 
+        [.. transactions.Select(FromModel)];
+}

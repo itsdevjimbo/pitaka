@@ -21,7 +21,11 @@ public record BudgetWithSpendResource(
 )
 {
     public static BudgetWithSpendResource FromModel(
-        Budget budget, decimal amountSpent, DateOnly cycleStart, DateOnly cycleEnd) =>
+        Budget budget,
+        decimal amountSpent,
+        DateOnly cycleStart,
+        DateOnly cycleEnd
+    ) =>
         new(
             budget.Id,
             budget.Name,

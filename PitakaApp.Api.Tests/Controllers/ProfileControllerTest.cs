@@ -84,7 +84,10 @@ public class ProfileControllerTest : IDisposable
         await _context.SaveChangesAsync();
         _client.ActAsUser(user);
 
-        var response = await _client.PutAsJsonAsync("/api/profile", new { name = _faker.Person.FullName });
+        var response = await _client.PutAsJsonAsync(
+            "/api/profile",
+            new { name = _faker.Person.FullName }
+        );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var body = await response.Content.ReadFromJsonAsync<ProfileResponse>();
@@ -95,7 +98,9 @@ public class ProfileControllerTest : IDisposable
     [Theory]
     [InlineData("")]
     [InlineData(null)]
-    public async Task UpdateProfile_WithEmptyOrMissingName_IsRejectedAsValidationProblemNamingName(string? name)
+    public async Task UpdateProfile_WithEmptyOrMissingName_IsRejectedAsValidationProblemNamingName(
+        string? name
+    )
     {
         var user = await UserFactory.CreateAsync(_context);
         _client.ActAsUser(user);
@@ -113,7 +118,10 @@ public class ProfileControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         _client.ActAsUser(user);
 
-        var response = await _client.PutAsJsonAsync("/api/profile", new { name = new string('a', 256) });
+        var response = await _client.PutAsJsonAsync(
+            "/api/profile",
+            new { name = new string('a', 256) }
+        );
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
         var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>();
@@ -152,7 +160,10 @@ public class ProfileControllerTest : IDisposable
     [Fact]
     public async Task UpdateProfile_WithoutToken_ReturnsUnauthorized()
     {
-        var response = await _client.PutAsJsonAsync("/api/profile", new { name = _faker.Person.FullName });
+        var response = await _client.PutAsJsonAsync(
+            "/api/profile",
+            new { name = _faker.Person.FullName }
+        );
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
@@ -166,27 +177,24 @@ public class ProfileControllerTest : IDisposable
 
         const string newPassword = "A-Fresh-Passphrase-9";
 
-        var response = await _client.PostAsJsonAsync("/api/profile/password", new
-        {
-            oldPassword = UserFactory.DefaultPassword,
-            newPassword,
-        });
+        var response = await _client.PostAsJsonAsync(
+            "/api/profile/password",
+            new { oldPassword = UserFactory.DefaultPassword, newPassword }
+        );
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
 
         // The new password is now the current one: a second change that offers it as the
         // old password is accepted, and one that re-offers the original is refused.
-        var again = await _client.PostAsJsonAsync("/api/profile/password", new
-        {
-            oldPassword = newPassword,
-            newPassword = "Yet-Another-Passphrase-1",
-        });
+        var again = await _client.PostAsJsonAsync(
+            "/api/profile/password",
+            new { oldPassword = newPassword, newPassword = "Yet-Another-Passphrase-1" }
+        );
         Assert.Equal(HttpStatusCode.NoContent, again.StatusCode);
 
-        var withStalePassword = await _client.PostAsJsonAsync("/api/profile/password", new
-        {
-            oldPassword = UserFactory.DefaultPassword,
-            newPassword = "Will-Never-Apply-2",
-        });
+        var withStalePassword = await _client.PostAsJsonAsync(
+            "/api/profile/password",
+            new { oldPassword = UserFactory.DefaultPassword, newPassword = "Will-Never-Apply-2" }
+        );
         Assert.Equal(HttpStatusCode.Unauthorized, withStalePassword.StatusCode);
     }
 
@@ -196,22 +204,20 @@ public class ProfileControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         _client.ActAsUser(user);
 
-        var response = await _client.PostAsJsonAsync("/api/profile/password", new
-        {
-            oldPassword = "not-the-password",
-            newPassword = "A-Fresh-Passphrase-9",
-        });
+        var response = await _client.PostAsJsonAsync(
+            "/api/profile/password",
+            new { oldPassword = "not-the-password", newPassword = "A-Fresh-Passphrase-9" }
+        );
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
         Assert.Equal("Your current password is incorrect.", problem!.Detail);
 
         // The current password still changes the password — nothing moved.
-        var withCurrent = await _client.PostAsJsonAsync("/api/profile/password", new
-        {
-            oldPassword = UserFactory.DefaultPassword,
-            newPassword = "A-Fresh-Passphrase-9",
-        });
+        var withCurrent = await _client.PostAsJsonAsync(
+            "/api/profile/password",
+            new { oldPassword = UserFactory.DefaultPassword, newPassword = "A-Fresh-Passphrase-9" }
+        );
         Assert.Equal(HttpStatusCode.NoContent, withCurrent.StatusCode);
     }
 
@@ -219,16 +225,17 @@ public class ProfileControllerTest : IDisposable
     [InlineData("short")]
     [InlineData("")]
     [InlineData(null)]
-    public async Task ChangePassword_WithNewPasswordFailingRegistrationsRule_IsValidationProblemNamingTheField(string? newPassword)
+    public async Task ChangePassword_WithNewPasswordFailingRegistrationsRule_IsValidationProblemNamingTheField(
+        string? newPassword
+    )
     {
         var user = await UserFactory.CreateAsync(_context);
         _client.ActAsUser(user);
 
-        var response = await _client.PostAsJsonAsync("/api/profile/password", new
-        {
-            oldPassword = UserFactory.DefaultPassword,
-            newPassword,
-        });
+        var response = await _client.PostAsJsonAsync(
+            "/api/profile/password",
+            new { oldPassword = UserFactory.DefaultPassword, newPassword }
+        );
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>();
@@ -241,11 +248,10 @@ public class ProfileControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         _client.ActAsUser(user);
 
-        var response = await _client.PostAsJsonAsync("/api/profile/password", new
-        {
-            oldPassword = (string?)null,
-            newPassword = "A-Fresh-Passphrase-9",
-        });
+        var response = await _client.PostAsJsonAsync(
+            "/api/profile/password",
+            new { oldPassword = (string?)null, newPassword = "A-Fresh-Passphrase-9" }
+        );
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>();
@@ -255,11 +261,10 @@ public class ProfileControllerTest : IDisposable
     [Fact]
     public async Task ChangePassword_WithoutToken_ReturnsUnauthorized()
     {
-        var response = await _client.PostAsJsonAsync("/api/profile/password", new
-        {
-            oldPassword = UserFactory.DefaultPassword,
-            newPassword = "A-Fresh-Passphrase-9",
-        });
+        var response = await _client.PostAsJsonAsync(
+            "/api/profile/password",
+            new { oldPassword = UserFactory.DefaultPassword, newPassword = "A-Fresh-Passphrase-9" }
+        );
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 

@@ -8,7 +8,7 @@ public class Category : TimestampedEntity
     public int? UserId { get; set; }
 
     [MaxLength(255)]
-    public required string Name { get; set;}
+    public required string Name { get; set; }
 
     public required CategoryType Type { get; init; }
 
@@ -23,7 +23,6 @@ public class Category : TimestampedEntity
     public bool IsDefault { get; set; } = false;
 
     public bool IsActive { get; set; } = true;
-
 
     public User? User { get; set; }
 

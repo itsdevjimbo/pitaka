@@ -17,12 +17,11 @@ namespace PitakaApp.Api.Migrations
             migrationBuilder.CreateIndex(
                 name: "ix_categories_user_id_name",
                 table: "categories",
-                columns: new[] { "user_id", "name" },
-                unique: true);
+                columns: ["user_id", "name"],
+                unique: true
+            );
 
-            migrationBuilder.DropIndex(
-                name: "ix_categories_user_id",
-                table: "categories");
+            migrationBuilder.DropIndex(name: "ix_categories_user_id", table: "categories");
         }
 
         /// <inheritdoc />
@@ -31,11 +30,10 @@ namespace PitakaApp.Api.Migrations
             migrationBuilder.CreateIndex(
                 name: "ix_categories_user_id",
                 table: "categories",
-                column: "user_id");
+                column: "user_id"
+            );
 
-            migrationBuilder.DropIndex(
-                name: "ix_categories_user_id_name",
-                table: "categories");
+            migrationBuilder.DropIndex(name: "ix_categories_user_id_name", table: "categories");
         }
     }
 }

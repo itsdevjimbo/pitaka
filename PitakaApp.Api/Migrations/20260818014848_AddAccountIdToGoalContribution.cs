@@ -12,19 +12,22 @@ namespace PitakaApp.Api.Migrations
         {
             migrationBuilder.DropForeignKey(
                 name: "fk_goal_contributions_transactions_transaction_id",
-                table: "goal_contributions");
+                table: "goal_contributions"
+            );
 
             migrationBuilder.AddColumn<int>(
                 name: "account_id",
                 table: "goal_contributions",
                 type: "int",
                 nullable: false,
-                defaultValue: 0);
+                defaultValue: 0
+            );
 
             migrationBuilder.CreateIndex(
                 name: "ix_goal_contributions_account_id",
                 table: "goal_contributions",
-                column: "account_id");
+                column: "account_id"
+            );
 
             migrationBuilder.AddForeignKey(
                 name: "fk_goal_contributions_accounts_account_id",
@@ -32,7 +35,8 @@ namespace PitakaApp.Api.Migrations
                 column: "account_id",
                 principalTable: "accounts",
                 principalColumn: "id",
-                onDelete: ReferentialAction.Cascade);
+                onDelete: ReferentialAction.Cascade
+            );
 
             migrationBuilder.AddForeignKey(
                 name: "fk_goal_contributions_transactions_transaction_id",
@@ -40,7 +44,8 @@ namespace PitakaApp.Api.Migrations
                 column: "transaction_id",
                 principalTable: "transactions",
                 principalColumn: "id",
-                onDelete: ReferentialAction.Restrict);
+                onDelete: ReferentialAction.Restrict
+            );
         }
 
         /// <inheritdoc />
@@ -48,19 +53,20 @@ namespace PitakaApp.Api.Migrations
         {
             migrationBuilder.DropForeignKey(
                 name: "fk_goal_contributions_accounts_account_id",
-                table: "goal_contributions");
+                table: "goal_contributions"
+            );
 
             migrationBuilder.DropForeignKey(
                 name: "fk_goal_contributions_transactions_transaction_id",
-                table: "goal_contributions");
+                table: "goal_contributions"
+            );
 
             migrationBuilder.DropIndex(
                 name: "ix_goal_contributions_account_id",
-                table: "goal_contributions");
+                table: "goal_contributions"
+            );
 
-            migrationBuilder.DropColumn(
-                name: "account_id",
-                table: "goal_contributions");
+            migrationBuilder.DropColumn(name: "account_id", table: "goal_contributions");
 
             migrationBuilder.AddForeignKey(
                 name: "fk_goal_contributions_transactions_transaction_id",
@@ -68,7 +74,8 @@ namespace PitakaApp.Api.Migrations
                 column: "transaction_id",
                 principalTable: "transactions",
                 principalColumn: "id",
-                onDelete: ReferentialAction.SetNull);
+                onDelete: ReferentialAction.SetNull
+            );
         }
     }
 }

@@ -6,20 +6,13 @@ using PitakaApp.Api.Models;
 
 namespace PitakaApp.Api.Services;
 
-public class AccountService
+public class AccountService(PitakaDbContext context)
 {
-    private readonly PitakaDbContext _context;
+    private readonly PitakaDbContext _context = context;
 
-    public AccountService(PitakaDbContext context)
-    {
-        _context = context;
-    }
-    
     public async Task<List<Account>> GetAllForUser(User user, AccountQueryInput input)
     {
-        var query = _context.Accounts
-            .AsNoTracking()
-            .Where(a => a.UserId == user.Id);
+        var query = _context.Accounts.AsNoTracking().Where(a => a.UserId == user.Id);
 
         if (input.Type is AccountType type)
         {
@@ -31,25 +24,28 @@ public class AccountService
             query = query.Where(a => a.IsActive == isActive);
         }
 
-        return await query
-            .OrderBy(a => a.Name)
-            .ToListAsync();
+        return await query.OrderBy(a => a.Name).ToListAsync();
     }
 
     public async Task<Account?> GetByIdForUser(User user, int id) =>
-        await _context.Accounts
-            .AsNoTracking()
+        await _context
+            .Accounts.AsNoTracking()
             .Where(a => a.Id == id && a.UserId == user.Id)
             .FirstOrDefaultAsync();
 
     public async Task<Account?> GetTrackedByIdForUserAsync(User user, int id) =>
-        await _context.Accounts
-            .Where(a => a.Id == id && a.UserId == user.Id)
-            .FirstOrDefaultAsync();
-    public async Task<bool> NameExistsForUserAsync(int userId, string name, int? excludeId = null) =>
-        await _context.Accounts
-            .AsNoTracking()
-            .AnyAsync(a => a.UserId == userId && a.Name == name && (excludeId == null || a.Id != excludeId));
+        await _context.Accounts.Where(a => a.Id == id && a.UserId == user.Id).FirstOrDefaultAsync();
+
+    public async Task<bool> NameExistsForUserAsync(
+        int userId,
+        string name,
+        int? excludeId = null
+    ) =>
+        await _context
+            .Accounts.AsNoTracking()
+            .AnyAsync(a =>
+                a.UserId == userId && a.Name == name && (excludeId == null || a.Id != excludeId)
+            );
 
     public async Task<Account> CreateAsync(User user, CreateAccountInput input)
     {
@@ -58,7 +54,7 @@ public class AccountService
         _context.Accounts.Add(account);
 
         await _context.SaveChangesAsync();
-        return account; 
+        return account;
     }
 
     public async Task<Account> UpdateAsync(Account account, UpdateAccountInput input)
@@ -70,11 +66,11 @@ public class AccountService
 
     public async Task<Account> PatchActiveStatus(Account account, PatchAccountActiveInput input)
     {
-
         if (input.IsActive)
         {
             account.Activate();
-        } else
+        }
+        else
         {
             account.Deactivate();
         }
@@ -90,12 +86,10 @@ public class AccountService
     }
 
     public async Task<bool> HasTransactionHistoryAsync(int accountId) =>
-        await _context.Transactions
-            .AsNoTracking()
+        await _context
+            .Transactions.AsNoTracking()
             .AnyAsync(t => t.AccountId == accountId || t.TransferToAccountId == accountId);
 
     public async Task<bool> HasGoalContributionsAsync(int accountId) =>
-        await _context.GoalContributions
-            .AsNoTracking()
-            .AnyAsync(t => t.AccountId == accountId);
+        await _context.GoalContributions.AsNoTracking().AnyAsync(t => t.AccountId == accountId);
 }

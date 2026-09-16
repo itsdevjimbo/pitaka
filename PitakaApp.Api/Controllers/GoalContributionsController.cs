@@ -11,28 +11,20 @@ namespace PitakaApp.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/[controller]")]
-public class GoalContributionsController : ControllerBase
+public class GoalContributionsController(
+    GoalContributionService goalContributionService,
+    GoalService goalService,
+    AccountService accountService,
+    CurrentUserAccessor currentUserAccessor
+) : ControllerBase
 {
-    private readonly GoalContributionService _goalContributionService;
+    private readonly GoalContributionService _goalContributionService = goalContributionService;
 
-    private readonly GoalService _goalService;
+    private readonly GoalService _goalService = goalService;
 
-    private readonly AccountService _accountService;
+    private readonly AccountService _accountService = accountService;
 
-    private readonly CurrentUserAccessor _currentUserAccessor;
-
-    public GoalContributionsController(
-        GoalContributionService goalContributionService,
-        GoalService goalService,
-        AccountService accountService,
-        CurrentUserAccessor currentUserAccessor
-    )
-    {
-        _goalContributionService = goalContributionService;
-        _goalService = goalService;
-        _accountService = accountService;
-        _currentUserAccessor = currentUserAccessor;
-    }
+    private readonly CurrentUserAccessor _currentUserAccessor = currentUserAccessor;
 
     [HttpGet]
     public async Task<IActionResult> Get()
@@ -42,7 +34,7 @@ public class GoalContributionsController : ControllerBase
 
         return Ok(GoalContributionResource.Collection(goalContributions));
     }
-    
+
     [HttpPost]
     public async Task<IActionResult> Create(CreateGoalContributionRequest request)
     {
@@ -52,38 +44,65 @@ public class GoalContributionsController : ControllerBase
 
         if (account == null)
         {
-            return Problem(detail: "Account does not exist", statusCode: StatusCodes.Status400BadRequest);
+            return Problem(
+                detail: "Account does not exist",
+                statusCode: StatusCodes.Status400BadRequest
+            );
         }
 
         if (!account.IsActive)
         {
-            return Problem(detail: "Account is inactive", statusCode: StatusCodes.Status400BadRequest);
+            return Problem(
+                detail: "Account is inactive",
+                statusCode: StatusCodes.Status400BadRequest
+            );
         }
 
         if (goal == null)
         {
-            return Problem(detail: "Goal does not exist", statusCode: StatusCodes.Status400BadRequest);
+            return Problem(
+                detail: "Goal does not exist",
+                statusCode: StatusCodes.Status400BadRequest
+            );
         }
 
         if (goal.IsAbandoned())
         {
-            return Problem(detail: "Cannot make contributions to an abandoned goal", statusCode: StatusCodes.Status400BadRequest);
+            return Problem(
+                detail: "Cannot make contributions to an abandoned goal",
+                statusCode: StatusCodes.Status400BadRequest
+            );
         }
 
-        if (!await _goalContributionService.CanEarmarkTransaction(account.Id, request.TransactionId))
+        if (
+            !await _goalContributionService.CanEarmarkTransaction(account.Id, request.TransactionId)
+        )
         {
-            return Problem(detail: "Cannot make a contribution based on this transaction", statusCode: StatusCodes.Status400BadRequest);
+            return Problem(
+                detail: "Cannot make a contribution based on this transaction",
+                statusCode: StatusCodes.Status400BadRequest
+            );
         }
 
         if (!await _goalContributionService.CanEarmarkAmount(account, request.Amount))
         {
-            return Problem(detail: "Contributions cannot exceed the account's balance", statusCode: StatusCodes.Status400BadRequest);
+            return Problem(
+                detail: "Contributions cannot exceed the account's balance",
+                statusCode: StatusCodes.Status400BadRequest
+            );
         }
 
-        var goalContribution = await _goalContributionService.CreateAsync(goal, account, request.ToInput());
-        return StatusCode(StatusCodes.Status201Created, GoalContributionResource.FromModel(goalContribution));
+        var goalContribution = await _goalContributionService.CreateAsync(
+            goal,
+            account,
+            request.ToInput()
+        );
+        return StatusCode(
+            StatusCodes.Status201Created,
+            GoalContributionResource.FromModel(goalContribution)
+        );
     }
-    
+
     [HttpGet("{id}")]
     public async Task<IActionResult> Show(int id)
     {
@@ -108,18 +127,18 @@ public class GoalContributionsController : ControllerBase
         {
             return NotFound();
         }
-        
+
         if (goalContribution.Goal.UserId != user.Id)
         {
             return Forbid();
         }
-        
+
         await _goalContributionService.UpdateAsync(goalContribution, request.ToInput());
 
         return Ok(GoalContributionResource.FromModel(goalContribution));
     }
 
-    [HttpDelete("{id}")] 
+    [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(int id)
     {
         var user = _currentUserAccessor.User!;
@@ -129,7 +148,7 @@ public class GoalContributionsController : ControllerBase
         {
             return NotFound();
         }
-        
+
         if (goalContribution.Goal.UserId != user.Id)
         {
             return Forbid();

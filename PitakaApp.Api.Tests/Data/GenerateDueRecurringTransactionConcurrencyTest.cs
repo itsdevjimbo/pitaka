@@ -10,7 +10,6 @@ namespace PitakaApp.Api.Tests.Data;
 [Collection("Database collection")]
 public class GenerateDueRecurringTransactionConcurrencyTest : IDisposable
 {
-    
     private readonly PitakaWebApplicationFactory _factory;
     private readonly IServiceScope _scope;
     private readonly PitakaDbContext _context;
@@ -28,19 +27,33 @@ public class GenerateDueRecurringTransactionConcurrencyTest : IDisposable
         var now = DateOnly.FromDateTime(DateTime.UtcNow);
 
         var user = await UserFactory.CreateAsync(_context);
-        var staleAccount = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 1000);
+        var staleAccount = await AccountFactory.CreateAsync(
+            _context,
+            user.Id,
+            initialBalance: 1000
+        );
         var account2 = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 1000);
 
         var recurringTransactionA = await RecurringTransactionFactory.CreateAsync(
-            _context, user.Id, staleAccount.Id, startDate: now.AddDays(-1), nextRunDate: now, name: "Test 1"
+            _context,
+            user.Id,
+            staleAccount.Id,
+            startDate: now.AddDays(-1),
+            nextRunDate: now,
+            name: "Test 1"
         );
         var recurringTransactionB = await RecurringTransactionFactory.CreateAsync(
-            _context, user.Id, account2.Id, startDate: now.AddDays(-1), nextRunDate: now, name: "Test 2"
+            _context,
+            user.Id,
+            account2.Id,
+            startDate: now.AddDays(-1),
+            nextRunDate: now,
+            name: "Test 2"
         );
 
         using var scopeA = _factory.Services.CreateScope();
         using var scopeB = _factory.Services.CreateScope();
-        
+
         var contextA = scopeA.ServiceProvider.GetRequiredService<PitakaDbContext>();
         var contextB = scopeB.ServiceProvider.GetRequiredService<PitakaDbContext>();
 
@@ -56,11 +69,22 @@ public class GenerateDueRecurringTransactionConcurrencyTest : IDisposable
 
         using var scopeC = _factory.Services.CreateScope();
         var contextC = scopeC.ServiceProvider.GetRequiredService<PitakaDbContext>();
-        Assert.True(await contextC.Transactions.AnyAsync(t => t.RecurringTransactionId == recurringTransactionB.Id));
-        Assert.False(await contextC.Transactions.AnyAsync(t => t.RecurringTransactionId == recurringTransactionA.Id));
+        Assert.True(
+            await contextC.Transactions.AnyAsync(t =>
+                t.RecurringTransactionId == recurringTransactionB.Id
+            )
+        );
+        Assert.False(
+            await contextC.Transactions.AnyAsync(t =>
+                t.RecurringTransactionId == recurringTransactionA.Id
+            )
+        );
 
-        var staleRecurringTransaction = await contextC.RecurringTransactions.Where(rt => rt.Id == recurringTransactionA.Id).FirstAsync();
+        var staleRecurringTransaction = await contextC
+            .RecurringTransactions.Where(rt => rt.Id == recurringTransactionA.Id)
+            .FirstAsync();
         Assert.Equal(now, staleRecurringTransaction.NextRunDate);
     }
+
     public void Dispose() => _scope.Dispose();
 }

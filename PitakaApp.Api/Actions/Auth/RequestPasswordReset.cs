@@ -8,18 +8,15 @@ using PitakaApp.Api.Services;
 
 namespace PitakaApp.Api.Actions.Auth;
 
-public class RequestPasswordReset
+public class RequestPasswordReset(
+    UserManager<User> userManager,
+    IEmailSender emailSender,
+    IOptions<PasswordResetOption> option
+)
 {
-    private readonly UserManager<User> _userManager;
-    private readonly IEmailSender _emailSender;
-    private readonly PasswordResetOption _option;
-
-    public RequestPasswordReset(UserManager<User> userManager, IEmailSender emailSender, IOptions<PasswordResetOption> option)
-    {
-        _userManager = userManager;
-        _emailSender = emailSender;
-        _option = option.Value;
-    }
+    private readonly UserManager<User> _userManager = userManager;
+    private readonly IEmailSender _emailSender = emailSender;
+    private readonly PasswordResetOption _option = option.Value;
 
     // Returns nothing at all — not a bool, not a nullable Profile. An unknown email is a
     // silent no-op inside the action, so the controller has no outcome to branch on and
@@ -44,7 +41,8 @@ public class RequestPasswordReset
             user.Email!,
             "Reset your Pitaka password",
             ComposeTextBody(url),
-            ComposeHtmlBody(url));
+            ComposeHtmlBody(url)
+        );
     }
 
     // Plain text. Says Profile, never "user" or "account", per CONTEXT.md. States that
@@ -52,18 +50,18 @@ public class RequestPasswordReset
     // reset URL with the Profile id and token appended.
     private static string ComposeTextBody(string url) =>
         $"""
-        Hi,
+            Hi,
 
-        We received a request to reset the password for your Pitaka Profile.
+            We received a request to reset the password for your Pitaka Profile.
 
-        Choose a new password here:
-        {url}
+            Choose a new password here:
+            {url}
 
-        If you did not ask for this, you can ignore this message — your password
-        will not change.
+            If you did not ask for this, you can ignore this message — your password
+            will not change.
 
-        — Pitaka
-        """;
+            — Pitaka
+            """;
 
     private static string ComposeHtmlBody(string url)
     {

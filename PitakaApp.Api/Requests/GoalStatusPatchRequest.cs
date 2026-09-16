@@ -3,7 +3,4 @@ using PitakaApp.Api.Enums;
 
 namespace PitakaApp.Api.Requests;
 
-public record GoalStatusPatchRequest (
-    [Required]
-    GoalStatus Status
-);
+public record GoalStatusPatchRequest([Required] GoalStatus Status);

@@ -1,3 +1,3 @@
 namespace PitakaApp.Api.Inputs;
 
-public record TagInput (string Name);
+public record TagInput(string Name);

@@ -14,7 +14,6 @@ namespace PitakaApp.Api.Tests.Controllers;
 [Collection("Database collection")]
 public class CategoriesControllerTest : IDisposable
 {
-    
     private readonly Faker _faker = new();
     private readonly IServiceScope _scope;
     private readonly PitakaDbContext _context;
@@ -24,9 +23,8 @@ public class CategoriesControllerTest : IDisposable
     {
         _scope = factory.Services.CreateScope();
         _context = _scope.ServiceProvider.GetRequiredService<PitakaDbContext>();
-        _client = factory.CreateClient();   
+        _client = factory.CreateClient();
     }
-
 
     [Fact]
     public async Task Get_WithLoggedInUser_ReturnsOk()
@@ -48,7 +46,9 @@ public class CategoriesControllerTest : IDisposable
         var response = await _client.GetAsync("/api/categories");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<List<CategoryResource>>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<List<CategoryResource>>(
+            TestJsonOptions.Default
+        );
         Assert.NotEmpty(body!);
         Assert.All(body!, c => Assert.True(c.IsDefault));
     }
@@ -56,12 +56,8 @@ public class CategoriesControllerTest : IDisposable
     [Fact]
     public async Task Create_WithNoLoggedInUser_ReturnsUnauthorized()
     {
-        var request = new
-        {
-            Name = "Test category",
-            Type = CategoryType.Expense,
-        };
-        
+        var request = new { Name = "Test category", Type = CategoryType.Expense };
+
         var response = await _client.PostAsJsonAsync("/api/categories", request);
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -72,12 +68,8 @@ public class CategoriesControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         _client.ActAsUser(user);
 
-        var request = new
-        {
-            Name = "Test category 2",
-            Type = CategoryType.Expense,
-        };
-        
+        var request = new { Name = "Test category 2", Type = CategoryType.Expense };
+
         var response = await _client.PostAsJsonAsync("/api/categories", request);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
     }
@@ -88,16 +80,14 @@ public class CategoriesControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         _client.ActAsUser(user);
 
-        var request = new
-        {
-            Name = "Test category 3",
-            Type = CategoryType.Expense,
-        };
-        
+        var request = new { Name = "Test category 3", Type = CategoryType.Expense };
+
         var response = await _client.PostAsJsonAsync("/api/categories", request);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<CategoryResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<CategoryResource>(
+            TestJsonOptions.Default
+        );
         Assert.Equal("Expense", body!.Type.ToString());
     }
 
@@ -109,11 +99,7 @@ public class CategoriesControllerTest : IDisposable
 
         await CategoryFactory.CreateAsync(_context, user.Id, name: "Groceries");
 
-        var request = new
-        {
-            Name = "Groceries",
-            Type = CategoryType.Expense,
-        };
+        var request = new { Name = "Groceries", Type = CategoryType.Expense };
 
         var response = await _client.PostAsJsonAsync("/api/categories", request);
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
@@ -129,11 +115,7 @@ public class CategoriesControllerTest : IDisposable
 
         _client.ActAsUser(userB);
 
-        var request = new
-        {
-            Name = "Groceries",
-            Type = CategoryType.Expense,
-        };
+        var request = new { Name = "Groceries", Type = CategoryType.Expense };
 
         var response = await _client.PostAsJsonAsync("/api/categories", request);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
@@ -157,7 +139,9 @@ public class CategoriesControllerTest : IDisposable
         var response = await _client.PostAsJsonAsync("/api/categories", request);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<CategoryResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<CategoryResource>(
+            TestJsonOptions.Default
+        );
         Assert.Equal("Electricity", body!.Name);
         Assert.Equal(CategoryType.Expense, body.Type);
     }
@@ -214,12 +198,12 @@ public class CategoriesControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         var seededCategory = await CategoryFactory.CreateAsync(_context, user.Id);
 
-        var request = new
-        {
-            Name = "Test category 3",
-        };
+        var request = new { Name = "Test category 3" };
 
-        var response = await _client.PutAsJsonAsync("/api/categories/" + seededCategory.Id, request);
+        var response = await _client.PutAsJsonAsync(
+            "/api/categories/" + seededCategory.Id,
+            request
+        );
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
@@ -229,10 +213,7 @@ public class CategoriesControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         _client.ActAsUser(user);
 
-        var request = new
-        {
-            Name = "Test category 3",
-        };
+        var request = new { Name = "Test category 3" };
 
         var response = await _client.PutAsJsonAsync("/api/categories/99999", request);
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -244,15 +225,15 @@ public class CategoriesControllerTest : IDisposable
         var userA = await UserFactory.CreateAsync(_context);
         var userB = await UserFactory.CreateAsync(_context);
         _client.ActAsUser(userA);
-        
+
         var seededCategory = await CategoryFactory.CreateAsync(_context, userB.Id);
 
-        var request = new
-        {
-            Name = "Test category 3",
-        };
+        var request = new { Name = "Test category 3" };
 
-        var response = await _client.PutAsJsonAsync("/api/categories/" + seededCategory.Id, request);
+        var response = await _client.PutAsJsonAsync(
+            "/api/categories/" + seededCategory.Id,
+            request
+        );
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
@@ -265,10 +246,7 @@ public class CategoriesControllerTest : IDisposable
 
         var category = await _context.Categories.Where(c => c.IsDefault).FirstAsync();
 
-        var request = new
-        {
-            Name = "Test category 3",
-        };
+        var request = new { Name = "Test category 3" };
 
         var response = await _client.PutAsJsonAsync("/api/categories/" + category.Id, request);
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
@@ -279,18 +257,20 @@ public class CategoriesControllerTest : IDisposable
     {
         var user = await UserFactory.CreateAsync(_context);
         _client.ActAsUser(user);
-        
+
         var seededCategory = await CategoryFactory.CreateAsync(_context, user.Id);
 
-        var request = new
-        {
-            Name = "Test category 3",
-        };
+        var request = new { Name = "Test category 3" };
 
-        var response = await _client.PutAsJsonAsync("/api/categories/" + seededCategory.Id, request);
+        var response = await _client.PutAsJsonAsync(
+            "/api/categories/" + seededCategory.Id,
+            request
+        );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        
-        var body = await response.Content.ReadFromJsonAsync<CategoryResource>(TestJsonOptions.Default);
+
+        var body = await response.Content.ReadFromJsonAsync<CategoryResource>(
+            TestJsonOptions.Default
+        );
         Assert.Equal("Test category 3", body!.Name);
     }
 
@@ -300,18 +280,23 @@ public class CategoriesControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         _client.ActAsUser(user);
 
-        var seededCategory = await CategoryFactory.CreateAsync(_context, user.Id, type: CategoryType.Expense);
+        var seededCategory = await CategoryFactory.CreateAsync(
+            _context,
+            user.Id,
+            type: CategoryType.Expense
+        );
 
-        var request = new
-        {
-            Name = "Renamed",
-            Type = "Income",
-        };
+        var request = new { Name = "Renamed", Type = "Income" };
 
-        var response = await _client.PutAsJsonAsync("/api/categories/" + seededCategory.Id, request);
+        var response = await _client.PutAsJsonAsync(
+            "/api/categories/" + seededCategory.Id,
+            request
+        );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<CategoryResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<CategoryResource>(
+            TestJsonOptions.Default
+        );
         Assert.Equal(CategoryType.Expense, body!.Type);
     }
 
@@ -321,17 +306,23 @@ public class CategoriesControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         _client.ActAsUser(user);
 
-        var seededCategory = await CategoryFactory.CreateAsync(_context, user.Id, type: CategoryType.Expense);
+        var seededCategory = await CategoryFactory.CreateAsync(
+            _context,
+            user.Id,
+            type: CategoryType.Expense
+        );
 
-        var request = new
-        {
-            Name = "Renamed",
-        };
+        var request = new { Name = "Renamed" };
 
-        var response = await _client.PutAsJsonAsync("/api/categories/" + seededCategory.Id, request);
+        var response = await _client.PutAsJsonAsync(
+            "/api/categories/" + seededCategory.Id,
+            request
+        );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<CategoryResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<CategoryResource>(
+            TestJsonOptions.Default
+        );
         Assert.Equal(CategoryType.Expense, body!.Type);
     }
 
@@ -344,12 +335,12 @@ public class CategoriesControllerTest : IDisposable
         await CategoryFactory.CreateAsync(_context, user.Id, name: "Groceries");
         var seededCategory = await CategoryFactory.CreateAsync(_context, user.Id, name: "Rent");
 
-        var request = new
-        {
-            Name = "Groceries",
-        };
+        var request = new { Name = "Groceries" };
 
-        var response = await _client.PutAsJsonAsync("/api/categories/" + seededCategory.Id, request);
+        var response = await _client.PutAsJsonAsync(
+            "/api/categories/" + seededCategory.Id,
+            request
+        );
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
     }
 
@@ -359,14 +350,18 @@ public class CategoriesControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         _client.ActAsUser(user);
 
-        var seededCategory = await CategoryFactory.CreateAsync(_context, user.Id, name: "Groceries");
+        var seededCategory = await CategoryFactory.CreateAsync(
+            _context,
+            user.Id,
+            name: "Groceries"
+        );
 
-        var request = new
-        {
-            Name = "Groceries",
-        };
+        var request = new { Name = "Groceries" };
 
-        var response = await _client.PutAsJsonAsync("/api/categories/" + seededCategory.Id, request);
+        var response = await _client.PutAsJsonAsync(
+            "/api/categories/" + seededCategory.Id,
+            request
+        );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
@@ -396,7 +391,7 @@ public class CategoriesControllerTest : IDisposable
         var userA = await UserFactory.CreateAsync(_context);
         var userB = await UserFactory.CreateAsync(_context);
         _client.ActAsUser(userA);
-        
+
         var seededCategory = await CategoryFactory.CreateAsync(_context, userB.Id);
 
         var response = await _client.DeleteAsync("api/categories/" + seededCategory.Id);
@@ -408,7 +403,7 @@ public class CategoriesControllerTest : IDisposable
     {
         var user = await UserFactory.CreateAsync(_context);
         _client.ActAsUser(user);
-        
+
         var seededCategory = await CategoryFactory.CreateAsync(_context, user.Id);
 
         var response = await _client.DeleteAsync("api/categories/" + seededCategory.Id);
@@ -423,7 +418,12 @@ public class CategoriesControllerTest : IDisposable
 
         var category = await CategoryFactory.CreateAsync(_context, user.Id);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
-        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, categoryId: category.Id);
+        await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            categoryId: category.Id
+        );
 
         var response = await _client.DeleteAsync("api/categories/" + category.Id);
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
@@ -450,7 +450,12 @@ public class CategoriesControllerTest : IDisposable
 
         var category = await CategoryFactory.CreateAsync(_context, user.Id);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
-        await RecurringTransactionFactory.CreateAsync(_context, user.Id, account.Id, categoryId: category.Id);
+        await RecurringTransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            categoryId: category.Id
+        );
 
         var response = await _client.DeleteAsync("api/categories/" + category.Id);
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
@@ -462,7 +467,10 @@ public class CategoriesControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         var category = await CategoryFactory.CreateAsync(_context, user.Id);
 
-        var response = await _client.PatchAsJsonAsync("/api/categories/" + category.Id + "/status", new { IsActive = false });
+        var response = await _client.PatchAsJsonAsync(
+            "/api/categories/" + category.Id + "/status",
+            new { IsActive = false }
+        );
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
@@ -472,7 +480,10 @@ public class CategoriesControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         _client.ActAsUser(user);
 
-        var response = await _client.PatchAsJsonAsync("/api/categories/999999/status", new { IsActive = false });
+        var response = await _client.PatchAsJsonAsync(
+            "/api/categories/999999/status",
+            new { IsActive = false }
+        );
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
@@ -485,7 +496,10 @@ public class CategoriesControllerTest : IDisposable
 
         _client.ActAsUser(userA);
 
-        var response = await _client.PatchAsJsonAsync("/api/categories/" + category.Id + "/status", new { IsActive = false });
+        var response = await _client.PatchAsJsonAsync(
+            "/api/categories/" + category.Id + "/status",
+            new { IsActive = false }
+        );
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
 
         var stored = await _context.Categories.AsNoTracking().SingleAsync(c => c.Id == category.Id);
@@ -500,7 +514,10 @@ public class CategoriesControllerTest : IDisposable
 
         _client.ActAsUser(user);
 
-        var response = await _client.PatchAsJsonAsync("/api/categories/" + category.Id + "/status", new { IsActive = false });
+        var response = await _client.PatchAsJsonAsync(
+            "/api/categories/" + category.Id + "/status",
+            new { IsActive = false }
+        );
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
@@ -514,7 +531,10 @@ public class CategoriesControllerTest : IDisposable
 
         // An empty body leaves IsActive unspecified. Before RespectRequiredConstructorParameters
         // it bound to default(bool) == false and retired the category. See issue #82.
-        var response = await _client.PatchAsJsonAsync("/api/categories/" + category.Id + "/status", new { });
+        var response = await _client.PatchAsJsonAsync(
+            "/api/categories/" + category.Id + "/status",
+            new { }
+        );
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
         var stored = await _context.Categories.AsNoTracking().SingleAsync(c => c.Id == category.Id);
@@ -529,10 +549,15 @@ public class CategoriesControllerTest : IDisposable
 
         _client.ActAsUser(user);
 
-        var response = await _client.PatchAsJsonAsync("/api/categories/" + category.Id + "/status", new { IsActive = false });
+        var response = await _client.PatchAsJsonAsync(
+            "/api/categories/" + category.Id + "/status",
+            new { IsActive = false }
+        );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<CategoryResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<CategoryResource>(
+            TestJsonOptions.Default
+        );
         Assert.False(body!.IsActive);
 
         var stored = await _context.Categories.AsNoTracking().SingleAsync(c => c.Id == category.Id);
@@ -547,10 +572,15 @@ public class CategoriesControllerTest : IDisposable
 
         _client.ActAsUser(user);
 
-        var response = await _client.PatchAsJsonAsync("/api/categories/" + category.Id + "/status", new { IsActive = true });
+        var response = await _client.PatchAsJsonAsync(
+            "/api/categories/" + category.Id + "/status",
+            new { IsActive = true }
+        );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<CategoryResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<CategoryResource>(
+            TestJsonOptions.Default
+        );
         Assert.True(body!.IsActive);
     }
 
@@ -562,9 +592,17 @@ public class CategoriesControllerTest : IDisposable
 
         var category = await CategoryFactory.CreateAsync(_context, user.Id);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
-        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, categoryId: category.Id);
+        await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            categoryId: category.Id
+        );
 
-        var response = await _client.PatchAsJsonAsync("/api/categories/" + category.Id + "/status", new { IsActive = false });
+        var response = await _client.PatchAsJsonAsync(
+            "/api/categories/" + category.Id + "/status",
+            new { IsActive = false }
+        );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
@@ -577,10 +615,15 @@ public class CategoriesControllerTest : IDisposable
         var category = await CategoryFactory.CreateAsync(_context, user.Id);
         await BudgetFactory.CreateAsync(_context, user.Id, categoryId: category.Id);
 
-        var response = await _client.PatchAsJsonAsync("/api/categories/" + category.Id + "/status", new { IsActive = false });
+        var response = await _client.PatchAsJsonAsync(
+            "/api/categories/" + category.Id + "/status",
+            new { IsActive = false }
+        );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var budget = await _context.Budgets.AsNoTracking().SingleAsync(b => b.CategoryId == category.Id);
+        var budget = await _context
+            .Budgets.AsNoTracking()
+            .SingleAsync(b => b.CategoryId == category.Id);
         Assert.Equal(category.Id, budget.CategoryId);
     }
 
@@ -588,14 +631,21 @@ public class CategoriesControllerTest : IDisposable
     public async Task Get_IncludesRetiredCategories()
     {
         var user = await UserFactory.CreateAsync(_context);
-        var retired = await CategoryFactory.CreateAsync(_context, user.Id, name: "Old Gym", isActive: false);
+        var retired = await CategoryFactory.CreateAsync(
+            _context,
+            user.Id,
+            name: "Old Gym",
+            isActive: false
+        );
 
         _client.ActAsUser(user);
 
         var response = await _client.GetAsync("/api/categories");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<List<CategoryResource>>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<List<CategoryResource>>(
+            TestJsonOptions.Default
+        );
         var seen = body!.Single(c => c.Id == retired.Id);
         Assert.False(seen.IsActive);
     }
@@ -608,7 +658,12 @@ public class CategoriesControllerTest : IDisposable
 
         var category = await CategoryFactory.CreateAsync(_context, user.Id, isActive: false);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
-        await TransactionFactory.CreateAsync(_context, user.Id, account.Id, categoryId: category.Id);
+        await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            categoryId: category.Id
+        );
 
         var response = await _client.DeleteAsync("api/categories/" + category.Id);
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
