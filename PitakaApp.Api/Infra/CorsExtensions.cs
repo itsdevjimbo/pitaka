@@ -12,13 +12,15 @@ public static class CorsExtensions
 
     public static WebApplicationBuilder AddPitakaCors(this WebApplicationBuilder builder)
     {
-        builder.Services.AddOptions<CorsOption>()
+        builder
+            .Services.AddOptions<CorsOption>()
             .Bind(builder.Configuration.GetSection(CorsOption.SectionName))
             .ValidateDataAnnotations()
             .Validate(
                 // Null is caught by [Required]; this validator also runs on failure, so no-op on null.
                 option => option.AllowedOrigins?.All(IsSchemeAndAuthorityOrigin) ?? true,
-                "Cors:AllowedOrigins entries must be scheme-and-authority origins with no trailing slash or path (e.g. http://localhost:4200).")
+                "Cors:AllowedOrigins entries must be scheme-and-authority origins with no trailing slash or path (e.g. http://localhost:4200)."
+            )
             .ValidateOnStart();
 
         // The policy's origins are pulled from the validated CorsOption at the point the
@@ -27,14 +29,21 @@ public static class CorsExtensions
         // JwtAuthenticationExtensions: a raw read here is too early to see configuration
         // sources the test suite adds via WebApplicationFactory.ConfigureAppConfiguration.
         builder.Services.AddCors();
-        builder.Services.AddOptions<CorsOptions>()
-            .Configure<IOptions<CorsOption>>((corsOptions, corsOption) =>
-            {
-                corsOptions.AddPolicy(PolicyName, policy => policy
-                    .WithOrigins(corsOption.Value.AllowedOrigins)
-                    .AllowAnyHeader()
-                    .AllowAnyMethod());
-            });
+        builder
+            .Services.AddOptions<CorsOptions>()
+            .Configure<IOptions<CorsOption>>(
+                (corsOptions, corsOption) =>
+                {
+                    corsOptions.AddPolicy(
+                        PolicyName,
+                        policy =>
+                            policy
+                                .WithOrigins(corsOption.Value.AllowedOrigins)
+                                .AllowAnyHeader()
+                                .AllowAnyMethod()
+                    );
+                }
+            );
 
         return builder;
     }

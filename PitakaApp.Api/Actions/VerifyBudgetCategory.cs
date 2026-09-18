@@ -19,19 +19,14 @@ public enum BudgetCategoryVerdict
 // type fixed to Expense rather than passed in. One query answers both "is it visible" and
 // "is it an expense category", and the verdict keeps the two failures apart so the caller
 // can word them differently. See .scratch/budget-expense-category/spec.md.
-public class VerifyBudgetCategory
+public class VerifyBudgetCategory(PitakaDbContext context)
 {
-    private readonly PitakaDbContext _context;
-
-    public VerifyBudgetCategory(PitakaDbContext context)
-    {
-        _context = context;
-    }
+    private readonly PitakaDbContext _context = context;
 
     public async Task<BudgetCategoryVerdict> VerifyAsync(User user, int categoryId)
     {
-        var category = await _context.Categories
-            .AsNoTracking()
+        var category = await _context
+            .Categories.AsNoTracking()
             .FirstOrDefaultAsync(c => c.Id == categoryId && (c.UserId == user.Id || c.IsDefault));
 
         if (category == null)

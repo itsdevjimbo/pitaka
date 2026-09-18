@@ -6,25 +6,25 @@ using PitakaApp.Api.Services;
 
 namespace PitakaApp.Api.Filters;
 
-public class ResolveCurrentUserFilter : IAsyncActionFilter
+public class ResolveCurrentUserFilter(
+    GetCurrentUser getCurrentUser,
+    CurrentUserAccessor currentUserAccessor
+) : IAsyncActionFilter
 {
-    private readonly GetCurrentUser _getCurrentUser;
-    private readonly CurrentUserAccessor _currentUserAccessor;
+    private readonly GetCurrentUser _getCurrentUser = getCurrentUser;
+    private readonly CurrentUserAccessor _currentUserAccessor = currentUserAccessor;
 
-    public ResolveCurrentUserFilter(GetCurrentUser getCurrentUser, CurrentUserAccessor currentUserAccessor)
-    {
-        _getCurrentUser = getCurrentUser;
-        _currentUserAccessor = currentUserAccessor;
-    }
-
-    public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
+    public async Task OnActionExecutionAsync(
+        ActionExecutingContext context,
+        ActionExecutionDelegate next
+    )
     {
         var user = await _getCurrentUser.ExecuteAsync(context.HttpContext.User);
 
         if (user == null)
         {
             context.Result = new UnauthorizedResult();
-            return; 
+            return;
         }
 
         _currentUserAccessor.User = user;

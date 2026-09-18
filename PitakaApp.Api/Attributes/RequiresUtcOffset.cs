@@ -6,8 +6,11 @@ public class RequiresUtcOffset : ValidationAttribute
 {
     public override bool IsValid(object? value)
     {
-        if (value == null) return true;
-        
+        if (value == null)
+        {
+            return true;
+        }
+
         if (value is DateTime dt)
         {
             return dt.Kind != DateTimeKind.Unspecified;

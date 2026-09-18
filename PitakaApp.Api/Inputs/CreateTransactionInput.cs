@@ -2,7 +2,7 @@ using PitakaApp.Api.Enums;
 
 namespace PitakaApp.Api.Inputs;
 
-public record CreateTransactionInput (
+public record CreateTransactionInput(
     TransactionType Type,
     decimal Amount,
     DateTime? TransactionDate = null,

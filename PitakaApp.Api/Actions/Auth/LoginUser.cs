@@ -17,16 +17,10 @@ public enum LoginOutcome
 // different status codes, so collapsing them would have to be undone at the controller.
 public record LoginResult(LoginOutcome Outcome, User? User = null);
 
-public class LoginUser
+public class LoginUser(UserManager<User> userManager, SignInManager<User> signInManager)
 {
-    private readonly UserManager<User> _userManager;
-    private readonly SignInManager<User> _signInManager;
-
-    public LoginUser(UserManager<User> userManager, SignInManager<User> signInManager)
-    {
-        _userManager = userManager;
-        _signInManager = signInManager;
-    }
+    private readonly UserManager<User> _userManager = userManager;
+    private readonly SignInManager<User> _signInManager = signInManager;
 
     public async Task<LoginResult> ExecuteAsync(LoginInput input)
     {
@@ -41,7 +35,11 @@ public class LoginUser
         // IsLockedOut and IsNotAllowed (the confirmed-account gate) are mutually
         // exclusive outcomes of this one call; a wrong email or wrong password that
         // hits neither still collapses to the same generic InvalidCredentials below.
-        var result = await _signInManager.CheckPasswordSignInAsync(user, input.Password, lockoutOnFailure: true);
+        var result = await _signInManager.CheckPasswordSignInAsync(
+            user,
+            input.Password,
+            lockoutOnFailure: true
+        );
 
         if (result.Succeeded)
         {

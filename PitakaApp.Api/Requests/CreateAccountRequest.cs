@@ -4,13 +4,9 @@ using PitakaApp.Api.Inputs;
 
 namespace PitakaApp.Api.Requests;
 
-public record CreateAccountRequest (
-    [Required, MaxLength(255)]
-    string Name,
-
-    [Required, EnumDataType(typeof(AccountType))]
-    AccountType Type,
-
+public record CreateAccountRequest(
+    [Required, MaxLength(255)] string Name,
+    [Required, EnumDataType(typeof(AccountType))] AccountType Type,
     decimal InitialBalance = 0
 )
 {

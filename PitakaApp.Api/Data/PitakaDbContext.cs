@@ -12,12 +12,10 @@ namespace PitakaApp.Api.Data;
 // IDataProtectionKeyContext backs AddDataProtection().PersistKeysToDbContext<PitakaDbContext>()
 // (see IdentityExtensions), persisting the Data Protection key ring here instead of the
 // per-machine default that a container redeploy wipes.
-public class PitakaDbContext : IdentityUserContext<User, int>, IDataProtectionKeyContext
+public class PitakaDbContext(DbContextOptions<PitakaDbContext> options)
+    : IdentityUserContext<User, int>(options),
+        IDataProtectionKeyContext
 {
-    public PitakaDbContext(DbContextOptions<PitakaDbContext> options) : base(options)
-    {
-    }
-
     public DbSet<Account> Accounts { get; set; }
     public DbSet<Category> Categories { get; set; }
     public DbSet<Transaction> Transactions { get; set; }
@@ -49,7 +47,8 @@ public class PitakaDbContext : IdentityUserContext<User, int>, IDataProtectionKe
         // Identity-default name "EmailIndex" is kept — renaming an index Identity already
         // created buys nothing — so this stays PascalCase like its sibling UserNameIndex
         // rather than the project's ix_* convention.
-        modelBuilder.Entity<User>()
+        modelBuilder
+            .Entity<User>()
             .HasIndex(u => u.NormalizedEmail)
             .HasDatabaseName("EmailIndex")
             .IsUnique();
@@ -62,11 +61,15 @@ public class PitakaDbContext : IdentityUserContext<User, int>, IDataProtectionKe
 
         modelBuilder.Entity<Goal>().HasIndex(c => new { c.UserId, c.Name }).IsUnique();
 
-        modelBuilder.Entity<RecurringTransaction>().HasIndex(c => new { c.UserId, c.Name }).IsUnique();
+        modelBuilder
+            .Entity<RecurringTransaction>()
+            .HasIndex(c => new { c.UserId, c.Name })
+            .IsUnique();
 
         modelBuilder.Entity<Tag>().HasIndex(c => new { c.UserId, c.Name }).IsUnique();
 
-        var enumProperties = modelBuilder.Model.GetEntityTypes()
+        var enumProperties = modelBuilder
+            .Model.GetEntityTypes()
             .SelectMany(e => e.GetProperties())
             .Where(p => (Nullable.GetUnderlyingType(p.ClrType) ?? p.ClrType).IsEnum)
             .ToList();
@@ -81,41 +84,45 @@ public class PitakaDbContext : IdentityUserContext<User, int>, IDataProtectionKe
             property.SetColumnType("varchar(100)");
         }
 
-        modelBuilder.Entity<Account>()
-            .Property(a => a.Version)
-            .IsConcurrencyToken();
+        modelBuilder.Entity<Account>().Property(a => a.Version).IsConcurrencyToken();
 
-        modelBuilder.Entity<Transaction>()
+        modelBuilder
+            .Entity<Transaction>()
             .HasOne(t => t.Account)
             .WithMany(a => a.Transactions)
             .HasForeignKey(t => t.AccountId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        modelBuilder.Entity<Transaction>()
+        modelBuilder
+            .Entity<Transaction>()
             .HasOne(t => t.TransferToAccount)
             .WithMany()
             .HasForeignKey(t => t.TransferToAccountId)
             .OnDelete(DeleteBehavior.SetNull);
 
-        modelBuilder.Entity<Category>()
+        modelBuilder
+            .Entity<Category>()
             .HasOne(c => c.User)
             .WithMany(u => u.Categories)
             .HasForeignKey(c => c.UserId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        modelBuilder.Entity<Budget>()
+        modelBuilder
+            .Entity<Budget>()
             .HasOne(b => b.Category)
             .WithMany()
             .HasForeignKey(b => b.CategoryId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        modelBuilder.Entity<RecurringTransaction>()
+        modelBuilder
+            .Entity<RecurringTransaction>()
             .HasOne(rt => rt.Category)
             .WithMany()
             .HasForeignKey(rt => rt.CategoryId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        modelBuilder.Entity<Transaction>()
+        modelBuilder
+            .Entity<Transaction>()
             .HasOne(t => t.Category)
             .WithMany()
             .HasForeignKey(t => t.CategoryId)
@@ -125,19 +132,22 @@ public class PitakaDbContext : IdentityUserContext<User, int>, IDataProtectionKe
         // discriminator other rules read (ADR 0007, ADR 0005, #71), so deleting a schedule
         // must not null it out from under them. A schedule with generated transactions is
         // in use and cannot be deleted; the person cancels it instead (ADR 0008).
-        modelBuilder.Entity<Transaction>()
+        modelBuilder
+            .Entity<Transaction>()
             .HasOne(t => t.RecurringTransaction)
             .WithMany()
             .HasForeignKey(t => t.RecurringTransactionId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        modelBuilder.Entity<GoalContribution>()
+        modelBuilder
+            .Entity<GoalContribution>()
             .HasOne(gc => gc.Transaction)
             .WithOne(t => t.GoalContribution)
             .HasForeignKey<GoalContribution>(gc => gc.TransactionId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        modelBuilder.Entity<GoalContribution>()
+        modelBuilder
+            .Entity<GoalContribution>()
             .HasOne(gc => gc.Account)
             .WithMany()
             .HasForeignKey(gc => gc.AccountId);
@@ -145,14 +155,20 @@ public class PitakaDbContext : IdentityUserContext<User, int>, IDataProtectionKe
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
-        foreach (var entry in ChangeTracker.Entries<ITimestamped>()
-             .Where(e => e.State == EntityState.Modified))
+        foreach (
+            var entry in ChangeTracker
+                .Entries<ITimestamped>()
+                .Where(e => e.State == EntityState.Modified)
+        )
         {
             entry.Entity.UpdatedAt = DateTime.UtcNow;
         }
 
-        foreach (var entry in ChangeTracker.Entries<Account>()
-             .Where(e => e.State == EntityState.Modified))
+        foreach (
+            var entry in ChangeTracker
+                .Entries<Account>()
+                .Where(e => e.State == EntityState.Modified)
+        )
         {
             entry.Entity.Version += 1;
         }
@@ -160,16 +176,25 @@ public class PitakaDbContext : IdentityUserContext<User, int>, IDataProtectionKe
         return base.SaveChanges(acceptAllChangesOnSuccess);
     }
 
-    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    public override Task<int> SaveChangesAsync(
+        bool acceptAllChangesOnSuccess,
+        CancellationToken cancellationToken = default
+    )
     {
-        foreach (var entry in ChangeTracker.Entries<ITimestamped>()
-             .Where(e => e.State == EntityState.Modified))
+        foreach (
+            var entry in ChangeTracker
+                .Entries<ITimestamped>()
+                .Where(e => e.State == EntityState.Modified)
+        )
         {
             entry.Entity.UpdatedAt = DateTime.UtcNow;
         }
 
-        foreach (var entry in ChangeTracker.Entries<Account>()
-             .Where(e => e.State == EntityState.Modified))
+        foreach (
+            var entry in ChangeTracker
+                .Entries<Account>()
+                .Where(e => e.State == EntityState.Modified)
+        )
         {
             entry.Entity.Version += 1;
         }

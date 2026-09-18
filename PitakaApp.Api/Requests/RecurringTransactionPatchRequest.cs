@@ -3,12 +3,9 @@ using PitakaApp.Api.Enums;
 
 namespace PitakaApp.Api.Requests;
 
-public record RecurringTransactionPatchRequest (
-    [Required]
-    RecurringTransactionStatus Status
-): IValidatableObject
+public record RecurringTransactionPatchRequest([Required] RecurringTransactionStatus Status)
+    : IValidatableObject
 {
-    
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
         if (Status == RecurringTransactionStatus.Completed)

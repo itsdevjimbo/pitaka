@@ -21,19 +21,18 @@ public enum TransactionCategoryVerdict
 // row itself. One query answers both questions, and the verdict keeps the two failures apart
 // so the caller can word them differently. This is the Transaction-side reader ADR 0003
 // names when it argues a Category's type must be permanent; see GitHub issue #76.
-public class VerifyTransactionCategory
+public class VerifyTransactionCategory(PitakaDbContext context)
 {
-    private readonly PitakaDbContext _context;
+    private readonly PitakaDbContext _context = context;
 
-    public VerifyTransactionCategory(PitakaDbContext context)
+    public async Task<TransactionCategoryVerdict> VerifyAsync(
+        User user,
+        int categoryId,
+        CategoryType expectedType
+    )
     {
-        _context = context;
-    }
-
-    public async Task<TransactionCategoryVerdict> VerifyAsync(User user, int categoryId, CategoryType expectedType)
-    {
-        var category = await _context.Categories
-            .AsNoTracking()
+        var category = await _context
+            .Categories.AsNoTracking()
             .FirstOrDefaultAsync(c => c.Id == categoryId && (c.UserId == user.Id || c.IsDefault));
 
         if (category == null)

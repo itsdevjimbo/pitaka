@@ -11,19 +11,11 @@ namespace PitakaApp.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/[controller]")]
-public class TagsController : ControllerBase
+public class TagsController(TagService tagService, CurrentUserAccessor currentUserAccessor)
+    : ControllerBase
 {
-    private readonly TagService _tagService;
-    private readonly CurrentUserAccessor _currentUserAccessor;
-
-    public TagsController(
-        TagService tagService,
-        CurrentUserAccessor currentUserAccessor
-    )
-    {
-        _tagService = tagService;
-        _currentUserAccessor = currentUserAccessor;
-    }
+    private readonly TagService _tagService = tagService;
+    private readonly CurrentUserAccessor _currentUserAccessor = currentUserAccessor;
 
     [HttpGet]
     public async Task<IActionResult> Get()
@@ -33,7 +25,7 @@ public class TagsController : ControllerBase
 
         return Ok(TagResource.Collection(tags));
     }
-    
+
     [HttpPost]
     public async Task<IActionResult> Create(TagRequest request)
     {
@@ -41,14 +33,17 @@ public class TagsController : ControllerBase
 
         if (await _tagService.NameExistsForUserAsync(user.Id, request.Name))
         {
-            return Problem(detail: "A tag with this name already exists.", statusCode: StatusCodes.Status409Conflict);
+            return Problem(
+                detail: "A tag with this name already exists.",
+                statusCode: StatusCodes.Status409Conflict
+            );
         }
 
         var tag = await _tagService.CreateAsync(user, request.ToInput());
 
         return StatusCode(StatusCodes.Status201Created, TagResource.FromModel(tag));
     }
-    
+
     [HttpGet("{id}")]
     public async Task<IActionResult> Show(int id)
     {
@@ -73,7 +68,7 @@ public class TagsController : ControllerBase
         {
             return NotFound();
         }
-        
+
         if (tag.UserId != user.Id)
         {
             return Forbid();
@@ -81,15 +76,18 @@ public class TagsController : ControllerBase
 
         if (await _tagService.NameExistsForUserAsync(user.Id, request.Name, excludeId: id))
         {
-            return Problem(detail: "A tag with this name already exists.", statusCode: StatusCodes.Status409Conflict);
+            return Problem(
+                detail: "A tag with this name already exists.",
+                statusCode: StatusCodes.Status409Conflict
+            );
         }
-        
+
         await _tagService.UpdateAsync(tag, request.ToInput());
 
         return Ok(TagResource.FromModel(tag));
     }
 
-    [HttpDelete("{id}")] 
+    [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(int id)
     {
         var user = _currentUserAccessor.User!;
@@ -99,7 +97,7 @@ public class TagsController : ControllerBase
         {
             return NotFound();
         }
-        
+
         if (tag.UserId != user.Id)
         {
             return Forbid();

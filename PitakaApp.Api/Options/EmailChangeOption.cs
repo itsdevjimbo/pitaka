@@ -11,7 +11,9 @@ public class EmailChangeOption
     // EmailConfirmationOption.ConfirmUrl. userId and token are appended as query
     // parameters. The default in appsettings.json is the `ng serve` origin already in
     // the CORS allow-list.
-    [Required(ErrorMessage = "EmailChange:ConfirmUrl must be set — the client confirm-email-change screen the email links to.")]
+    [Required(
+        ErrorMessage = "EmailChange:ConfirmUrl must be set — the client confirm-email-change screen the email links to."
+    )]
     [Url(ErrorMessage = "EmailChange:ConfirmUrl must be an absolute URL.")]
     public string ConfirmUrl { get; set; } = string.Empty;
 
@@ -20,5 +22,6 @@ public class EmailChangeOption
     // than the shared DataProtectionTokenProviderOptions.TokenLifespan that reset and
     // registration-confirmation ride — the split IdentityExtensions anticipated. Defaults
     // by reference to the registration confirmation lifespan, not a copy of its value.
-    public TimeSpan TokenLifespan { get; set; } = IdentityExtensions.RegistrationConfirmationTokenLifespan;
+    public TimeSpan TokenLifespan { get; set; } =
+        IdentityExtensions.RegistrationConfirmationTokenLifespan;
 }

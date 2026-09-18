@@ -1,31 +1,20 @@
 using System.ComponentModel.DataAnnotations;
+using PitakaApp.Api.Attributes;
 using PitakaApp.Api.Enums;
 using PitakaApp.Api.Inputs;
-using PitakaApp.Api.Attributes;
 
 namespace PitakaApp.Api.Requests;
 
-public record CreateTransactionRequest (
-    [Required]
-    int AccountId,
-
-    [Required]
-    TransactionType Type,
-
-    [Required, Range(typeof(decimal), "0.01", "999999999999.99")]
-    decimal Amount,
-    
+public record CreateTransactionRequest(
+    [Required] int AccountId,
+    [Required] TransactionType Type,
+    [Required, Range(typeof(decimal), "0.01", "999999999999.99")] decimal Amount,
     int? CategoryId = null,
-
-    [RequiresUtcOffset]
-    DateTime? TransactionDate = null,
-
+    [RequiresUtcOffset] DateTime? TransactionDate = null,
     int? TransferToAccountId = null,
-
     string? Description = null,
-
     int[]? TagIds = null
-): IValidatableObject
+) : IValidatableObject
 {
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
@@ -36,7 +25,7 @@ public record CreateTransactionRequest (
                 [nameof(TransferToAccountId)]
             );
         }
-        
+
         if (Type == TransactionType.Transfer && TransferToAccountId == null)
         {
             yield return new ValidationResult(
@@ -62,8 +51,8 @@ public record CreateTransactionRequest (
     }
 
     public CreateTransactionInput ToInput() =>
-        new (
-            Type: Type, 
+        new(
+            Type: Type,
             Amount: Amount,
             TransactionDate: TransactionDate,
             CategoryId: CategoryId,

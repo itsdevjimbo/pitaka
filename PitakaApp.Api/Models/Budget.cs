@@ -25,9 +25,7 @@ public class Budget : TimestampedEntity
 
     public string? Description { get; set; }
 
-
     public User User { get; set; } = null!;
 
     public Category? Category { get; set; }
-
 }

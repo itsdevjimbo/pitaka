@@ -34,7 +34,6 @@ public class AccountServiceTest : IDisposable
 
         Assert.Equal(account.InitialBalance, account.CurrentBalance);
     }
-    
-    
+
     public void Dispose() => _scope.Dispose();
 }

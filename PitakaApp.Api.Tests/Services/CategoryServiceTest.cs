@@ -11,7 +11,7 @@ namespace PitakaApp.Api.Tests.Services;
 
 [Collection("Database collection")]
 public class CategoryServiceTest : IDisposable
-{    
+{
     private readonly Faker _faker = new();
     private readonly IServiceScope _scope;
     private readonly PitakaDbContext _context;
@@ -38,11 +38,11 @@ public class CategoryServiceTest : IDisposable
         var systemDefaultCategories = await _categoryService.GetSystemDefaults();
 
         var user = await UserFactory.CreateAsync(_context);
-        
+
         await CategoryFactory.CreateAsync(_context, user.Id);
 
         var categories = await _categoryService.GetAllForUser(user);
-        
+
         Assert.Equal(systemDefaultCategories.Count + 1, categories.Count);
     }
 
@@ -53,7 +53,7 @@ public class CategoryServiceTest : IDisposable
 
         var userA = await UserFactory.CreateAsync(_context);
         var userB = await UserFactory.CreateAsync(_context);
-        
+
         await CategoryFactory.CreateAsync(_context, userA.Id);
         await CategoryFactory.CreateAsync(_context, userA.Id);
 
@@ -61,7 +61,7 @@ public class CategoryServiceTest : IDisposable
 
         var categoriesA = await _categoryService.GetAllForUser(userA);
         Assert.Equal(systemDefaultCategories.Count + 2, categoriesA.Count);
-        
+
         var categoriesB = await _categoryService.GetAllForUser(userB);
         Assert.Equal(systemDefaultCategories.Count + 1, categoriesB.Count);
     }
@@ -70,7 +70,10 @@ public class CategoryServiceTest : IDisposable
     public async Task CreateUserOwnedCategory_ReturnsCategoryIsDefaultFalse()
     {
         var user = await UserFactory.CreateAsync(_context);
-        var input = new CreateCategoryInput(Name: "Test category", Type: Enums.CategoryType.Expense);
+        var input = new CreateCategoryInput(
+            Name: "Test category",
+            Type: Enums.CategoryType.Expense
+        );
         var category = await _categoryService.CreateUserOwnedAsync(user, input);
 
         Assert.NotNull(category);
@@ -112,19 +115,23 @@ public class CategoryServiceTest : IDisposable
     public async Task Update_ReturnsCorrectSavedCategory()
     {
         var seededCategory = await CategoryFactory.CreateAsync(_context);
-        var input = new UpdateCategoryInput(Name: "Test category", Description: "desc", Icon: "icon");
+        var input = new UpdateCategoryInput(
+            Name: "Test category",
+            Description: "desc",
+            Icon: "icon"
+        );
         var category = await _categoryService.UpdateAsync(seededCategory, input);
         Assert.Equal("Test category", category.Name);
         Assert.Equal("desc", category.Description);
         Assert.Equal("icon", category.Icon);
     }
-    
+
     [Fact]
     public async Task Delete_EnsuresTheEntityIsDeleted()
     {
         var seededCategory = await CategoryFactory.CreateAsync(_context);
         await _categoryService.DeleteAsync(seededCategory);
-        
+
         var exists = await _context.Categories.AnyAsync(c => c.Id == seededCategory.Id);
         Assert.False(exists);
     }

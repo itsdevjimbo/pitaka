@@ -2,7 +2,7 @@ using PitakaApp.Api.Enums;
 
 namespace PitakaApp.Api.Inputs;
 
-public record CreateRecurringTransactionInput (
+public record CreateRecurringTransactionInput(
     int AccountId,
     int? CategoryId,
     string Name,

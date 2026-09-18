@@ -16,7 +16,6 @@ namespace PitakaApp.Api.Tests.Controllers;
 [Collection("Database collection")]
 public class AuthControllerTest : IDisposable
 {
-    
     private readonly Faker _faker = new();
     private readonly IServiceScope _scope;
     private readonly PitakaDbContext _context;
@@ -56,27 +55,33 @@ public class AuthControllerTest : IDisposable
         var email = _faker.Internet.Email();
         await UserFactory.CreateAsync(_context, email);
 
-        var wrongEmailResponse = await _client.PostAsJsonAsync("/api/auth/login", new
-        {
-            email = "wrong@email.com",
-            password = UserFactory.DefaultPassword,
-        });
+        var wrongEmailResponse = await _client.PostAsJsonAsync(
+            "/api/auth/login",
+            new { email = "wrong@email.com", password = UserFactory.DefaultPassword }
+        );
 
-        var wrongPasswordResponse = await _client.PostAsJsonAsync("/api/auth/login", new
-        {
-            email,
-            password = "WrongPassword123!",
-        });
+        var wrongPasswordResponse = await _client.PostAsJsonAsync(
+            "/api/auth/login",
+            new { email, password = "WrongPassword123!" }
+        );
 
         Assert.Equal(HttpStatusCode.Unauthorized, wrongEmailResponse.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, wrongPasswordResponse.StatusCode);
 
         // ProblemDetails, not a bare quoted string — Content-Type and a populated detail.
-        Assert.Equal("application/problem+json", wrongEmailResponse.Content.Headers.ContentType?.MediaType);
-        Assert.Equal("application/problem+json", wrongPasswordResponse.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(
+            "application/problem+json",
+            wrongEmailResponse.Content.Headers.ContentType?.MediaType
+        );
+        Assert.Equal(
+            "application/problem+json",
+            wrongPasswordResponse.Content.Headers.ContentType?.MediaType
+        );
 
-        var wrongEmailProblem = await wrongEmailResponse.Content.ReadFromJsonAsync<ProblemDetails>();
-        var wrongPasswordProblem = await wrongPasswordResponse.Content.ReadFromJsonAsync<ProblemDetails>();
+        var wrongEmailProblem =
+            await wrongEmailResponse.Content.ReadFromJsonAsync<ProblemDetails>();
+        var wrongPasswordProblem =
+            await wrongPasswordResponse.Content.ReadFromJsonAsync<ProblemDetails>();
 
         Assert.Equal("Invalid email or password.", wrongEmailProblem!.Detail);
 
@@ -92,9 +97,10 @@ public class AuthControllerTest : IDisposable
     [InlineData("missing password")]
     public async Task Login_WithMissingField_ReturnsBadRequestNotUnauthorized(string missing)
     {
-        object request = missing == "missing email"
-            ? new { password = UserFactory.DefaultPassword }
-            : new { email = _faker.Internet.Email() };
+        object request =
+            missing == "missing email"
+                ? new { password = UserFactory.DefaultPassword }
+                : new { email = _faker.Internet.Email() };
 
         var response = await _client.PostAsJsonAsync("/api/auth/login", request);
 
@@ -169,7 +175,10 @@ public class AuthControllerTest : IDisposable
     [InlineData("name", "Name")]
     [InlineData("email", "Email")]
     [InlineData("password", "Password")]
-    public async Task Register_WithInvalidField_ReturnsBadRequestNamingTheField(string field, string expectedKey)
+    public async Task Register_WithInvalidField_ReturnsBadRequestNamingTheField(
+        string field,
+        string expectedKey
+    )
     {
         var request = new Dictionary<string, string>
         {
@@ -200,23 +209,29 @@ public class AuthControllerTest : IDisposable
     {
         // A 129-character password fails the ceiling; a compliant-length password with no
         // digits, symbols or case mix must still succeed — length only, no complexity.
-        var tooLong = await _client.PostAsJsonAsync("/api/auth/register", new
-        {
-            name = _faker.Person.FullName,
-            email = _faker.Internet.Email(),
-            password = new string('a', 129),
-        });
+        var tooLong = await _client.PostAsJsonAsync(
+            "/api/auth/register",
+            new
+            {
+                name = _faker.Person.FullName,
+                email = _faker.Internet.Email(),
+                password = new string('a', 129),
+            }
+        );
         Assert.Equal(HttpStatusCode.BadRequest, tooLong.StatusCode);
 
         var tooLongProblem = await tooLong.Content.ReadFromJsonAsync<ValidationProblemDetails>();
         Assert.Contains("Password", tooLongProblem!.Errors.Keys);
 
-        var noComplexity = await _client.PostAsJsonAsync("/api/auth/register", new
-        {
-            name = _faker.Person.FullName,
-            email = _faker.Internet.Email(),
-            password = "aaaaaaaa",
-        });
+        var noComplexity = await _client.PostAsJsonAsync(
+            "/api/auth/register",
+            new
+            {
+                name = _faker.Person.FullName,
+                email = _faker.Internet.Email(),
+                password = "aaaaaaaa",
+            }
+        );
         Assert.Equal(HttpStatusCode.Created, noComplexity.StatusCode);
     }
 
@@ -294,14 +309,23 @@ public class AuthControllerTest : IDisposable
         await UserFactory.CreateAsync(_context, knownEmail);
         var unknownEmail = _faker.Internet.Email();
 
-        var known = await _client.PostAsJsonAsync("/api/auth/forgot-password", new { email = knownEmail });
-        var unknown = await _client.PostAsJsonAsync("/api/auth/forgot-password", new { email = unknownEmail });
+        var known = await _client.PostAsJsonAsync(
+            "/api/auth/forgot-password",
+            new { email = knownEmail }
+        );
+        var unknown = await _client.PostAsJsonAsync(
+            "/api/auth/forgot-password",
+            new { email = unknownEmail }
+        );
 
         Assert.Equal(HttpStatusCode.Accepted, known.StatusCode);
         Assert.Equal(HttpStatusCode.Accepted, unknown.StatusCode);
 
         // Byte-identical responses — same status, same (empty) body.
-        Assert.Equal(await known.Content.ReadAsByteArrayAsync(), await unknown.Content.ReadAsByteArrayAsync());
+        Assert.Equal(
+            await known.Content.ReadAsByteArrayAsync(),
+            await unknown.Content.ReadAsByteArrayAsync()
+        );
 
         Assert.Empty(_emailSender.To(unknownEmail));
     }
@@ -309,7 +333,10 @@ public class AuthControllerTest : IDisposable
     [Fact]
     public async Task ForgotPassword_MalformedEmail_Returns400NamingEmail()
     {
-        var response = await _client.PostAsJsonAsync("/api/auth/forgot-password", new { email = "not-an-email" });
+        var response = await _client.PostAsJsonAsync(
+            "/api/auth/forgot-password",
+            new { email = "not-an-email" }
+        );
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
@@ -327,16 +354,33 @@ public class AuthControllerTest : IDisposable
         await _client.PostAsJsonAsync("/api/auth/forgot-password", new { email });
         var (userId, token) = ResetLinkDeliveredTo(email);
 
-        var reset = await _client.PostAsJsonAsync("/api/auth/reset-password", new { userId, token, password = newPassword });
+        var reset = await _client.PostAsJsonAsync(
+            "/api/auth/reset-password",
+            new
+            {
+                userId,
+                token,
+                password = newPassword,
+            }
+        );
         Assert.Equal(HttpStatusCode.NoContent, reset.StatusCode);
         // No session handed back — the body is empty and no auth cookie is set.
         Assert.Empty(await reset.Content.ReadAsByteArrayAsync());
-        Assert.DoesNotContain(reset.Headers, h => h.Key.Equals("Set-Cookie", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(
+            reset.Headers,
+            h => h.Key.Equals("Set-Cookie", StringComparison.OrdinalIgnoreCase)
+        );
 
-        var withNew = await _client.PostAsJsonAsync("/api/auth/login", new { email, password = newPassword });
+        var withNew = await _client.PostAsJsonAsync(
+            "/api/auth/login",
+            new { email, password = newPassword }
+        );
         Assert.Equal(HttpStatusCode.OK, withNew.StatusCode);
 
-        var withOld = await _client.PostAsJsonAsync("/api/auth/login", new { email, password = UserFactory.DefaultPassword });
+        var withOld = await _client.PostAsJsonAsync(
+            "/api/auth/login",
+            new { email, password = UserFactory.DefaultPassword }
+        );
         Assert.Equal(HttpStatusCode.Unauthorized, withOld.StatusCode);
     }
 
@@ -349,8 +393,24 @@ public class AuthControllerTest : IDisposable
         await _client.PostAsJsonAsync("/api/auth/forgot-password", new { email });
         var (userId, token) = ResetLinkDeliveredTo(email);
 
-        var first = await _client.PostAsJsonAsync("/api/auth/reset-password", new { userId, token, password = "first-new-password" });
-        var second = await _client.PostAsJsonAsync("/api/auth/reset-password", new { userId, token, password = "second-new-password" });
+        var first = await _client.PostAsJsonAsync(
+            "/api/auth/reset-password",
+            new
+            {
+                userId,
+                token,
+                password = "first-new-password",
+            }
+        );
+        var second = await _client.PostAsJsonAsync(
+            "/api/auth/reset-password",
+            new
+            {
+                userId,
+                token,
+                password = "second-new-password",
+            }
+        );
 
         Assert.Equal(HttpStatusCode.NoContent, first.StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, second.StatusCode);
@@ -368,15 +428,41 @@ public class AuthControllerTest : IDisposable
 
         await _client.PostAsJsonAsync("/api/auth/forgot-password", new { email });
         var (userId, token) = ResetLinkDeliveredTo(email);
-        await _client.PostAsJsonAsync("/api/auth/reset-password", new { userId, token, password = "used-up-password" });
+        await _client.PostAsJsonAsync(
+            "/api/auth/reset-password",
+            new
+            {
+                userId,
+                token,
+                password = "used-up-password",
+            }
+        );
 
-        var usedResponse = await _client.PostAsJsonAsync("/api/auth/reset-password", new { userId, token, password = "another-password" });
-        var unknownResponse = await _client.PostAsJsonAsync("/api/auth/reset-password",
-            new { userId = -1, token, password = "another-password" });
+        var usedResponse = await _client.PostAsJsonAsync(
+            "/api/auth/reset-password",
+            new
+            {
+                userId,
+                token,
+                password = "another-password",
+            }
+        );
+        var unknownResponse = await _client.PostAsJsonAsync(
+            "/api/auth/reset-password",
+            new
+            {
+                userId = -1,
+                token,
+                password = "another-password",
+            }
+        );
 
         Assert.Equal(HttpStatusCode.BadRequest, usedResponse.StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, unknownResponse.StatusCode);
-        Assert.Equal("application/problem+json", unknownResponse.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(
+            "application/problem+json",
+            unknownResponse.Content.Headers.ContentType?.MediaType
+        );
 
         var usedProblem = await usedResponse.Content.ReadFromJsonAsync<ProblemDetails>();
         var unknownProblem = await unknownResponse.Content.ReadFromJsonAsync<ProblemDetails>();
@@ -394,13 +480,29 @@ public class AuthControllerTest : IDisposable
         await _client.PostAsJsonAsync("/api/auth/forgot-password", new { email });
         var (userId, token) = ResetLinkDeliveredTo(email);
 
-        var tooShort = await _client.PostAsJsonAsync("/api/auth/reset-password", new { userId, token, password = "short12" });
+        var tooShort = await _client.PostAsJsonAsync(
+            "/api/auth/reset-password",
+            new
+            {
+                userId,
+                token,
+                password = "short12",
+            }
+        );
         Assert.Equal(HttpStatusCode.BadRequest, tooShort.StatusCode);
         var problem = await tooShort.Content.ReadFromJsonAsync<ValidationProblemDetails>();
         Assert.Contains("Password", problem!.Errors.Keys);
 
         // The rejected attempt must not have burned the link.
-        var retry = await _client.PostAsJsonAsync("/api/auth/reset-password", new { userId, token, password = "a-long-enough-password" });
+        var retry = await _client.PostAsJsonAsync(
+            "/api/auth/reset-password",
+            new
+            {
+                userId,
+                token,
+                password = "a-long-enough-password",
+            }
+        );
         Assert.Equal(HttpStatusCode.NoContent, retry.StatusCode);
     }
 
@@ -418,12 +520,26 @@ public class AuthControllerTest : IDisposable
         var (firstUserId, firstToken) = ExtractUserIdAndToken(delivered[0].TextBody);
         var (secondUserId, secondToken) = ExtractUserIdAndToken(delivered[1].TextBody);
 
-        var usingSecond = await _client.PostAsJsonAsync("/api/auth/reset-password",
-            new { userId = secondUserId, token = secondToken, password = "the-winning-password" });
+        var usingSecond = await _client.PostAsJsonAsync(
+            "/api/auth/reset-password",
+            new
+            {
+                userId = secondUserId,
+                token = secondToken,
+                password = "the-winning-password",
+            }
+        );
         Assert.Equal(HttpStatusCode.NoContent, usingSecond.StatusCode);
 
-        var usingFirst = await _client.PostAsJsonAsync("/api/auth/reset-password",
-            new { userId = firstUserId, token = firstToken, password = "the-losing-password" });
+        var usingFirst = await _client.PostAsJsonAsync(
+            "/api/auth/reset-password",
+            new
+            {
+                userId = firstUserId,
+                token = firstToken,
+                password = "the-losing-password",
+            }
+        );
         Assert.Equal(HttpStatusCode.BadRequest, usingFirst.StatusCode);
     }
 
@@ -431,19 +547,28 @@ public class AuthControllerTest : IDisposable
     public async Task ConfirmEmail_TheArc_ThenLoginSucceeds()
     {
         var email = _faker.Internet.Email();
-        await _client.PostAsJsonAsync("/api/auth/register", new
-        {
-            name = _faker.Person.FullName,
-            email,
-            password = "TestPass123!",
-        });
+        await _client.PostAsJsonAsync(
+            "/api/auth/register",
+            new
+            {
+                name = _faker.Person.FullName,
+                email,
+                password = "TestPass123!",
+            }
+        );
 
         var (userId, token) = ConfirmationDeliveredTo(email);
 
-        var confirm = await _client.PostAsJsonAsync("/api/auth/confirm-email", new { userId, token });
+        var confirm = await _client.PostAsJsonAsync(
+            "/api/auth/confirm-email",
+            new { userId, token }
+        );
         Assert.Equal(HttpStatusCode.NoContent, confirm.StatusCode);
 
-        var login = await _client.PostAsJsonAsync("/api/auth/login", new { email, password = "TestPass123!" });
+        var login = await _client.PostAsJsonAsync(
+            "/api/auth/login",
+            new { email, password = "TestPass123!" }
+        );
         Assert.Equal(HttpStatusCode.OK, login.StatusCode);
     }
 
@@ -455,8 +580,10 @@ public class AuthControllerTest : IDisposable
         user.EmailConfirmed = false;
         await _context.SaveChangesAsync();
 
-        var response = await _client.PostAsJsonAsync("/api/auth/confirm-email",
-            new { userId = user.Id, token = "this-token-was-never-issued" });
+        var response = await _client.PostAsJsonAsync(
+            "/api/auth/confirm-email",
+            new { userId = user.Id, token = "this-token-was-never-issued" }
+        );
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
@@ -469,14 +596,20 @@ public class AuthControllerTest : IDisposable
     public async Task Login_BeforeConfirming_Returns403WithDetail()
     {
         var email = _faker.Internet.Email();
-        await _client.PostAsJsonAsync("/api/auth/register", new
-        {
-            name = _faker.Person.FullName,
-            email,
-            password = "TestPass123!",
-        });
+        await _client.PostAsJsonAsync(
+            "/api/auth/register",
+            new
+            {
+                name = _faker.Person.FullName,
+                email,
+                password = "TestPass123!",
+            }
+        );
 
-        var response = await _client.PostAsJsonAsync("/api/auth/login", new { email, password = "TestPass123!" });
+        var response = await _client.PostAsJsonAsync(
+            "/api/auth/login",
+            new { email, password = "TestPass123!" }
+        );
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
@@ -493,11 +626,16 @@ public class AuthControllerTest : IDisposable
 
         for (var i = 0; i < 5; i++)
         {
-            await _client.PostAsJsonAsync("/api/auth/login", new { email, password = "WrongPassword123!" });
+            await _client.PostAsJsonAsync(
+                "/api/auth/login",
+                new { email, password = "WrongPassword123!" }
+            );
         }
 
-        var response = await _client.PostAsJsonAsync("/api/auth/login",
-            new { email, password = UserFactory.DefaultPassword });
+        var response = await _client.PostAsJsonAsync(
+            "/api/auth/login",
+            new { email, password = UserFactory.DefaultPassword }
+        );
 
         Assert.Equal((HttpStatusCode)423, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
@@ -516,11 +654,16 @@ public class AuthControllerTest : IDisposable
 
         for (var i = 0; i < 5; i++)
         {
-            await _client.PostAsJsonAsync("/api/auth/login", new { email, password = "WrongPassword123!" });
+            await _client.PostAsJsonAsync(
+                "/api/auth/login",
+                new { email, password = "WrongPassword123!" }
+            );
         }
 
-        var response = await _client.PostAsJsonAsync("/api/auth/login",
-            new { email, password = UserFactory.DefaultPassword });
+        var response = await _client.PostAsJsonAsync(
+            "/api/auth/login",
+            new { email, password = UserFactory.DefaultPassword }
+        );
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
 
@@ -536,7 +679,10 @@ public class AuthControllerTest : IDisposable
         user.EmailConfirmed = false;
         await _context.SaveChangesAsync();
 
-        var response = await _client.PostAsJsonAsync("/api/auth/resend-confirmation", new { email });
+        var response = await _client.PostAsJsonAsync(
+            "/api/auth/resend-confirmation",
+            new { email }
+        );
 
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
         Assert.NotEmpty(_emailSender.To(email));
@@ -551,12 +697,21 @@ public class AuthControllerTest : IDisposable
         await _context.SaveChangesAsync();
         var unknownEmail = _faker.Internet.Email();
 
-        var knownResponse = await _client.PostAsJsonAsync("/api/auth/resend-confirmation", new { email = knownEmail });
-        var unknownResponse = await _client.PostAsJsonAsync("/api/auth/resend-confirmation", new { email = unknownEmail });
+        var knownResponse = await _client.PostAsJsonAsync(
+            "/api/auth/resend-confirmation",
+            new { email = knownEmail }
+        );
+        var unknownResponse = await _client.PostAsJsonAsync(
+            "/api/auth/resend-confirmation",
+            new { email = unknownEmail }
+        );
 
         Assert.Equal(HttpStatusCode.Accepted, knownResponse.StatusCode);
         Assert.Equal(HttpStatusCode.Accepted, unknownResponse.StatusCode);
-        Assert.Equal(await knownResponse.Content.ReadAsByteArrayAsync(), await unknownResponse.Content.ReadAsByteArrayAsync());
+        Assert.Equal(
+            await knownResponse.Content.ReadAsByteArrayAsync(),
+            await unknownResponse.Content.ReadAsByteArrayAsync()
+        );
 
         Assert.Empty(_emailSender.To(unknownEmail));
     }
@@ -567,7 +722,10 @@ public class AuthControllerTest : IDisposable
         var email = _faker.Internet.Email();
         await UserFactory.CreateAsync(_context, email); // EmailConfirmed = true by default
 
-        var response = await _client.PostAsJsonAsync("/api/auth/resend-confirmation", new { email });
+        var response = await _client.PostAsJsonAsync(
+            "/api/auth/resend-confirmation",
+            new { email }
+        );
 
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
         Assert.Empty(_emailSender.To(email));
@@ -592,7 +750,10 @@ public class AuthControllerTest : IDisposable
         var textLink = Regex.Match(message.TextBody, @"https?://\S+");
         Assert.True(textLink.Success, $"No link found in text email body:\n{message.TextBody}");
 
-        var anchor = Regex.Match(message.HtmlBody, "<a href=\"(?<href>[^\"]+)\">(?<label>[^<]+)</a>");
+        var anchor = Regex.Match(
+            message.HtmlBody,
+            "<a href=\"(?<href>[^\"]+)\">(?<label>[^<]+)</a>"
+        );
         Assert.True(anchor.Success, $"No anchor found in HTML email body:\n{message.HtmlBody}");
 
         var href = WebUtility.HtmlDecode(anchor.Groups["href"].Value);
@@ -606,7 +767,10 @@ public class AuthControllerTest : IDisposable
         var match = Regex.Match(body, @"userId=(?<userId>\d+)&token=(?<token>\S+)");
         Assert.True(match.Success, $"No userId/token link found in email body:\n{body}");
 
-        return (int.Parse(match.Groups["userId"].Value), Uri.UnescapeDataString(match.Groups["token"].Value));
+        return (
+            int.Parse(match.Groups["userId"].Value),
+            Uri.UnescapeDataString(match.Groups["token"].Value)
+        );
     }
 
     public void Dispose() => _scope.Dispose();

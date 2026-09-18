@@ -38,11 +38,19 @@ public sealed partial class ZoneBearingDateTimeOffsetModelBinder : IModelBinder
         // beside it ("from must be strictly earlier than to").
         var field = bindingContext.FieldName.ToLowerInvariant();
 
-        if (!DateTimeOffset.TryParse(raw, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed))
+        if (
+            !DateTimeOffset.TryParse(
+                raw,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out var parsed
+            )
+        )
         {
             bindingContext.ModelState.TryAddModelError(
                 modelName,
-                $"{field} must be an ISO-8601 timestamp (e.g. '2026-09-01T00:00:00+08:00').");
+                $"{field} must be an ISO-8601 timestamp (e.g. '2026-09-01T00:00:00+08:00')."
+            );
             return Task.CompletedTask;
         }
 
@@ -50,7 +58,8 @@ public sealed partial class ZoneBearingDateTimeOffsetModelBinder : IModelBinder
         {
             bindingContext.ModelState.TryAddModelError(
                 modelName,
-                $"{field} must carry a zone designator — a trailing 'Z' or '±HH:MM' (e.g. '2026-09-01T00:00:00+08:00').");
+                $"{field} must carry a zone designator — a trailing 'Z' or '±HH:MM' (e.g. '2026-09-01T00:00:00+08:00')."
+            );
             return Task.CompletedTask;
         }
 

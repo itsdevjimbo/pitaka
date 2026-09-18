@@ -10,7 +10,7 @@ namespace PitakaApp.Api.Tests.Actions.Auth;
 
 [Collection("Database collection")]
 public class RegisterUserTest : IDisposable
-{    
+{
     private readonly Faker _faker = new();
     private readonly IServiceScope _scope;
     private readonly RegisterUser _registerUser;
@@ -27,7 +27,8 @@ public class RegisterUserTest : IDisposable
     public async Task Register_UniqueEmail_ReturnsSucceededWithUser()
     {
         var result = await _registerUser.ExecuteAsync(
-            new RegisterInput(_faker.Person.FullName, _faker.Internet.Email(), "TestPass123!"));
+            new RegisterInput(_faker.Person.FullName, _faker.Internet.Email(), "TestPass123!")
+        );
 
         Assert.Equal(RegisterOutcome.Succeeded, result.Outcome);
         Assert.NotNull(result.User);
@@ -40,7 +41,8 @@ public class RegisterUserTest : IDisposable
         await UserFactory.CreateAsync(_context, email);
 
         var result = await _registerUser.ExecuteAsync(
-            new RegisterInput(_faker.Person.FullName, email, "Password123"));
+            new RegisterInput(_faker.Person.FullName, email, "Password123")
+        );
 
         Assert.Equal(RegisterOutcome.EmailTaken, result.Outcome);
         Assert.Null(result.User);
@@ -55,7 +57,8 @@ public class RegisterUserTest : IDisposable
         var email = $"o'{_faker.Internet.UserName()}@example.com";
 
         var result = await _registerUser.ExecuteAsync(
-            new RegisterInput(_faker.Person.FullName, email, "TestPass123!"));
+            new RegisterInput(_faker.Person.FullName, email, "TestPass123!")
+        );
 
         Assert.Equal(RegisterOutcome.Succeeded, result.Outcome);
     }
@@ -70,11 +73,15 @@ public class RegisterUserTest : IDisposable
         var email = $"o(comment){_faker.Internet.UserName()}@example.com";
 
         var result = await _registerUser.ExecuteAsync(
-            new RegisterInput(_faker.Person.FullName, email, "TestPass123!"));
+            new RegisterInput(_faker.Person.FullName, email, "TestPass123!")
+        );
 
         Assert.Equal(RegisterOutcome.Failed, result.Outcome);
         Assert.NotEmpty(result.Errors!);
-        Assert.DoesNotContain(result.Errors!, e => e.Code is "DuplicateUserName" or "DuplicateEmail");
+        Assert.DoesNotContain(
+            result.Errors!,
+            e => e.Code is "DuplicateUserName" or "DuplicateEmail"
+        );
     }
 
     public void Dispose() => _scope.Dispose();

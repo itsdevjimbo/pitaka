@@ -1,6 +1,6 @@
 namespace PitakaApp.Api.Inputs;
 
-public record UpdateRecurringTransactionInput (
+public record UpdateRecurringTransactionInput(
     string Name,
     decimal Amount,
     int? CategoryId,

@@ -30,7 +30,7 @@ public static class ApplicationServiceExtensions
         services.AddScoped<CategoryService>();
         services.AddScoped<VerifyBudgetCategory>();
         services.AddScoped<VerifyTransactionCategory>();
-        
+
         // Account
         services.AddScoped<AccountService>();
         services.AddScoped<UpdateAccountBalance>();
@@ -43,7 +43,7 @@ public static class ApplicationServiceExtensions
         services.AddScoped<GetBudgetCycle>();
         services.AddScoped<GetBudgetAmountSpent>();
         services.AddScoped<GetBudgetWithSpend>();
-        
+
         // Goal
         services.AddScoped<GoalService>();
         services.AddScoped<GoalContributionService>();

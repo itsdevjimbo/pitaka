@@ -12,15 +12,15 @@ public record RecurringTransactionResource(
     decimal Amount,
     string? Description,
     Frequency Frequency,
-    DateOnly StartDate, 
+    DateOnly StartDate,
     DateOnly? EndDate,
     DateOnly NextRunDate,
     RecurringTransactionStatus Status
 )
 {
     public static RecurringTransactionResource FromModel(RecurringTransaction rt) =>
-        new (
-            rt.Id, 
+        new(
+            rt.Id,
             rt.AccountId,
             rt.CategoryId,
             rt.Name,
@@ -34,6 +34,7 @@ public record RecurringTransactionResource(
             rt.Status
         );
 
-    public static List<RecurringTransactionResource> Collection(IEnumerable<RecurringTransaction> recurringTransactions) =>
-        recurringTransactions.Select(FromModel).ToList();
-} 
+    public static List<RecurringTransactionResource> Collection(
+        IEnumerable<RecurringTransaction> recurringTransactions
+    ) => [.. recurringTransactions.Select(FromModel)];
+}

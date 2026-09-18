@@ -7,14 +7,13 @@ using PitakaApp.Api.Tests.Fixtures;
 
 namespace PitakaApp.Api.Tests.Actions.Auth;
 
-
 [Collection("Database collection")]
 public class GetCurrentUserTest : IDisposable
 {
-
     private readonly IServiceScope _scope;
     private readonly GetCurrentUser _getCurrentUser;
     private readonly PitakaDbContext _context;
+
     public GetCurrentUserTest(PitakaWebApplicationFactory factory)
     {
         _scope = factory.Services.CreateScope();

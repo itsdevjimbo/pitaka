@@ -12,22 +12,15 @@ namespace PitakaApp.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/[controller]")]
-public class CategoriesController : ControllerBase
+public class CategoriesController(
+    GetCurrentUser getCurrentUser,
+    CategoryService categoryService,
+    CurrentUserAccessor currentUserAccessor
+) : ControllerBase
 {
-    private readonly GetCurrentUser _getCurrentUser;
-    private readonly CategoryService _categoryService;
-    private readonly CurrentUserAccessor _currentUserAccessor;
-
-    public CategoriesController(
-        GetCurrentUser getCurrentUser,
-        CategoryService categoryService,
-        CurrentUserAccessor currentUserAccessor
-    )
-    {
-        _getCurrentUser = getCurrentUser;
-        _categoryService = categoryService;
-        _currentUserAccessor = currentUserAccessor;
-    }
+    private readonly GetCurrentUser _getCurrentUser = getCurrentUser;
+    private readonly CategoryService _categoryService = categoryService;
+    private readonly CurrentUserAccessor _currentUserAccessor = currentUserAccessor;
 
     [AllowAnonymous]
     [HttpGet]
@@ -35,7 +28,7 @@ public class CategoriesController : ControllerBase
     {
         var user = await _getCurrentUser.ExecuteAsync(User);
         List<Category> categories;
-        
+
         if (user != null)
         {
             categories = await _categoryService.GetAllForUser(user);
@@ -54,7 +47,10 @@ public class CategoriesController : ControllerBase
 
         if (await _categoryService.NameExistsForUserAsync(user.Id, request.Name))
         {
-            return Problem(detail: "A category with this name already exists.", statusCode: StatusCodes.Status409Conflict);
+            return Problem(
+                detail: "A category with this name already exists.",
+                statusCode: StatusCodes.Status409Conflict
+            );
         }
 
         var category = await _categoryService.CreateUserOwnedAsync(user, request.ToInput());
@@ -69,7 +65,7 @@ public class CategoriesController : ControllerBase
 
         if (category == null)
         {
-            return NotFound();    
+            return NotFound();
         }
 
         return Ok(CategoryResource.FromModel(category));
@@ -86,7 +82,7 @@ public class CategoriesController : ControllerBase
         {
             return NotFound();
         }
-        
+
         if (category.UserId != user.Id)
         {
             return Forbid();
@@ -94,7 +90,10 @@ public class CategoriesController : ControllerBase
 
         if (await _categoryService.NameExistsForUserAsync(user.Id, request.Name, excludeId: id))
         {
-            return Problem(detail: "A category with this name already exists.", statusCode: StatusCodes.Status409Conflict);
+            return Problem(
+                detail: "A category with this name already exists.",
+                statusCode: StatusCodes.Status409Conflict
+            );
         }
 
         category = await _categoryService.UpdateAsync(category, request.ToInput());
@@ -133,7 +132,7 @@ public class CategoriesController : ControllerBase
         {
             return NotFound();
         }
-        
+
         if (category.UserId != user.Id)
         {
             return Forbid();
@@ -141,7 +140,10 @@ public class CategoriesController : ControllerBase
 
         if (await _categoryService.IsInUseAsync(id))
         {
-            return Problem(detail: "This category is in use and cannot be deleted.", statusCode: StatusCodes.Status409Conflict);
+            return Problem(
+                detail: "This category is in use and cannot be deleted.",
+                statusCode: StatusCodes.Status409Conflict
+            );
         }
 
         await _categoryService.DeleteAsync(category);

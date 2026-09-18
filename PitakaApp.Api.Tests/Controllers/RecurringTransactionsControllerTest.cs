@@ -25,7 +25,7 @@ public class RecurringTransactionsControllerTest : IDisposable
         _context = _scope.ServiceProvider.GetRequiredService<PitakaDbContext>();
         _client = factory.CreateClient();
     }
-    
+
     [Fact]
     public async Task Get_WithoutLoggedInUser_ReturnsUnauthorized()
     {
@@ -42,17 +42,34 @@ public class RecurringTransactionsControllerTest : IDisposable
         var accountB = await AccountFactory.CreateAsync(_context, userB.Id, initialBalance: 5000);
 
         await RecurringTransactionFactory.CreateAsync(_context, userB.Id, accountB.Id);
-        
-        await RecurringTransactionFactory.CreateAsync(_context, userA.Id, accountA.Id, name: "Test 1");
-        await RecurringTransactionFactory.CreateAsync(_context, userA.Id, accountA.Id, name: "Test 2");
-        await RecurringTransactionFactory.CreateAsync(_context, userA.Id, accountA.Id, name: "Test 3");
-        
+
+        await RecurringTransactionFactory.CreateAsync(
+            _context,
+            userA.Id,
+            accountA.Id,
+            name: "Test 1"
+        );
+        await RecurringTransactionFactory.CreateAsync(
+            _context,
+            userA.Id,
+            accountA.Id,
+            name: "Test 2"
+        );
+        await RecurringTransactionFactory.CreateAsync(
+            _context,
+            userA.Id,
+            accountA.Id,
+            name: "Test 3"
+        );
+
         _client.ActAsUser(userA);
 
         var response = await _client.GetAsync("/api/recurring-transactions");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<List<RecurringTransactionResource>>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<List<RecurringTransactionResource>>(
+            TestJsonOptions.Default
+        );
         Assert.Equal(3, body!.Count);
     }
 
@@ -66,9 +83,9 @@ public class RecurringTransactionsControllerTest : IDisposable
             Type = RecurringTransactionType.Income,
             Frequency = Frequency.Daily,
             Amount = 500,
-            StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1))
+            StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)),
         };
-        
+
         var response = await _client.PostAsJsonAsync("/api/recurring-transactions", request);
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -86,9 +103,9 @@ public class RecurringTransactionsControllerTest : IDisposable
             Type = RecurringTransactionType.Income,
             Frequency = Frequency.Daily,
             Amount = 500,
-            StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1))
+            StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)),
         };
-        
+
         var response = await _client.PostAsJsonAsync("/api/recurring-transactions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -109,9 +126,9 @@ public class RecurringTransactionsControllerTest : IDisposable
             Type = RecurringTransactionType.Income,
             Frequency = Frequency.Daily,
             Amount = 500,
-            StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1))
+            StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)),
         };
-        
+
         var response = await _client.PostAsJsonAsync("/api/recurring-transactions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -131,9 +148,9 @@ public class RecurringTransactionsControllerTest : IDisposable
             Type = RecurringTransactionType.Income,
             Frequency = Frequency.Daily,
             Amount = 500,
-            StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1))
+            StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)),
         };
-        
+
         var response = await _client.PostAsJsonAsync("/api/recurring-transactions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -154,9 +171,9 @@ public class RecurringTransactionsControllerTest : IDisposable
             Type = RecurringTransactionType.Income,
             Frequency = Frequency.Daily,
             Amount = 500,
-            StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1))
+            StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)),
         };
-        
+
         var response = await _client.PostAsJsonAsync("/api/recurring-transactions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -179,9 +196,9 @@ public class RecurringTransactionsControllerTest : IDisposable
             Type = RecurringTransactionType.Income,
             Frequency = Frequency.Daily,
             Amount = 500,
-            StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1))
+            StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)),
         };
-        
+
         var response = await _client.PostAsJsonAsync("/api/recurring-transactions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -192,7 +209,12 @@ public class RecurringTransactionsControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
 
-        await RecurringTransactionFactory.CreateAsync(_context, user.Id, account.Id, name: "Test 1");
+        await RecurringTransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            name: "Test 1"
+        );
 
         _client.ActAsUser(user);
 
@@ -203,42 +225,107 @@ public class RecurringTransactionsControllerTest : IDisposable
             Type = RecurringTransactionType.Income,
             Frequency = Frequency.Daily,
             Amount = 500,
-            StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1))
+            StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)),
         };
-        
+
         var response = await _client.PostAsJsonAsync("/api/recurring-transactions", request);
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
     }
+
     public static IEnumerable<object?[]> InvalidRecurringTransactionRequests()
     {
         var startDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(3));
 
         // Missing name
-        yield return new object?[] { null, 500m, RecurringTransactionType.Income, Frequency.Daily,  startDate, null };
+        yield return new object?[]
+        {
+            null,
+            500m,
+            RecurringTransactionType.Income,
+            Frequency.Daily,
+            startDate,
+            null,
+        };
 
         // Negavtive amount
-        yield return new object?[] { "Test", -100m, RecurringTransactionType.Income, Frequency.Daily,  startDate, null };
+        yield return new object?[]
+        {
+            "Test",
+            -100m,
+            RecurringTransactionType.Income,
+            Frequency.Daily,
+            startDate,
+            null,
+        };
 
         // 0 amount
-        yield return new object?[] { "Test", 0, RecurringTransactionType.Income, Frequency.Daily,  startDate, null };
+        yield return new object?[]
+        {
+            "Test",
+            0,
+            RecurringTransactionType.Income,
+            Frequency.Daily,
+            startDate,
+            null,
+        };
 
         // missing type
-        yield return new object?[] { "Test", 100m, null, Frequency.Daily,  startDate, null };
+        yield return new object?[] { "Test", 100m, null, Frequency.Daily, startDate, null };
 
         // missing daily
-        yield return new object?[] { "Test", 100m, RecurringTransactionType.Income, null,  startDate, null };
+        yield return new object?[]
+        {
+            "Test",
+            100m,
+            RecurringTransactionType.Income,
+            null,
+            startDate,
+            null,
+        };
 
         // start date today
-        yield return new object?[] { "Test", 100m, RecurringTransactionType.Income, Frequency.Daily, DateOnly.FromDateTime(DateTime.UtcNow) , null };
+        yield return new object?[]
+        {
+            "Test",
+            100m,
+            RecurringTransactionType.Income,
+            Frequency.Daily,
+            DateOnly.FromDateTime(DateTime.UtcNow),
+            null,
+        };
 
         // start in the past
-        yield return new object?[] { "Test", 100m, RecurringTransactionType.Income, Frequency.Daily, DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1)), null};
+        yield return new object?[]
+        {
+            "Test",
+            100m,
+            RecurringTransactionType.Income,
+            Frequency.Daily,
+            DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1)),
+            null,
+        };
 
         // end date before start date
-        yield return new object?[] { "Test", 100m, RecurringTransactionType.Income, Frequency.Daily, startDate, DateOnly.FromDateTime(DateTime.UtcNow)};
+        yield return new object?[]
+        {
+            "Test",
+            100m,
+            RecurringTransactionType.Income,
+            Frequency.Daily,
+            startDate,
+            DateOnly.FromDateTime(DateTime.UtcNow),
+        };
 
         // end date same with start date
-        yield return new object?[] { "Test", 100m, RecurringTransactionType.Income, Frequency.Daily, startDate, startDate};
+        yield return new object?[]
+        {
+            "Test",
+            100m,
+            RecurringTransactionType.Income,
+            Frequency.Daily,
+            startDate,
+            startDate,
+        };
     }
 
     [Theory]
@@ -265,9 +352,8 @@ public class RecurringTransactionsControllerTest : IDisposable
             Type = type,
             Frequency = frequency,
             StartDate = startDate,
-            EndDate = endDate
+            EndDate = endDate,
         };
-
 
         var response = await _client.PostAsJsonAsync("/api/recurring-transactions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -304,7 +390,9 @@ public class RecurringTransactionsControllerTest : IDisposable
         var response = await _client.PostAsJsonAsync("/api/recurring-transactions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
-        Assert.False(await _context.RecurringTransactions.AsNoTracking().AnyAsync(r => r.UserId == user.Id));
+        Assert.False(
+            await _context.RecurringTransactions.AsNoTracking().AnyAsync(r => r.UserId == user.Id)
+        );
     }
 
     [Fact]
@@ -313,7 +401,7 @@ public class RecurringTransactionsControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
         var category = await CategoryFactory.CreateAsync(_context, user.Id);
-        
+
         _client.ActAsUser(user);
 
         var request = new
@@ -328,12 +416,16 @@ public class RecurringTransactionsControllerTest : IDisposable
             EndDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(3)),
             Description = "Test description",
         };
-        
+
         var response = await _client.PostAsJsonAsync("/api/recurring-transactions", request);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-        var recurringTransaction = await _context.RecurringTransactions.Where(rt => rt.UserId == user.Id).FirstAsync();
-        var body = await response.Content.ReadFromJsonAsync<RecurringTransactionResource>(TestJsonOptions.Default);
+        var recurringTransaction = await _context
+            .RecurringTransactions.Where(rt => rt.UserId == user.Id)
+            .FirstAsync();
+        var body = await response.Content.ReadFromJsonAsync<RecurringTransactionResource>(
+            TestJsonOptions.Default
+        );
 
         Assert.Equal(recurringTransaction.Id, body!.Id);
         Assert.Equal(account.Id, body.AccountId);
@@ -354,7 +446,7 @@ public class RecurringTransactionsControllerTest : IDisposable
     {
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
-        
+
         _client.ActAsUser(user);
 
         var request = new
@@ -364,13 +456,15 @@ public class RecurringTransactionsControllerTest : IDisposable
             Type = RecurringTransactionType.Income,
             Frequency = Frequency.Daily,
             Amount = 500,
-            StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1))
+            StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)),
         };
-        
-        var response = await _client.PostAsJsonAsync("/api/recurring-transactions", request);
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);  
 
-        var body = await response.Content.ReadFromJsonAsync<RecurringTransactionResource>(TestJsonOptions.Default);
+        var response = await _client.PostAsJsonAsync("/api/recurring-transactions", request);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<RecurringTransactionResource>(
+            TestJsonOptions.Default
+        );
         Assert.Null(body!.EndDate);
     }
 
@@ -380,7 +474,7 @@ public class RecurringTransactionsControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
         var category = await CategoryFactory.CreateAsync(_context, user.Id);
-        
+
         _client.ActAsUser(user);
 
         var request = new
@@ -391,13 +485,15 @@ public class RecurringTransactionsControllerTest : IDisposable
             Type = RecurringTransactionType.Income,
             Frequency = Frequency.Daily,
             Amount = 500,
-            StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1))
+            StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)),
         };
-        
-        var response = await _client.PostAsJsonAsync("/api/recurring-transactions", request);
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);  
 
-        var body = await response.Content.ReadFromJsonAsync<RecurringTransactionResource>(TestJsonOptions.Default);
+        var response = await _client.PostAsJsonAsync("/api/recurring-transactions", request);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<RecurringTransactionResource>(
+            TestJsonOptions.Default
+        );
         Assert.Equal(category.Id, body!.CategoryId);
     }
 
@@ -407,7 +503,7 @@ public class RecurringTransactionsControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
         var category = await CategoryFactory.CreateAsync(_context);
-        
+
         _client.ActAsUser(user);
 
         var request = new
@@ -418,13 +514,15 @@ public class RecurringTransactionsControllerTest : IDisposable
             Type = RecurringTransactionType.Income,
             Frequency = Frequency.Daily,
             Amount = 500,
-            StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1))
+            StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)),
         };
-        
-        var response = await _client.PostAsJsonAsync("/api/recurring-transactions", request);
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);  
 
-        var body = await response.Content.ReadFromJsonAsync<RecurringTransactionResource>(TestJsonOptions.Default);
+        var response = await _client.PostAsJsonAsync("/api/recurring-transactions", request);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<RecurringTransactionResource>(
+            TestJsonOptions.Default
+        );
         Assert.Equal(category.Id, body!.CategoryId);
     }
 
@@ -437,8 +535,13 @@ public class RecurringTransactionsControllerTest : IDisposable
         var accountA = await AccountFactory.CreateAsync(_context, userA.Id);
         var accountB = await AccountFactory.CreateAsync(_context, userB.Id);
 
-        await RecurringTransactionFactory.CreateAsync(_context, userB.Id, accountB.Id, name: "Test 1");
-        
+        await RecurringTransactionFactory.CreateAsync(
+            _context,
+            userB.Id,
+            accountB.Id,
+            name: "Test 1"
+        );
+
         _client.ActAsUser(userA);
 
         var request = new
@@ -448,13 +551,15 @@ public class RecurringTransactionsControllerTest : IDisposable
             Type = RecurringTransactionType.Income,
             Frequency = Frequency.Daily,
             Amount = 500,
-            StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1))
+            StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)),
         };
-        
-        var response = await _client.PostAsJsonAsync("/api/recurring-transactions", request);
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);  
 
-        var body = await response.Content.ReadFromJsonAsync<RecurringTransactionResource>(TestJsonOptions.Default);
+        var response = await _client.PostAsJsonAsync("/api/recurring-transactions", request);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<RecurringTransactionResource>(
+            TestJsonOptions.Default
+        );
         Assert.Equal("Test 1", body!.Name);
     }
 
@@ -463,10 +568,17 @@ public class RecurringTransactionsControllerTest : IDisposable
     {
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
-        
-        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(_context, user.Id, account.Id, name: "Test 1");
 
-        var response = await _client.GetAsync("/api/recurring-transactions/" + recurringTransaction.Id);
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            name: "Test 1"
+        );
+
+        var response = await _client.GetAsync(
+            "/api/recurring-transactions/" + recurringTransaction.Id
+        );
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
@@ -474,7 +586,7 @@ public class RecurringTransactionsControllerTest : IDisposable
     public async Task Show_WithNonExistentRecurringTransaction_ReturnsNotFound()
     {
         var user = await UserFactory.CreateAsync(_context);
-        
+
         _client.ActAsUser(user);
 
         var response = await _client.GetAsync("/api/recurring-transactions/999999");
@@ -488,12 +600,19 @@ public class RecurringTransactionsControllerTest : IDisposable
         var userB = await UserFactory.CreateAsync(_context);
 
         var account = await AccountFactory.CreateAsync(_context, userB.Id);
-        
-        _client.ActAsUser(userA);
-        
-        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(_context, userB.Id, account.Id, name: "Test 1");
 
-        var response = await _client.GetAsync("/api/recurring-transactions/" + recurringTransaction.Id);
+        _client.ActAsUser(userA);
+
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            _context,
+            userB.Id,
+            account.Id,
+            name: "Test 1"
+        );
+
+        var response = await _client.GetAsync(
+            "/api/recurring-transactions/" + recurringTransaction.Id
+        );
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
@@ -502,14 +621,23 @@ public class RecurringTransactionsControllerTest : IDisposable
     {
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
-        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(_context, user.Id, account.Id, name: "Test 1");
-        
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            name: "Test 1"
+        );
+
         _client.ActAsUser(user);
 
-        var response = await _client.GetAsync("/api/recurring-transactions/" + recurringTransaction.Id);
+        var response = await _client.GetAsync(
+            "/api/recurring-transactions/" + recurringTransaction.Id
+        );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<RecurringTransactionResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<RecurringTransactionResource>(
+            TestJsonOptions.Default
+        );
 
         Assert.Equal(recurringTransaction.Id, body!.Id);
         Assert.Equal(account.Id, body.AccountId);
@@ -530,14 +658,18 @@ public class RecurringTransactionsControllerTest : IDisposable
     {
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
-        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(_context, user.Id, account.Id);
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id
+        );
 
-        var request = new
-        {
-            Name = "Test 1",
-        };
+        var request = new { Name = "Test 1" };
 
-        var response = await _client.PutAsJsonAsync("/api/recurring-transactions/" + recurringTransaction.Id, request);
+        var response = await _client.PutAsJsonAsync(
+            "/api/recurring-transactions/" + recurringTransaction.Id,
+            request
+        );
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
@@ -547,11 +679,7 @@ public class RecurringTransactionsControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         _client.ActAsUser(user);
 
-        var request = new
-        {
-            Name = "Test 1",
-            Amount = 501,
-        };
+        var request = new { Name = "Test 1", Amount = 501 };
 
         var response = await _client.PutAsJsonAsync("/api/recurring-transactions/999999", request);
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -563,17 +691,20 @@ public class RecurringTransactionsControllerTest : IDisposable
         var userA = await UserFactory.CreateAsync(_context);
         var userB = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, userB.Id);
-        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(_context, userB.Id, account.Id);
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            _context,
+            userB.Id,
+            account.Id
+        );
 
         _client.ActAsUser(userA);
 
-        var request = new
-        {
-            Name = "Test 1",
-            Amount = 501,
-        };
+        var request = new { Name = "Test 1", Amount = 501 };
 
-        var response = await _client.PutAsJsonAsync("/api/recurring-transactions/" + recurringTransaction.Id, request);
+        var response = await _client.PutAsJsonAsync(
+            "/api/recurring-transactions/" + recurringTransaction.Id,
+            request
+        );
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
@@ -582,18 +713,27 @@ public class RecurringTransactionsControllerTest : IDisposable
     {
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
-        await RecurringTransactionFactory.CreateAsync(_context, user.Id, account.Id, name: "Test 1");
-        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(_context, user.Id, account.Id, name: "Other test");
+        await RecurringTransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            name: "Test 1"
+        );
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            name: "Other test"
+        );
 
         _client.ActAsUser(user);
 
-        var request = new
-        {
-            Name = "Test 1",
-            Amount = 501,
-        };
+        var request = new { Name = "Test 1", Amount = 501 };
 
-        var response = await _client.PutAsJsonAsync("/api/recurring-transactions/" + recurringTransaction.Id, request);
+        var response = await _client.PutAsJsonAsync(
+            "/api/recurring-transactions/" + recurringTransaction.Id,
+            request
+        );
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
     }
 
@@ -602,7 +742,11 @@ public class RecurringTransactionsControllerTest : IDisposable
     {
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
-        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(_context, user.Id, account.Id);
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id
+        );
 
         _client.ActAsUser(user);
 
@@ -610,10 +754,13 @@ public class RecurringTransactionsControllerTest : IDisposable
         {
             Name = "Test 1",
             Amount = 501,
-            EndDate =  DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1))
+            EndDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)),
         };
 
-        var response = await _client.PutAsJsonAsync("/api/recurring-transactions/" + recurringTransaction.Id, request);
+        var response = await _client.PutAsJsonAsync(
+            "/api/recurring-transactions/" + recurringTransaction.Id,
+            request
+        );
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
@@ -622,7 +769,11 @@ public class RecurringTransactionsControllerTest : IDisposable
     {
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
-        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(_context, user.Id, account.Id);
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id
+        );
 
         _client.ActAsUser(user);
 
@@ -630,10 +781,13 @@ public class RecurringTransactionsControllerTest : IDisposable
         {
             Name = "Test 1",
             Amount = 501,
-            CategoryId =  9999
+            CategoryId = 9999,
         };
 
-        var response = await _client.PutAsJsonAsync("/api/recurring-transactions/" + recurringTransaction.Id, request);
+        var response = await _client.PutAsJsonAsync(
+            "/api/recurring-transactions/" + recurringTransaction.Id,
+            request
+        );
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
@@ -644,7 +798,11 @@ public class RecurringTransactionsControllerTest : IDisposable
         var userB = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
         var category = await CategoryFactory.CreateAsync(_context, userB.Id);
-        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(_context, user.Id, account.Id);
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id
+        );
 
         _client.ActAsUser(user);
 
@@ -652,10 +810,13 @@ public class RecurringTransactionsControllerTest : IDisposable
         {
             Name = "Test 1",
             Amount = 501,
-            CategoryId =  category.Id
+            CategoryId = category.Id,
         };
 
-        var response = await _client.PutAsJsonAsync("/api/recurring-transactions/" + recurringTransaction.Id, request);
+        var response = await _client.PutAsJsonAsync(
+            "/api/recurring-transactions/" + recurringTransaction.Id,
+            request
+        );
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
@@ -665,25 +826,34 @@ public class RecurringTransactionsControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
         var category = await CategoryFactory.CreateAsync(_context, user.Id);
-        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(_context, user.Id, account.Id);
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id
+        );
 
         _client.ActAsUser(user);
 
         var request = new
         {
             Name = "Updated name",
-            CategoryId =  category.Id,
+            CategoryId = category.Id,
             Amount = 5000,
             Description = "Updated description",
-            EndDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(7))
+            EndDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(7)),
         };
 
-        var response = await _client.PutAsJsonAsync("/api/recurring-transactions/" + recurringTransaction.Id, request);
+        var response = await _client.PutAsJsonAsync(
+            "/api/recurring-transactions/" + recurringTransaction.Id,
+            request
+        );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         await _context.Entry(recurringTransaction).ReloadAsync();
-        
-        var body = await response.Content.ReadFromJsonAsync<RecurringTransactionResource>(TestJsonOptions.Default);
+
+        var body = await response.Content.ReadFromJsonAsync<RecurringTransactionResource>(
+            TestJsonOptions.Default
+        );
 
         Assert.Equal(recurringTransaction.Id, body!.Id);
         Assert.Equal(account.Id, body.AccountId);
@@ -704,17 +874,21 @@ public class RecurringTransactionsControllerTest : IDisposable
     {
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
-        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(_context, user.Id, account.Id, name: "Test 1");
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            name: "Test 1"
+        );
 
         _client.ActAsUser(user);
 
-        var request = new
-        {
-            Name = "Test 1",
-            Amount = 501,
-        };
+        var request = new { Name = "Test 1", Amount = 501 };
 
-        var response = await _client.PutAsJsonAsync("/api/recurring-transactions/" + recurringTransaction.Id, request);
+        var response = await _client.PutAsJsonAsync(
+            "/api/recurring-transactions/" + recurringTransaction.Id,
+            request
+        );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
@@ -724,20 +898,25 @@ public class RecurringTransactionsControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
         var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
-            _context, user.Id, account.Id, name: "Test 1", endDate: DateOnly.FromDateTime(DateTime.UtcNow.AddDays(7))
+            _context,
+            user.Id,
+            account.Id,
+            name: "Test 1",
+            endDate: DateOnly.FromDateTime(DateTime.UtcNow.AddDays(7))
         );
 
         _client.ActAsUser(user);
 
-        var request = new
-        {
-            Name = "Test 1",
-            Amount = 501,
-        };
+        var request = new { Name = "Test 1", Amount = 501 };
 
-        var response = await _client.PutAsJsonAsync("/api/recurring-transactions/" + recurringTransaction.Id, request);
+        var response = await _client.PutAsJsonAsync(
+            "/api/recurring-transactions/" + recurringTransaction.Id,
+            request
+        );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync<RecurringTransactionResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<RecurringTransactionResource>(
+            TestJsonOptions.Default
+        );
 
         Assert.Null(body!.EndDate);
     }
@@ -748,7 +927,12 @@ public class RecurringTransactionsControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
         var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
-            _context, user.Id, account.Id, name: "Test 1", endDate: DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-3)), status: RecurringTransactionStatus.Cancelled
+            _context,
+            user.Id,
+            account.Id,
+            name: "Test 1",
+            endDate: DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-3)),
+            status: RecurringTransactionStatus.Cancelled
         );
 
         _client.ActAsUser(user);
@@ -757,13 +941,18 @@ public class RecurringTransactionsControllerTest : IDisposable
         {
             Name = "Test 1",
             Amount = 501,
-            EndDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(10))
+            EndDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(10)),
         };
 
-        var response = await _client.PutAsJsonAsync("/api/recurring-transactions/" + recurringTransaction.Id, request);
+        var response = await _client.PutAsJsonAsync(
+            "/api/recurring-transactions/" + recurringTransaction.Id,
+            request
+        );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<RecurringTransactionResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<RecurringTransactionResource>(
+            TestJsonOptions.Default
+        );
         Assert.Equal(recurringTransaction.Status, body!.Status);
     }
 
@@ -772,9 +961,16 @@ public class RecurringTransactionsControllerTest : IDisposable
     {
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
-        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(_context, user.Id, account.Id);
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id
+        );
 
-        var response = await _client.PatchAsJsonAsync("/api/recurring-transactions/" + recurringTransaction.Id + "/status", new { Status = "Paused" });
+        var response = await _client.PatchAsJsonAsync(
+            "/api/recurring-transactions/" + recurringTransaction.Id + "/status",
+            new { Status = "Paused" }
+        );
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
@@ -784,8 +980,11 @@ public class RecurringTransactionsControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
 
         _client.ActAsUser(user);
-        
-        var response = await _client.PatchAsJsonAsync("/api/recurring-transactions/99999/status", new { Status = "Paused" });
+
+        var response = await _client.PatchAsJsonAsync(
+            "/api/recurring-transactions/99999/status",
+            new { Status = "Paused" }
+        );
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
@@ -795,11 +994,18 @@ public class RecurringTransactionsControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         var userB = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, userB.Id);
-        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(_context, userB.Id, account.Id);
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            _context,
+            userB.Id,
+            account.Id
+        );
 
         _client.ActAsUser(user);
 
-        var response = await _client.PatchAsJsonAsync("/api/recurring-transactions/" + recurringTransaction.Id + "/status", new { Status = "Paused" });
+        var response = await _client.PatchAsJsonAsync(
+            "/api/recurring-transactions/" + recurringTransaction.Id + "/status",
+            new { Status = "Paused" }
+        );
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
@@ -808,11 +1014,18 @@ public class RecurringTransactionsControllerTest : IDisposable
     {
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
-        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(_context, user.Id, account.Id);
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id
+        );
 
         _client.ActAsUser(user);
 
-        var response = await _client.PatchAsJsonAsync("/api/recurring-transactions/" + recurringTransaction.Id + "/status", new { Status = "Test Sttus" });
+        var response = await _client.PatchAsJsonAsync(
+            "/api/recurring-transactions/" + recurringTransaction.Id + "/status",
+            new { Status = "Test Sttus" }
+        );
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
@@ -821,11 +1034,18 @@ public class RecurringTransactionsControllerTest : IDisposable
     {
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
-        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(_context, user.Id, account.Id);
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id
+        );
 
         _client.ActAsUser(user);
 
-        var response = await _client.PatchAsJsonAsync("/api/recurring-transactions/" + recurringTransaction.Id + "/status", new { Status = "Completed" });
+        var response = await _client.PatchAsJsonAsync(
+            "/api/recurring-transactions/" + recurringTransaction.Id + "/status",
+            new { Status = "Completed" }
+        );
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
@@ -835,7 +1055,10 @@ public class RecurringTransactionsControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
         var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
-            _context, user.Id, account.Id, status: RecurringTransactionStatus.Cancelled
+            _context,
+            user.Id,
+            account.Id,
+            status: RecurringTransactionStatus.Cancelled
         );
 
         _client.ActAsUser(user);
@@ -845,11 +1068,13 @@ public class RecurringTransactionsControllerTest : IDisposable
         // (rejecting only Completed) waved through, putting a cancelled money-movement schedule
         // back in play. See issue #82.
         var response = await _client.PatchAsJsonAsync(
-            "/api/recurring-transactions/" + recurringTransaction.Id + "/status", new { }
+            "/api/recurring-transactions/" + recurringTransaction.Id + "/status",
+            new { }
         );
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
-        var stored = await _context.RecurringTransactions.AsNoTracking()
+        var stored = await _context
+            .RecurringTransactions.AsNoTracking()
             .SingleAsync(r => r.Id == recurringTransaction.Id);
         Assert.Equal(RecurringTransactionStatus.Cancelled, stored.Status);
     }
@@ -859,16 +1084,25 @@ public class RecurringTransactionsControllerTest : IDisposable
     {
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
-        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(_context, user.Id, account.Id);
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id
+        );
 
         _client.ActAsUser(user);
 
-        var response = await _client.PatchAsJsonAsync("/api/recurring-transactions/" + recurringTransaction.Id + "/status", new { Status = "Paused" });
+        var response = await _client.PatchAsJsonAsync(
+            "/api/recurring-transactions/" + recurringTransaction.Id + "/status",
+            new { Status = "Paused" }
+        );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        
+
         await _context.Entry(recurringTransaction).ReloadAsync();
 
-        var body = await response.Content.ReadFromJsonAsync<RecurringTransactionResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<RecurringTransactionResource>(
+            TestJsonOptions.Default
+        );
         Assert.Equal(recurringTransaction.NextRunDate, body!.NextRunDate);
     }
 
@@ -880,16 +1114,24 @@ public class RecurringTransactionsControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
         var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
-            _context, user.Id, account.Id, status: RecurringTransactionStatus.Paused, startDate: startDate
+            _context,
+            user.Id,
+            account.Id,
+            status: RecurringTransactionStatus.Paused,
+            startDate: startDate
         );
 
-        
         _client.ActAsUser(user);
 
-        var response = await _client.PatchAsJsonAsync("/api/recurring-transactions/" + recurringTransaction.Id + "/status", new { Status = "Active" });
+        var response = await _client.PatchAsJsonAsync(
+            "/api/recurring-transactions/" + recurringTransaction.Id + "/status",
+            new { Status = "Active" }
+        );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<RecurringTransactionResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<RecurringTransactionResource>(
+            TestJsonOptions.Default
+        );
         Assert.Equal(DateOnly.FromDateTime(DateTime.UtcNow), body!.NextRunDate);
     }
 
@@ -902,16 +1144,26 @@ public class RecurringTransactionsControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
         var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
-            _context, user.Id, account.Id, status: RecurringTransactionStatus.Paused, 
-            startDate: startDate, endDate: endDte, nextRunDate: startDate
+            _context,
+            user.Id,
+            account.Id,
+            status: RecurringTransactionStatus.Paused,
+            startDate: startDate,
+            endDate: endDte,
+            nextRunDate: startDate
         );
-        
+
         _client.ActAsUser(user);
 
-        var response = await _client.PatchAsJsonAsync("/api/recurring-transactions/" + recurringTransaction.Id + "/status", new { Status = "Active" });
+        var response = await _client.PatchAsJsonAsync(
+            "/api/recurring-transactions/" + recurringTransaction.Id + "/status",
+            new { Status = "Active" }
+        );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<RecurringTransactionResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<RecurringTransactionResource>(
+            TestJsonOptions.Default
+        );
         Assert.Equal(startDate, body!.NextRunDate);
         Assert.Equal(RecurringTransactionStatus.Completed, body!.Status);
     }
@@ -921,16 +1173,25 @@ public class RecurringTransactionsControllerTest : IDisposable
     {
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
-        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(_context, user.Id, account.Id);
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id
+        );
 
         _client.ActAsUser(user);
 
-        var response = await _client.PatchAsJsonAsync("/api/recurring-transactions/" + recurringTransaction.Id + "/status", new { Status = "Cancelled" });
+        var response = await _client.PatchAsJsonAsync(
+            "/api/recurring-transactions/" + recurringTransaction.Id + "/status",
+            new { Status = "Cancelled" }
+        );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        
+
         await _context.Entry(recurringTransaction).ReloadAsync();
 
-        var body = await response.Content.ReadFromJsonAsync<RecurringTransactionResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<RecurringTransactionResource>(
+            TestJsonOptions.Default
+        );
         Assert.Equal(RecurringTransactionStatus.Cancelled, body!.Status);
     }
 
@@ -939,16 +1200,26 @@ public class RecurringTransactionsControllerTest : IDisposable
     {
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
-        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(_context, user.Id, account.Id, status: RecurringTransactionStatus.Paused);
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            status: RecurringTransactionStatus.Paused
+        );
 
         _client.ActAsUser(user);
 
-        var response = await _client.PatchAsJsonAsync("/api/recurring-transactions/" + recurringTransaction.Id + "/status", new { Status = "Cancelled" });
+        var response = await _client.PatchAsJsonAsync(
+            "/api/recurring-transactions/" + recurringTransaction.Id + "/status",
+            new { Status = "Cancelled" }
+        );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        
+
         await _context.Entry(recurringTransaction).ReloadAsync();
 
-        var body = await response.Content.ReadFromJsonAsync<RecurringTransactionResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<RecurringTransactionResource>(
+            TestJsonOptions.Default
+        );
         Assert.Equal(RecurringTransactionStatus.Cancelled, body!.Status);
     }
 
@@ -957,16 +1228,26 @@ public class RecurringTransactionsControllerTest : IDisposable
     {
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id, isActive: false);
-        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(_context, user.Id, account.Id, status: RecurringTransactionStatus.Paused);
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            status: RecurringTransactionStatus.Paused
+        );
 
         _client.ActAsUser(user);
 
-        var response = await _client.PatchAsJsonAsync("/api/recurring-transactions/" + recurringTransaction.Id + "/status", new { Status = "Active" });
+        var response = await _client.PatchAsJsonAsync(
+            "/api/recurring-transactions/" + recurringTransaction.Id + "/status",
+            new { Status = "Active" }
+        );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        
+
         await _context.Entry(recurringTransaction).ReloadAsync();
 
-        var body = await response.Content.ReadFromJsonAsync<RecurringTransactionResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<RecurringTransactionResource>(
+            TestJsonOptions.Default
+        );
         Assert.Equal(RecurringTransactionStatus.Active, body!.Status);
     }
 
@@ -975,9 +1256,15 @@ public class RecurringTransactionsControllerTest : IDisposable
     {
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
-        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(_context, user.Id, account.Id );
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id
+        );
 
-        var response = await _client.DeleteAsync("api/recurring-transactions/" + recurringTransaction.Id);
+        var response = await _client.DeleteAsync(
+            "api/recurring-transactions/" + recurringTransaction.Id
+        );
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
@@ -987,11 +1274,17 @@ public class RecurringTransactionsControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         var userB = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, userB.Id);
-        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(_context, userB.Id, account.Id );
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            _context,
+            userB.Id,
+            account.Id
+        );
 
         _client.ActAsUser(user);
 
-        var response = await _client.DeleteAsync("api/recurring-transactions/" + recurringTransaction.Id);
+        var response = await _client.DeleteAsync(
+            "api/recurring-transactions/" + recurringTransaction.Id
+        );
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
@@ -1000,14 +1293,22 @@ public class RecurringTransactionsControllerTest : IDisposable
     {
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
-        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(_context, user.Id, account.Id);
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id
+        );
 
         _client.ActAsUser(user);
 
-        var response = await _client.DeleteAsync("api/recurring-transactions/" + recurringTransaction.Id);
+        var response = await _client.DeleteAsync(
+            "api/recurring-transactions/" + recurringTransaction.Id
+        );
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
 
-        Assert.False(await _context.RecurringTransactions.AnyAsync(rt => rt.Id == recurringTransaction.Id));
+        Assert.False(
+            await _context.RecurringTransactions.AnyAsync(rt => rt.Id == recurringTransaction.Id)
+        );
     }
 
     // The refusal turns on history, not status — a schedule that has generated a Transaction
@@ -1018,23 +1319,37 @@ public class RecurringTransactionsControllerTest : IDisposable
     [InlineData(RecurringTransactionStatus.Paused)]
     [InlineData(RecurringTransactionStatus.Completed)]
     [InlineData(RecurringTransactionStatus.Cancelled)]
-    public async Task Delete_WithGeneratedTransaction_ReturnsConflict(RecurringTransactionStatus status)
+    public async Task Delete_WithGeneratedTransaction_ReturnsConflict(
+        RecurringTransactionStatus status
+    )
     {
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
         var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
-            _context, user.Id, account.Id, status: status);
+            _context,
+            user.Id,
+            account.Id,
+            status: status
+        );
         var transaction = await TransactionFactory.CreateAsync(
-            _context, user.Id, account.Id, recurringTransactionId: recurringTransaction.Id);
+            _context,
+            user.Id,
+            account.Id,
+            recurringTransactionId: recurringTransaction.Id
+        );
 
         _client.ActAsUser(user);
 
-        var response = await _client.DeleteAsync("api/recurring-transactions/" + recurringTransaction.Id);
+        var response = await _client.DeleteAsync(
+            "api/recurring-transactions/" + recurringTransaction.Id
+        );
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
 
         // The schedule survives, and so does the link — the surviving link is the point of
         // the change, and the status code alone does not prove it.
-        Assert.True(await _context.RecurringTransactions.AnyAsync(rt => rt.Id == recurringTransaction.Id));
+        Assert.True(
+            await _context.RecurringTransactions.AnyAsync(rt => rt.Id == recurringTransaction.Id)
+        );
         await _context.Entry(transaction).ReloadAsync();
         Assert.Equal(recurringTransaction.Id, transaction.RecurringTransactionId);
     }
@@ -1044,19 +1359,31 @@ public class RecurringTransactionsControllerTest : IDisposable
     {
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
-        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(_context, user.Id, account.Id);
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id
+        );
         var transaction = await TransactionFactory.CreateAsync(
-            _context, user.Id, account.Id, recurringTransactionId: recurringTransaction.Id);
+            _context,
+            user.Id,
+            account.Id,
+            recurringTransactionId: recurringTransaction.Id
+        );
 
         var transactionService = _scope.ServiceProvider.GetRequiredService<TransactionService>();
         await transactionService.DeleteAsync(transaction);
 
         _client.ActAsUser(user);
 
-        var response = await _client.DeleteAsync("api/recurring-transactions/" + recurringTransaction.Id);
+        var response = await _client.DeleteAsync(
+            "api/recurring-transactions/" + recurringTransaction.Id
+        );
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
 
-        Assert.False(await _context.RecurringTransactions.AnyAsync(rt => rt.Id == recurringTransaction.Id));
+        Assert.False(
+            await _context.RecurringTransactions.AnyAsync(rt => rt.Id == recurringTransaction.Id)
+        );
     }
 
     [Fact]
@@ -1064,7 +1391,11 @@ public class RecurringTransactionsControllerTest : IDisposable
     {
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
-        var incomeCategory = await CategoryFactory.CreateAsync(_context, user.Id, type: CategoryType.Income);
+        var incomeCategory = await CategoryFactory.CreateAsync(
+            _context,
+            user.Id,
+            type: CategoryType.Income
+        );
 
         _client.ActAsUser(user);
 
@@ -1085,7 +1416,8 @@ public class RecurringTransactionsControllerTest : IDisposable
         var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
         Assert.Equal(
             "A recurring transaction's category must be of the same type as the transaction.",
-            problem!.Detail);
+            problem!.Detail
+        );
     }
 
     [Fact]
@@ -1093,7 +1425,11 @@ public class RecurringTransactionsControllerTest : IDisposable
     {
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
-        var expenseCategory = await CategoryFactory.CreateAsync(_context, user.Id, type: CategoryType.Expense);
+        var expenseCategory = await CategoryFactory.CreateAsync(
+            _context,
+            user.Id,
+            type: CategoryType.Expense
+        );
 
         _client.ActAsUser(user);
 
@@ -1111,7 +1447,9 @@ public class RecurringTransactionsControllerTest : IDisposable
         var response = await _client.PostAsJsonAsync("/api/recurring-transactions", request);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<RecurringTransactionResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<RecurringTransactionResource>(
+            TestJsonOptions.Default
+        );
         Assert.Equal(expenseCategory.Id, body!.CategoryId);
     }
 
@@ -1121,27 +1459,38 @@ public class RecurringTransactionsControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
         var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
-            _context, user.Id, account.Id, type: RecurringTransactionType.Expense);
-        var incomeCategory = await CategoryFactory.CreateAsync(_context, user.Id, type: CategoryType.Income);
+            _context,
+            user.Id,
+            account.Id,
+            type: RecurringTransactionType.Expense
+        );
+        var incomeCategory = await CategoryFactory.CreateAsync(
+            _context,
+            user.Id,
+            type: CategoryType.Income
+        );
 
         _client.ActAsUser(user);
 
         // The PUT never restates Type — it is read from the stored Expense recurring transaction.
         var request = new
         {
-            Name = recurringTransaction.Name,
+            recurringTransaction.Name,
             Amount = 500,
             CategoryId = incomeCategory.Id,
         };
 
         var response = await _client.PutAsJsonAsync(
-            "/api/recurring-transactions/" + recurringTransaction.Id, request);
+            "/api/recurring-transactions/" + recurringTransaction.Id,
+            request
+        );
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
         var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
         Assert.Equal(
             "A recurring transaction's category must be of the same type as the transaction.",
-            problem!.Detail);
+            problem!.Detail
+        );
     }
 
     public void Dispose() => _scope.Dispose();

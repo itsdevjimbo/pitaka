@@ -11,12 +11,18 @@ public class GetBudgetCycleTest
         DateTime utcNow,
         BudgetPeriod period,
         DateOnly startDate,
-        DateOnly? endDate = null)
+        DateOnly? endDate = null
+    )
     {
         var clock = new FakeTimeProvider();
         clock.SetUtcNow(utcNow);
 
-        var budget = BudgetFactory.Make(userId: 1, period: period, startDate: startDate, endDate: endDate);
+        var budget = BudgetFactory.Make(
+            userId: 1,
+            period: period,
+            startDate: startDate,
+            endDate: endDate
+        );
 
         return new GetBudgetCycle(clock).ForBudget(budget);
     }
@@ -27,7 +33,11 @@ public class GetBudgetCycleTest
     [Fact]
     public void Daily_IsTheDayItself()
     {
-        var (start, end) = Resolve(Utc(2026, 08, 15), BudgetPeriod.Daily, new DateOnly(2026, 01, 01));
+        var (start, end) = Resolve(
+            Utc(2026, 08, 15),
+            BudgetPeriod.Daily,
+            new DateOnly(2026, 01, 01)
+        );
 
         Assert.Equal(new DateOnly(2026, 08, 15), start);
         Assert.Equal(new DateOnly(2026, 08, 15), end);
@@ -37,7 +47,11 @@ public class GetBudgetCycleTest
     public void Weekly_RunsMondayThroughSunday()
     {
         // 2026-08-15 is a Saturday.
-        var (start, end) = Resolve(Utc(2026, 08, 15), BudgetPeriod.Weekly, new DateOnly(2026, 01, 01));
+        var (start, end) = Resolve(
+            Utc(2026, 08, 15),
+            BudgetPeriod.Weekly,
+            new DateOnly(2026, 01, 01)
+        );
 
         Assert.Equal(new DateOnly(2026, 08, 10), start);
         Assert.Equal(new DateOnly(2026, 08, 16), end);
@@ -47,7 +61,11 @@ public class GetBudgetCycleTest
     public void Weekly_TodayOnMonday_StartsThatDay()
     {
         // 2026-08-17 is a Monday.
-        var (start, end) = Resolve(Utc(2026, 08, 17), BudgetPeriod.Weekly, new DateOnly(2026, 01, 01));
+        var (start, end) = Resolve(
+            Utc(2026, 08, 17),
+            BudgetPeriod.Weekly,
+            new DateOnly(2026, 01, 01)
+        );
 
         Assert.Equal(new DateOnly(2026, 08, 17), start);
         Assert.Equal(new DateOnly(2026, 08, 23), end);
@@ -57,7 +75,11 @@ public class GetBudgetCycleTest
     public void Weekly_TodayOnSunday_EndsThatDay()
     {
         // 2026-08-16 is a Sunday.
-        var (start, end) = Resolve(Utc(2026, 08, 16), BudgetPeriod.Weekly, new DateOnly(2026, 01, 01));
+        var (start, end) = Resolve(
+            Utc(2026, 08, 16),
+            BudgetPeriod.Weekly,
+            new DateOnly(2026, 01, 01)
+        );
 
         Assert.Equal(new DateOnly(2026, 08, 10), start);
         Assert.Equal(new DateOnly(2026, 08, 16), end);
@@ -66,7 +88,11 @@ public class GetBudgetCycleTest
     [Fact]
     public void Monthly_28DayMonth()
     {
-        var (start, end) = Resolve(Utc(2026, 02, 15), BudgetPeriod.Monthly, new DateOnly(2026, 01, 01));
+        var (start, end) = Resolve(
+            Utc(2026, 02, 15),
+            BudgetPeriod.Monthly,
+            new DateOnly(2026, 01, 01)
+        );
 
         Assert.Equal(new DateOnly(2026, 02, 01), start);
         Assert.Equal(new DateOnly(2026, 02, 28), end);
@@ -75,7 +101,11 @@ public class GetBudgetCycleTest
     [Fact]
     public void Monthly_31DayMonth()
     {
-        var (start, end) = Resolve(Utc(2026, 08, 15), BudgetPeriod.Monthly, new DateOnly(2026, 01, 01));
+        var (start, end) = Resolve(
+            Utc(2026, 08, 15),
+            BudgetPeriod.Monthly,
+            new DateOnly(2026, 01, 01)
+        );
 
         Assert.Equal(new DateOnly(2026, 08, 01), start);
         Assert.Equal(new DateOnly(2026, 08, 31), end);
@@ -84,7 +114,11 @@ public class GetBudgetCycleTest
     [Fact]
     public void Quarterly_FirstQuarter()
     {
-        var (start, end) = Resolve(Utc(2026, 02, 15), BudgetPeriod.Quarterly, new DateOnly(2026, 01, 01));
+        var (start, end) = Resolve(
+            Utc(2026, 02, 15),
+            BudgetPeriod.Quarterly,
+            new DateOnly(2026, 01, 01)
+        );
 
         Assert.Equal(new DateOnly(2026, 01, 01), start);
         Assert.Equal(new DateOnly(2026, 03, 31), end);
@@ -96,11 +130,22 @@ public class GetBudgetCycleTest
     [InlineData(2026, 07, 01, 2026, 07, 01, 2026, 09, 30)] // first day of Q3
     [InlineData(2026, 11, 20, 2026, 10, 01, 2026, 12, 31)] // inside Q4
     public void Quarterly_AlignsToCalendarQuarter(
-        int y, int m, int d,
-        int startY, int startM, int startD,
-        int endY, int endM, int endD)
+        int y,
+        int m,
+        int d,
+        int startY,
+        int startM,
+        int startD,
+        int endY,
+        int endM,
+        int endD
+    )
     {
-        var (start, end) = Resolve(Utc(y, m, d), BudgetPeriod.Quarterly, new DateOnly(2025, 01, 01));
+        var (start, end) = Resolve(
+            Utc(y, m, d),
+            BudgetPeriod.Quarterly,
+            new DateOnly(2025, 01, 01)
+        );
 
         Assert.Equal(new DateOnly(startY, startM, startD), start);
         Assert.Equal(new DateOnly(endY, endM, endD), end);
@@ -109,7 +154,11 @@ public class GetBudgetCycleTest
     [Fact]
     public void Yearly_RunsJanuaryFirstThroughDecemberThirtyFirst()
     {
-        var (start, end) = Resolve(Utc(2026, 05, 15), BudgetPeriod.Yearly, new DateOnly(2020, 03, 09));
+        var (start, end) = Resolve(
+            Utc(2026, 05, 15),
+            BudgetPeriod.Yearly,
+            new DateOnly(2020, 03, 09)
+        );
 
         Assert.Equal(new DateOnly(2026, 01, 01), start);
         Assert.Equal(new DateOnly(2026, 12, 31), end);
@@ -119,7 +168,11 @@ public class GetBudgetCycleTest
     public void FirstCycle_IsTruncatedByStartDate()
     {
         // A Monthly Budget starting the 17th reports the 17th-31st, not the 1st-31st.
-        var (start, end) = Resolve(Utc(2026, 08, 20), BudgetPeriod.Monthly, new DateOnly(2026, 08, 17));
+        var (start, end) = Resolve(
+            Utc(2026, 08, 20),
+            BudgetPeriod.Monthly,
+            new DateOnly(2026, 08, 17)
+        );
 
         Assert.Equal(new DateOnly(2026, 08, 17), start);
         Assert.Equal(new DateOnly(2026, 08, 31), end);
@@ -129,7 +182,11 @@ public class GetBudgetCycleTest
     public void LastCycle_IsTruncatedByEndDate()
     {
         var (start, end) = Resolve(
-            Utc(2026, 08, 10), BudgetPeriod.Monthly, new DateOnly(2026, 08, 01), new DateOnly(2026, 08, 20));
+            Utc(2026, 08, 10),
+            BudgetPeriod.Monthly,
+            new DateOnly(2026, 08, 01),
+            new DateOnly(2026, 08, 20)
+        );
 
         Assert.Equal(new DateOnly(2026, 08, 01), start);
         Assert.Equal(new DateOnly(2026, 08, 20), end);
@@ -138,7 +195,11 @@ public class GetBudgetCycleTest
     [Fact]
     public void StartDateInFuture_DescribesTheFirstCycle()
     {
-        var (start, end) = Resolve(Utc(2026, 08, 15), BudgetPeriod.Monthly, new DateOnly(2026, 09, 10));
+        var (start, end) = Resolve(
+            Utc(2026, 08, 15),
+            BudgetPeriod.Monthly,
+            new DateOnly(2026, 09, 10)
+        );
 
         Assert.Equal(new DateOnly(2026, 09, 10), start);
         Assert.Equal(new DateOnly(2026, 09, 30), end);
@@ -148,7 +209,11 @@ public class GetBudgetCycleTest
     public void EndDateInPast_DescribesTheFinalCycle()
     {
         var (start, end) = Resolve(
-            Utc(2026, 08, 15), BudgetPeriod.Monthly, new DateOnly(2026, 01, 01), new DateOnly(2026, 06, 20));
+            Utc(2026, 08, 15),
+            BudgetPeriod.Monthly,
+            new DateOnly(2026, 01, 01),
+            new DateOnly(2026, 06, 20)
+        );
 
         Assert.Equal(new DateOnly(2026, 06, 01), start);
         Assert.Equal(new DateOnly(2026, 06, 20), end);
@@ -158,7 +223,11 @@ public class GetBudgetCycleTest
     public void StartDateAndEndDateInSameCycle_ProduceOneShortWindow()
     {
         var (start, end) = Resolve(
-            Utc(2026, 08, 15), BudgetPeriod.Monthly, new DateOnly(2026, 08, 10), new DateOnly(2026, 08, 20));
+            Utc(2026, 08, 15),
+            BudgetPeriod.Monthly,
+            new DateOnly(2026, 08, 10),
+            new DateOnly(2026, 08, 20)
+        );
 
         Assert.Equal(new DateOnly(2026, 08, 10), start);
         Assert.Equal(new DateOnly(2026, 08, 20), end);

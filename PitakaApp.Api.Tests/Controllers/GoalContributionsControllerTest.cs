@@ -14,7 +14,6 @@ namespace PitakaApp.Api.Tests.Controllers;
 [Collection("Database collection")]
 public class GoalContributionsControllerTest
 {
-    
     private readonly IServiceScope _scope;
     private readonly PitakaDbContext _context;
     private readonly HttpClient _client;
@@ -25,7 +24,7 @@ public class GoalContributionsControllerTest
         _context = _scope.ServiceProvider.GetRequiredService<PitakaDbContext>();
         _client = factory.CreateClient();
     }
-    
+
     [Fact]
     public async Task Get_WithoutLoggedInUser_ReturnsUnauthorized()
     {
@@ -38,7 +37,7 @@ public class GoalContributionsControllerTest
     {
         var userA = await UserFactory.CreateAsync(_context);
         var userB = await UserFactory.CreateAsync(_context);
-        
+
         var accountA = await AccountFactory.CreateAsync(_context, userA.Id, initialBalance: 5000);
         var accountB = await AccountFactory.CreateAsync(_context, userB.Id, initialBalance: 5000);
 
@@ -50,13 +49,15 @@ public class GoalContributionsControllerTest
         await GoalContributionFactory.CreateAsync(_context, goalA.Id, accountA.Id);
         await GoalContributionFactory.CreateAsync(_context, goalA.Id, accountA.Id);
         await GoalContributionFactory.CreateAsync(_context, goalA.Id, accountA.Id);
-        
+
         _client.ActAsUser(userA);
 
         var response = await _client.GetAsync("/api/goal-contributions");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<List<GoalContributionResource>>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<List<GoalContributionResource>>(
+            TestJsonOptions.Default
+        );
         Assert.Equal(3, body!.Count);
     }
 
@@ -70,7 +71,7 @@ public class GoalContributionsControllerTest
             Amount = 30,
             ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
-        
+
         var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -80,7 +81,9 @@ public class GoalContributionsControllerTest
     [InlineData("accountId")]
     [InlineData("amount")]
     [InlineData("contributionDate")]
-    public async Task Create_WithoutRequiredField_ReturnsValidationBadRequestAndCreatesNothing(string omitted)
+    public async Task Create_WithoutRequiredField_ReturnsValidationBadRequestAndCreatesNothing(
+        string omitted
+    )
     {
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 5000);
@@ -108,7 +111,9 @@ public class GoalContributionsControllerTest
         Assert.NotNull(problem);
         Assert.NotEmpty(problem!.Errors);
 
-        Assert.False(await _context.GoalContributions.AsNoTracking().AnyAsync(gc => gc.GoalId == goal.Id));
+        Assert.False(
+            await _context.GoalContributions.AsNoTracking().AnyAsync(gc => gc.GoalId == goal.Id)
+        );
     }
 
     [Fact]
@@ -117,7 +122,7 @@ public class GoalContributionsControllerTest
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 5000);
         _client.ActAsUser(user);
-        
+
         var request = new
         {
             GoalId = 999,
@@ -125,10 +130,10 @@ public class GoalContributionsControllerTest
             Amount = 30,
             ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
-        
+
         var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        
+
         var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
         Assert.Equal("Goal does not exist", problem!.Detail);
     }
@@ -142,7 +147,7 @@ public class GoalContributionsControllerTest
         var account = await AccountFactory.CreateAsync(_context, userA.Id, initialBalance: 5000);
 
         _client.ActAsUser(userA);
-        
+
         var request = new
         {
             GoalId = goal.Id,
@@ -150,7 +155,7 @@ public class GoalContributionsControllerTest
             Amount = 30,
             ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
-        
+
         var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
@@ -163,10 +168,15 @@ public class GoalContributionsControllerTest
     {
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 5000);
-        var goal = await GoalFactory.CreateAsync(_context, user.Id, targetAmount: 10000, status: GoalStatus.Abandoned);
+        var goal = await GoalFactory.CreateAsync(
+            _context,
+            user.Id,
+            targetAmount: 10000,
+            status: GoalStatus.Abandoned
+        );
 
         _client.ActAsUser(user);
-        
+
         var request = new
         {
             GoalId = goal.Id,
@@ -174,7 +184,7 @@ public class GoalContributionsControllerTest
             Amount = 30,
             ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
-        
+
         var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
@@ -188,7 +198,7 @@ public class GoalContributionsControllerTest
         var user = await UserFactory.CreateAsync(_context);
         var goal = await GoalFactory.CreateAsync(_context, user.Id, targetAmount: 10000);
         _client.ActAsUser(user);
-        
+
         var request = new
         {
             GoalId = goal.Id,
@@ -196,7 +206,7 @@ public class GoalContributionsControllerTest
             Amount = 30,
             ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
-        
+
         var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
@@ -213,7 +223,7 @@ public class GoalContributionsControllerTest
         var account = await AccountFactory.CreateAsync(_context, userB.Id, initialBalance: 5000);
 
         _client.ActAsUser(userA);
-        
+
         var request = new
         {
             GoalId = goal.Id,
@@ -221,7 +231,7 @@ public class GoalContributionsControllerTest
             Amount = 30,
             ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
-        
+
         var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
@@ -233,11 +243,16 @@ public class GoalContributionsControllerTest
     public async Task Create_WithInactiveAccount_ReturnsBadRequest()
     {
         var user = await UserFactory.CreateAsync(_context);
-        var account = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 5000, isActive: false);
+        var account = await AccountFactory.CreateAsync(
+            _context,
+            user.Id,
+            initialBalance: 5000,
+            isActive: false
+        );
         var goal = await GoalFactory.CreateAsync(_context, user.Id, targetAmount: 10000);
 
         _client.ActAsUser(user);
-        
+
         var request = new
         {
             GoalId = goal.Id,
@@ -245,7 +260,7 @@ public class GoalContributionsControllerTest
             Amount = 30,
             ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
-        
+
         var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
@@ -259,10 +274,15 @@ public class GoalContributionsControllerTest
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 5000);
         var goal = await GoalFactory.CreateAsync(_context, user.Id, targetAmount: 10000);
-        var transaction = await TransactionFactory.CreateAsync(_context, user.Id, accountId: account.Id, type: TransactionType.Expense);
+        var transaction = await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            accountId: account.Id,
+            type: TransactionType.Expense
+        );
 
         _client.ActAsUser(user);
-        
+
         var request = new
         {
             GoalId = goal.Id,
@@ -271,7 +291,7 @@ public class GoalContributionsControllerTest
             TransactionId = transaction.Id,
             ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
-        
+
         var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
@@ -284,14 +304,22 @@ public class GoalContributionsControllerTest
     {
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 5000);
-        var targetAccount = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 5000);
+        var targetAccount = await AccountFactory.CreateAsync(
+            _context,
+            user.Id,
+            initialBalance: 5000
+        );
         var goal = await GoalFactory.CreateAsync(_context, user.Id, targetAmount: 10000);
         var transaction = await TransactionFactory.CreateAsync(
-            _context, user.Id, accountId: account.Id, type: TransactionType.Transfer, transferToAccountId: targetAccount.Id
+            _context,
+            user.Id,
+            accountId: account.Id,
+            type: TransactionType.Transfer,
+            transferToAccountId: targetAccount.Id
         );
 
         _client.ActAsUser(user);
-        
+
         var request = new
         {
             GoalId = goal.Id,
@@ -300,7 +328,7 @@ public class GoalContributionsControllerTest
             TransactionId = transaction.Id,
             ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
-        
+
         var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
@@ -315,12 +343,16 @@ public class GoalContributionsControllerTest
 
         var accountA = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 5000);
         var accountB = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 5000);
-        var transaction = await TransactionFactory.CreateAsync(_context, user.Id, accountId: accountB.Id);
+        var transaction = await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            accountId: accountB.Id
+        );
 
         var goal = await GoalFactory.CreateAsync(_context, user.Id, targetAmount: 10000);
 
         _client.ActAsUser(user);
-        
+
         var request = new
         {
             GoalId = goal.Id,
@@ -329,14 +361,13 @@ public class GoalContributionsControllerTest
             TransactionId = transaction.Id,
             ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
-        
+
         var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
         var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
         Assert.Equal("Cannot make a contribution based on this transaction", problem!.Detail);
     }
-
 
     [Fact]
     public async Task Create_WithTransactionBelongsToOtherUser_ReturnsBadRequest()
@@ -346,10 +377,14 @@ public class GoalContributionsControllerTest
         var accountA = await AccountFactory.CreateAsync(_context, userA.Id, initialBalance: 5000);
         var accountB = await AccountFactory.CreateAsync(_context, userB.Id, initialBalance: 5000);
         var goal = await GoalFactory.CreateAsync(_context, userA.Id, targetAmount: 10000);
-        var transaction = await TransactionFactory.CreateAsync(_context, userB.Id, accountId: accountB.Id);
+        var transaction = await TransactionFactory.CreateAsync(
+            _context,
+            userB.Id,
+            accountId: accountB.Id
+        );
 
         _client.ActAsUser(userA);
-        
+
         var request = new
         {
             GoalId = goal.Id,
@@ -358,7 +393,7 @@ public class GoalContributionsControllerTest
             TransactionId = transaction.Id,
             ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
-        
+
         var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
@@ -375,7 +410,7 @@ public class GoalContributionsControllerTest
         await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id, amount: 300);
 
         _client.ActAsUser(user);
-        
+
         var request = new
         {
             GoalId = goal.Id,
@@ -383,13 +418,14 @@ public class GoalContributionsControllerTest
             Amount = 300,
             ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
-        
+
         var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
         var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
         Assert.Equal("Contributions cannot exceed the account's balance", problem!.Detail);
     }
+
     public static IEnumerable<object?[]> InvalidGoalContributionRequests()
     {
         // Missing goalId
@@ -404,7 +440,7 @@ public class GoalContributionsControllerTest
         // Invalid amount range
         yield return new object?[] { 1, 1, -300m, DateOnly.FromDateTime(DateTime.Now) };
 
-        // Missing amount 
+        // Missing amount
         yield return new object?[] { 1, 1, null, DateOnly.FromDateTime(DateTime.Now) };
 
         // Missing contribution date
@@ -416,20 +452,20 @@ public class GoalContributionsControllerTest
     public async Task Create_WithInvalidData_ReturnsBadRequest(
         int? goalId,
         int? accountId,
-        decimal? amount, 
+        decimal? amount,
         DateOnly? contributionDate
     )
     {
         var user = await UserFactory.CreateAsync(_context);
         _client.ActAsUser(user);
 
-        var request = new { 
+        var request = new
+        {
             GoalId = goalId,
             AccountId = accountId,
             Amount = amount,
             ContributionDate = contributionDate,
         };
-
 
         var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -443,7 +479,7 @@ public class GoalContributionsControllerTest
         var goal = await GoalFactory.CreateAsync(_context, user.Id, targetAmount: 10000);
 
         _client.ActAsUser(user);
-        
+
         var request = new
         {
             GoalId = goal.Id,
@@ -451,7 +487,7 @@ public class GoalContributionsControllerTest
             Amount = 30,
             ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
-        
+
         var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
     }
@@ -462,10 +498,14 @@ public class GoalContributionsControllerTest
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 5000);
         var goal = await GoalFactory.CreateAsync(_context, user.Id, targetAmount: 10000);
-        var transaction = await TransactionFactory.CreateAsync(_context, user.Id, accountId: account.Id);
+        var transaction = await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            accountId: account.Id
+        );
 
         _client.ActAsUser(user);
-        
+
         var request = new
         {
             GoalId = goal.Id,
@@ -474,7 +514,7 @@ public class GoalContributionsControllerTest
             TransactionId = transaction.Id,
             ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
-        
+
         var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
     }
@@ -483,11 +523,23 @@ public class GoalContributionsControllerTest
     public async Task Create_WithValidTransferTransaction_ReturnsCreated()
     {
         var user = await UserFactory.CreateAsync(_context);
-        var sourceAccount = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 5000);
-        var destinationAccount = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 5000);
+        var sourceAccount = await AccountFactory.CreateAsync(
+            _context,
+            user.Id,
+            initialBalance: 5000
+        );
+        var destinationAccount = await AccountFactory.CreateAsync(
+            _context,
+            user.Id,
+            initialBalance: 5000
+        );
         var goal = await GoalFactory.CreateAsync(_context, user.Id, targetAmount: 10000);
         var transaction = await TransactionFactory.CreateAsync(
-            _context, user.Id, accountId: sourceAccount.Id, type: TransactionType.Transfer, transferToAccountId: destinationAccount.Id
+            _context,
+            user.Id,
+            accountId: sourceAccount.Id,
+            type: TransactionType.Transfer,
+            transferToAccountId: destinationAccount.Id
         );
 
         _client.ActAsUser(user);
@@ -502,14 +554,16 @@ public class GoalContributionsControllerTest
             TransactionId = transaction.Id,
             ContributionDate = now,
         };
-        
+
         var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        
-        var goalContribution = await _context.GoalContributions.Where(gc => gc.GoalId == goal.Id).FirstAsync();
+
+        var goalContribution = await _context
+            .GoalContributions.Where(gc => gc.GoalId == goal.Id)
+            .FirstAsync();
 
         var body = await response.Content.ReadFromJsonAsync<GoalContributionResource>();
-        
+
         Assert.Equal(goalContribution.Id, body!.Id);
         Assert.Equal(goal.Id, body.GoalId);
         Assert.Equal(destinationAccount.Id, body.AccountId);
@@ -527,7 +581,7 @@ public class GoalContributionsControllerTest
         var goal = await GoalFactory.CreateAsync(_context, user.Id, targetAmount: 10000);
 
         _client.ActAsUser(user);
-        
+
         var request = new
         {
             GoalId = goal.Id,
@@ -535,7 +589,7 @@ public class GoalContributionsControllerTest
             Amount = 5000,
             ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
-        
+
         var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
     }
@@ -549,7 +603,7 @@ public class GoalContributionsControllerTest
         await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id, amount: 1000);
 
         _client.ActAsUser(user);
-        
+
         var request = new
         {
             GoalId = goal.Id,
@@ -557,7 +611,7 @@ public class GoalContributionsControllerTest
             Amount = 2000,
             ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
-        
+
         var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
     }
@@ -567,11 +621,16 @@ public class GoalContributionsControllerTest
     {
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 5000);
-        var goal = await GoalFactory.CreateAsync(_context, user.Id, targetAmount: 2000, status: GoalStatus.Completed);
+        var goal = await GoalFactory.CreateAsync(
+            _context,
+            user.Id,
+            targetAmount: 2000,
+            status: GoalStatus.Completed
+        );
         await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id, amount: 2000);
 
         _client.ActAsUser(user);
-        
+
         var request = new
         {
             GoalId = goal.Id,
@@ -579,7 +638,7 @@ public class GoalContributionsControllerTest
             Amount = 2000,
             ContributionDate = DateOnly.FromDateTime(DateTime.Now),
         };
-        
+
         var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
     }
@@ -615,13 +674,13 @@ public class GoalContributionsControllerTest
         var account = await AccountFactory.CreateAsync(_context, userB.Id);
         var goal = await GoalFactory.CreateAsync(_context, userB.Id);
         var contribution = await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id);
-        
+
         _client.ActAsUser(userA);
 
         var response = await _client.GetAsync("/api/goal-contributions/" + contribution.Id);
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
-    
+
     [Fact]
     public async Task Show_ReturnsOk()
     {
@@ -629,14 +688,14 @@ public class GoalContributionsControllerTest
         var account = await AccountFactory.CreateAsync(_context, user.Id);
         var goal = await GoalFactory.CreateAsync(_context, user.Id);
         var contribution = await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id);
-        
+
         _client.ActAsUser(user);
 
         var response = await _client.GetAsync("/api/goal-contributions/" + contribution.Id);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var body = await response.Content.ReadFromJsonAsync<GoalContributionResource>();
-        
+
         Assert.Equal(contribution.Id, body!.Id);
         Assert.Equal(contribution.GoalId, body.GoalId);
         Assert.Equal(contribution.AccountId, body.AccountId);
@@ -657,10 +716,13 @@ public class GoalContributionsControllerTest
         var request = new
         {
             ContributionDate = DateOnly.FromDateTime(DateTime.Now).AddDays(-3),
-            Note = "Test note"
+            Note = "Test note",
         };
 
-        var response = await _client.PutAsJsonAsync("/api/goal-contributions/" + contribution.Id, request);
+        var response = await _client.PutAsJsonAsync(
+            "/api/goal-contributions/" + contribution.Id,
+            request
+        );
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
@@ -670,11 +732,11 @@ public class GoalContributionsControllerTest
         var user = await UserFactory.CreateAsync(_context);
 
         _client.ActAsUser(user);
-        
+
         var request = new
         {
             ContributionDate = DateOnly.FromDateTime(DateTime.Now).AddDays(-3),
-            Note = "Test note"
+            Note = "Test note",
         };
 
         var response = await _client.PutAsJsonAsync("/api/goal-contributions/99999", request);
@@ -691,14 +753,17 @@ public class GoalContributionsControllerTest
         var contribution = await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id);
 
         _client.ActAsUser(userA);
-        
+
         var request = new
         {
             ContributionDate = DateOnly.FromDateTime(DateTime.Now).AddDays(-3),
-            Note = "Test note"
+            Note = "Test note",
         };
 
-        var response = await _client.PutAsJsonAsync("/api/goal-contributions/" + contribution.Id, request);
+        var response = await _client.PutAsJsonAsync(
+            "/api/goal-contributions/" + contribution.Id,
+            request
+        );
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
@@ -711,18 +776,17 @@ public class GoalContributionsControllerTest
         var contribution = await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id);
 
         _client.ActAsUser(user);
-        
+
         var contributionDate = DateOnly.FromDateTime(DateTime.Now).AddDays(-3);
 
-        var request = new
-        {
-            ContributionDate = contributionDate,
-            Note = "Test note"
-        };
+        var request = new { ContributionDate = contributionDate, Note = "Test note" };
 
-        var response = await _client.PutAsJsonAsync("/api/goal-contributions/" + contribution.Id, request);
+        var response = await _client.PutAsJsonAsync(
+            "/api/goal-contributions/" + contribution.Id,
+            request
+        );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        
+
         var body = await response.Content.ReadFromJsonAsync<GoalContributionResource>();
 
         Assert.Equal(contribution.AccountId, body!.AccountId);

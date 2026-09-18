@@ -12,19 +12,23 @@ namespace PitakaApp.Api.Migrations
         {
             migrationBuilder.DropForeignKey(
                 name: "fk_budgets_categories_category_id",
-                table: "budgets");
+                table: "budgets"
+            );
 
             migrationBuilder.DropForeignKey(
                 name: "fk_categories_categories_parent_id",
-                table: "categories");
+                table: "categories"
+            );
 
             migrationBuilder.DropForeignKey(
                 name: "fk_recurring_transactions_categories_category_id",
-                table: "recurring_transactions");
+                table: "recurring_transactions"
+            );
 
             migrationBuilder.DropForeignKey(
                 name: "fk_transactions_categories_category_id",
-                table: "transactions");
+                table: "transactions"
+            );
 
             migrationBuilder.AddForeignKey(
                 name: "fk_budgets_categories_category_id",
@@ -32,7 +36,8 @@ namespace PitakaApp.Api.Migrations
                 column: "category_id",
                 principalTable: "categories",
                 principalColumn: "id",
-                onDelete: ReferentialAction.Restrict);
+                onDelete: ReferentialAction.Restrict
+            );
 
             migrationBuilder.AddForeignKey(
                 name: "fk_categories_categories_parent_id",
@@ -40,7 +45,8 @@ namespace PitakaApp.Api.Migrations
                 column: "parent_id",
                 principalTable: "categories",
                 principalColumn: "id",
-                onDelete: ReferentialAction.Restrict);
+                onDelete: ReferentialAction.Restrict
+            );
 
             migrationBuilder.AddForeignKey(
                 name: "fk_recurring_transactions_categories_category_id",
@@ -48,7 +54,8 @@ namespace PitakaApp.Api.Migrations
                 column: "category_id",
                 principalTable: "categories",
                 principalColumn: "id",
-                onDelete: ReferentialAction.Restrict);
+                onDelete: ReferentialAction.Restrict
+            );
 
             migrationBuilder.AddForeignKey(
                 name: "fk_transactions_categories_category_id",
@@ -56,7 +63,8 @@ namespace PitakaApp.Api.Migrations
                 column: "category_id",
                 principalTable: "categories",
                 principalColumn: "id",
-                onDelete: ReferentialAction.Restrict);
+                onDelete: ReferentialAction.Restrict
+            );
         }
 
         /// <inheritdoc />
@@ -64,19 +72,23 @@ namespace PitakaApp.Api.Migrations
         {
             migrationBuilder.DropForeignKey(
                 name: "fk_budgets_categories_category_id",
-                table: "budgets");
+                table: "budgets"
+            );
 
             migrationBuilder.DropForeignKey(
                 name: "fk_categories_categories_parent_id",
-                table: "categories");
+                table: "categories"
+            );
 
             migrationBuilder.DropForeignKey(
                 name: "fk_recurring_transactions_categories_category_id",
-                table: "recurring_transactions");
+                table: "recurring_transactions"
+            );
 
             migrationBuilder.DropForeignKey(
                 name: "fk_transactions_categories_category_id",
-                table: "transactions");
+                table: "transactions"
+            );
 
             migrationBuilder.AddForeignKey(
                 name: "fk_budgets_categories_category_id",
@@ -84,7 +96,8 @@ namespace PitakaApp.Api.Migrations
                 column: "category_id",
                 principalTable: "categories",
                 principalColumn: "id",
-                onDelete: ReferentialAction.SetNull);
+                onDelete: ReferentialAction.SetNull
+            );
 
             migrationBuilder.AddForeignKey(
                 name: "fk_categories_categories_parent_id",
@@ -92,7 +105,8 @@ namespace PitakaApp.Api.Migrations
                 column: "parent_id",
                 principalTable: "categories",
                 principalColumn: "id",
-                onDelete: ReferentialAction.SetNull);
+                onDelete: ReferentialAction.SetNull
+            );
 
             migrationBuilder.AddForeignKey(
                 name: "fk_recurring_transactions_categories_category_id",
@@ -100,7 +114,8 @@ namespace PitakaApp.Api.Migrations
                 column: "category_id",
                 principalTable: "categories",
                 principalColumn: "id",
-                onDelete: ReferentialAction.SetNull);
+                onDelete: ReferentialAction.SetNull
+            );
 
             migrationBuilder.AddForeignKey(
                 name: "fk_transactions_categories_category_id",
@@ -108,7 +123,8 @@ namespace PitakaApp.Api.Migrations
                 column: "category_id",
                 principalTable: "categories",
                 principalColumn: "id",
-                onDelete: ReferentialAction.SetNull);
+                onDelete: ReferentialAction.SetNull
+            );
         }
     }
 }

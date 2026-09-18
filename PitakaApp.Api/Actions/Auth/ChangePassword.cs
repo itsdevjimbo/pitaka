@@ -18,14 +18,9 @@ public enum ChangePasswordOutcome
 // to carry back — the endpoint answers 204. The controller renders IncorrectPassword as
 // the 401 the email change already uses, so both password-gated forms on one client
 // screen speak identically.
-public class ChangePassword
+public class ChangePassword(UserManager<User> userManager)
 {
-    private readonly UserManager<User> _userManager;
-
-    public ChangePassword(UserManager<User> userManager)
-    {
-        _userManager = userManager;
-    }
+    private readonly UserManager<User> _userManager = userManager;
 
     public async Task<ChangePasswordOutcome> ExecuteAsync(User user, ChangePasswordInput input)
     {
@@ -42,11 +37,9 @@ public class ChangePassword
         // Reload through the manager so the instance we mutate is the one the store
         // tracks — the `user` off ResolveCurrentUserFilter is AsNoTracking. Same shape
         // as RequestEmailChange / ChangeProfileName.
-        var managed = await _userManager.FindByIdAsync(user.Id.ToString());
-        if (managed is null)
-        {
-            throw new InvalidOperationException($"Profile {user.Id} vanished mid-request.");
-        }
+        var managed =
+            await _userManager.FindByIdAsync(user.Id.ToString())
+            ?? throw new InvalidOperationException($"Profile {user.Id} vanished mid-request.");
 
         // ChangePasswordAsync rotates the security stamp, which invalidates outstanding
         // confirmation and reset links but not issued JWTs — the caller's session keeps
@@ -54,11 +47,16 @@ public class ChangePassword
         // password's validity is already guaranteed by ChangePasswordRequest's
         // annotation and the old one is checked just above, so a non-success result here
         // is a store failure, not a rejected input.
-        var result = await _userManager.ChangePasswordAsync(managed, input.OldPassword, input.NewPassword);
+        var result = await _userManager.ChangePasswordAsync(
+            managed,
+            input.OldPassword,
+            input.NewPassword
+        );
         if (!result.Succeeded)
         {
             throw new InvalidOperationException(
-                $"Changing the Profile password failed: {string.Join(", ", result.Errors.Select(e => e.Description))}");
+                $"Changing the Profile password failed: {string.Join(", ", result.Errors.Select(e => e.Description))}"
+            );
         }
 
         return ChangePasswordOutcome.Succeeded;

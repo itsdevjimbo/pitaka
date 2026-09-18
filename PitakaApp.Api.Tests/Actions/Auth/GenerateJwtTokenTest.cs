@@ -18,13 +18,15 @@ public class GenerateJwtTokenTest
     public GenerateJwtTokenTest()
     {
         var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Jwt:Key"] = "test-signing-key-at-least-32-characters-long",
-                ["Jwt:Issuer"] = "PitakaApp",
-                ["Jwt:Audience"] = "PitakaAppUsers",
-                ["Jwt:ExpiryMinutes"] = "60",
-            })
+            .AddInMemoryCollection(
+                new Dictionary<string, string?>
+                {
+                    ["Jwt:Key"] = "test-signing-key-at-least-32-characters-long",
+                    ["Jwt:Issuer"] = "PitakaApp",
+                    ["Jwt:Audience"] = "PitakaAppUsers",
+                    ["Jwt:ExpiryMinutes"] = "60",
+                }
+            )
             .Build();
 
         var options = new ServiceCollection()
@@ -50,7 +52,10 @@ public class GenerateJwtTokenTest
 
         var jwt = new JwtSecurityTokenHandler().ReadJwtToken(token);
 
-        Assert.Equal(user.Id.ToString(), jwt.Claims.First(c => c.Type == ClaimTypes.NameIdentifier).Value);
+        Assert.Equal(
+            user.Id.ToString(),
+            jwt.Claims.First(c => c.Type == ClaimTypes.NameIdentifier).Value
+        );
         Assert.Equal(user.Email, jwt.Claims.First(c => c.Type == ClaimTypes.Email).Value);
         Assert.Equal("PitakaApp", jwt.Issuer);
     }

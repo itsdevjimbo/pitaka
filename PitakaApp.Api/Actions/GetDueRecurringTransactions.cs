@@ -4,24 +4,19 @@ using PitakaApp.Api.Models;
 
 namespace PitakaApp.Api.Actions;
 
-public class GetDueRecurringTransactions
+public class GetDueRecurringTransactions(PitakaDbContext context, TimeProvider timeProvider)
 {
-    private readonly PitakaDbContext _context;
-    
-    private readonly TimeProvider _timeProvider;
-    
-    public GetDueRecurringTransactions(PitakaDbContext context, TimeProvider timeProvider)
-    {
-        _context = context;
-        _timeProvider = timeProvider;
-    }
+    private readonly PitakaDbContext _context = context;
 
-    public async Task<List<RecurringTransaction>> GetAsync() => 
-        await _context.RecurringTransactions
-                .AsNoTracking()
-                .Where(rt => 
-                    rt.Status == Enums.RecurringTransactionStatus.Active && rt.Account.IsActive  && 
-                    rt.NextRunDate <= DateOnly.FromDateTime(_timeProvider.GetUtcNow().DateTime)
-                )
-                .ToListAsync();
+    private readonly TimeProvider _timeProvider = timeProvider;
+
+    public async Task<List<RecurringTransaction>> GetAsync() =>
+        await _context
+            .RecurringTransactions.AsNoTracking()
+            .Where(rt =>
+                rt.Status == Enums.RecurringTransactionStatus.Active
+                && rt.Account.IsActive
+                && rt.NextRunDate <= DateOnly.FromDateTime(_timeProvider.GetUtcNow().DateTime)
+            )
+            .ToListAsync();
 }

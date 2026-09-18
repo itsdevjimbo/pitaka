@@ -10,7 +10,9 @@ public class PasswordResetOption
     // client's routing. userId and token are appended as query parameters — same shape
     // as EmailConfirmationOption.ConfirmUrl. The default in appsettings.json is the
     // `ng serve` origin already in the CORS allow-list.
-    [Required(ErrorMessage = "PasswordReset:ResetUrl must be set — the client reset screen the email links to.")]
+    [Required(
+        ErrorMessage = "PasswordReset:ResetUrl must be set — the client reset screen the email links to."
+    )]
     [Url(ErrorMessage = "PasswordReset:ResetUrl must be an absolute URL.")]
     public string ResetUrl { get; set; } = string.Empty;
 }

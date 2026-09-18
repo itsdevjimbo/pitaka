@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
-using PitakaApp.Api.Models;
 using PitakaApp.Api.Enums;
+using PitakaApp.Api.Models;
 
 namespace PitakaApp.Api.Data;
 
@@ -16,29 +16,43 @@ public static class CategorySeeder
 
         var systemCategories = new Dictionary<CategoryType, List<string>>
         {
-            [CategoryType.Expense] = new List<string>
-            {
-                "Food & Dining", "Housing", "Transportation", "Health & Wellness",
-                "Shopping", "Entertainment", "Bills & Utilities", "Education",
-                "Travel", "Family & Pets", "Debt Payments", "Miscellaneous"
-            },
-            [CategoryType.Income] = new List<string>
-            {
-                "Salary", "Investments",
-                "Gifts Received", "Refunds & Reimbursements", "Other Income"
-            }
+            [CategoryType.Expense] =
+            [
+                "Food & Dining",
+                "Housing",
+                "Transportation",
+                "Health & Wellness",
+                "Shopping",
+                "Entertainment",
+                "Bills & Utilities",
+                "Education",
+                "Travel",
+                "Family & Pets",
+                "Debt Payments",
+                "Miscellaneous",
+            ],
+            [CategoryType.Income] =
+            [
+                "Salary",
+                "Investments",
+                "Gifts Received",
+                "Refunds & Reimbursements",
+                "Other Income",
+            ],
         };
 
         foreach (var category in systemCategories)
         {
             foreach (var categoryName in category.Value)
             {
-                categories.Add(new Category
-                {
-                    Name = categoryName,
-                    Type = category.Key,
-                    IsDefault = true,
-                });
+                categories.Add(
+                    new Category
+                    {
+                        Name = categoryName,
+                        Type = category.Key,
+                        IsDefault = true,
+                    }
+                );
             }
         }
 

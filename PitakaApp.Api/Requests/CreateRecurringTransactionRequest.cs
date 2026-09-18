@@ -8,31 +8,17 @@ namespace PitakaApp.Api.Requests;
 // default: with RespectRequiredConstructorParameters on, a parameter without a default
 // is mandatory in the body. CategoryId, Description and EndDate are the three a
 // standing instruction can legitimately omit. See ADR 0009.
-public record CreateRecurringTransactionRequest (
-    [Required]
-    int AccountId,
-
-    [Required, MaxLength(255)]
-    string Name,
-
-    [Required]
-    RecurringTransactionType Type,
-
-    [Required]
-    Frequency Frequency,
-
-    [Required, Range(typeof(decimal), "0.01", "999999999999.99")]
-    decimal Amount,
-
-    [Required]
-    DateOnly StartDate,
-
+public record CreateRecurringTransactionRequest(
+    [Required] int AccountId,
+    [Required, MaxLength(255)] string Name,
+    [Required] RecurringTransactionType Type,
+    [Required] Frequency Frequency,
+    [Required, Range(typeof(decimal), "0.01", "999999999999.99")] decimal Amount,
+    [Required] DateOnly StartDate,
     int? CategoryId = null,
-
     string? Description = null,
-
     DateOnly? EndDate = null
-): IValidatableObject
+) : IValidatableObject
 {
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
@@ -54,5 +40,5 @@ public record CreateRecurringTransactionRequest (
     }
 
     public CreateRecurringTransactionInput ToInput() =>
-        new (AccountId, CategoryId, Name, Type, Amount, Description, Frequency, StartDate, EndDate);
+        new(AccountId, CategoryId, Name, Type, Amount, Description, Frequency, StartDate, EndDate);
 }

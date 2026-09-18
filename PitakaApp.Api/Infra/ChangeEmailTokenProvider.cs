@@ -14,16 +14,11 @@ namespace PitakaApp.Api.Infra;
 //
 // IOptions<T> is covariant, so IOptions<ChangeEmailTokenProviderOptions> satisfies the
 // base constructor's IOptions<DataProtectionTokenProviderOptions>.
-public class ChangeEmailTokenProvider : DataProtectorTokenProvider<User>
-{
-    public ChangeEmailTokenProvider(
-        IDataProtectionProvider dataProtectionProvider,
-        IOptions<ChangeEmailTokenProviderOptions> options,
-        ILogger<DataProtectorTokenProvider<User>> logger)
-        : base(dataProtectionProvider, options, logger)
-    {
-    }
-}
+public class ChangeEmailTokenProvider(
+    IDataProtectionProvider dataProtectionProvider,
+    IOptions<ChangeEmailTokenProviderOptions> options,
+    ILogger<DataProtectorTokenProvider<User>> logger
+) : DataProtectorTokenProvider<User>(dataProtectionProvider, options, logger) { }
 
 public class ChangeEmailTokenProviderOptions : DataProtectionTokenProviderOptions
 {

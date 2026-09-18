@@ -1,18 +1,21 @@
+using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Mvc.ApplicationModels;
 using Microsoft.EntityFrameworkCore;
 using PitakaApp.Api.Data;
-using PitakaApp.Api.Infra;
-using Microsoft.AspNetCore.Mvc.ApplicationModels;
 using PitakaApp.Api.Handlers;
+using PitakaApp.Api.Infra;
 using PitakaApp.Api.ModelBinding;
-using System.Text.Json.Serialization;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddControllers(options =>
+builder
+    .Services.AddControllers(options =>
     {
-        options.Conventions.Add(new RouteTokenTransformerConvention(new SlugifyParameterTransformer()));
+        options.Conventions.Add(
+            new RouteTokenTransformerConvention(new SlugifyParameterTransformer())
+        );
 
         // A DateTimeOffset bound from the wire (query/route/form, never a JSON body) must
         // carry its own zone designator. Without this the default binder reads a bare
@@ -21,33 +24,37 @@ builder.Services.AddControllers(options =>
         options.ModelBinderProviders.Insert(0, new ZoneBearingDateTimeOffsetModelBinderProvider());
     })
     .AddJsonOptions(options =>
-        {
-            options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    {
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
 
-            // A constructor parameter with no default value is mandatory in the JSON body:
-            // a missing one is a 400 raised by the deserialiser, before the action runs.
-            // Without this, `[Required]` on a non-nullable value type (an enum, `bool`,
-            // `int`, `decimal`, `DateOnly`) validates nothing — a missing property binds to
-            // `default(T)` and passes, and every enum in this codebase has a real zero value
-            // (`CategoryType.Income`, `GoalStatus.Active`, ...), so the write succeeds
-            // silently. Every request record therefore gives an explicit default to each
-            // parameter a client may legitimately omit. See ADR 0009 and issue #82.
-            options.JsonSerializerOptions.RespectRequiredConstructorParameters = true;
-        }
-    );
-
+        // A constructor parameter with no default value is mandatory in the JSON body:
+        // a missing one is a 400 raised by the deserialiser, before the action runs.
+        // Without this, `[Required]` on a non-nullable value type (an enum, `bool`,
+        // `int`, `decimal`, `DateOnly`) validates nothing — a missing property binds to
+        // `default(T)` and passes, and every enum in this codebase has a real zero value
+        // (`CategoryType.Income`, `GoalStatus.Active`, ...), so the write succeeds
+        // silently. Every request record therefore gives an explicit default to each
+        // parameter a client may legitimately omit. See ADR 0009 and issue #82.
+        options.JsonSerializerOptions.RespectRequiredConstructorParameters = true;
+    });
 
 builder.Services.AddOpenApi();
-builder.Services.AddDbContext<PitakaDbContext>((serviceProvider, options) =>
+builder.Services.AddDbContext<PitakaDbContext>(
+    (serviceProvider, options) =>
     {
-        var connectionString = serviceProvider.GetRequiredService<IConfiguration>()
+        var connectionString = serviceProvider
+            .GetRequiredService<IConfiguration>()
             .GetConnectionString("DefaultConnection");
         options
             .UseMySql(connectionString, ServerVersion.AutoDetect(connectionString))
             .UseSnakeCaseNamingConvention()
             .UseSeeding((context, _) => DbSeeder.Seed(context))
-            .UseAsyncSeeding(async (context, _, cancellationToken) => await DbSeeder.SeedAsync(context, cancellationToken));
-    });
+            .UseAsyncSeeding(
+                async (context, _, cancellationToken) =>
+                    await DbSeeder.SeedAsync(context, cancellationToken)
+            );
+    }
+);
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddApplicationServices();
 builder.Services.AddPitakaIdentity();

@@ -1,4 +1,3 @@
-
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using PitakaApp.Api.Data;
@@ -38,17 +37,25 @@ public class GoalContributionConcurrencyTest : IDisposable
 
         var serviceA = scopeA.ServiceProvider.GetRequiredService<GoalContributionService>();
         var serviceB = scopeB.ServiceProvider.GetRequiredService<GoalContributionService>();
-        
+
         var accountA = await contextA.Accounts.FirstAsync(a => a.Id == account.Id);
         var accountB = await contextB.Accounts.FirstAsync(a => a.Id == account.Id);
 
-        var inputA = new CreateGoalContributionInput(null, 200, DateOnly.FromDateTime(DateTime.Now));
-        var inputB = new CreateGoalContributionInput(null, 200, DateOnly.FromDateTime(DateTime.Now));
+        var inputA = new CreateGoalContributionInput(
+            null,
+            200,
+            DateOnly.FromDateTime(DateTime.Now)
+        );
+        var inputB = new CreateGoalContributionInput(
+            null,
+            200,
+            DateOnly.FromDateTime(DateTime.Now)
+        );
 
         await serviceA.CreateAsync(goal, accountA, inputA);
-        
-        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(
-            () => serviceB.CreateAsync(goal, accountB, inputB) // stale Version, should throw
+
+        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() =>
+            serviceB.CreateAsync(goal, accountB, inputB) // stale Version, should throw
         );
     }
 

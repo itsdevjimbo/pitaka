@@ -6,7 +6,13 @@ namespace PitakaApp.Api.Tests.Factories;
 
 public class GoalFactory
 {
-    public static Goal Make(int userId, string? name = null, decimal? targetAmount = null, DateOnly? targetDate = null, GoalStatus? status = null)
+    public static Goal Make(
+        int userId,
+        string? name = null,
+        decimal? targetAmount = null,
+        DateOnly? targetDate = null,
+        GoalStatus? status = null
+    )
     {
         return new Goal
         {
@@ -14,11 +20,18 @@ public class GoalFactory
             Name = name ?? "Test goal",
             TargetAmount = targetAmount ?? 10000,
             TargetDate = targetDate,
-            Status = status ?? GoalStatus.Active
+            Status = status ?? GoalStatus.Active,
         };
     }
 
-    public static async Task<Goal> CreateAsync(PitakaDbContext context, int userId, string? name = null, decimal? targetAmount = null, DateOnly? targetDate = null, GoalStatus? status = null)
+    public static async Task<Goal> CreateAsync(
+        PitakaDbContext context,
+        int userId,
+        string? name = null,
+        decimal? targetAmount = null,
+        DateOnly? targetDate = null,
+        GoalStatus? status = null
+    )
     {
         var goal = Make(userId, name, targetAmount, targetDate, status);
         context.Goals.Add(goal);

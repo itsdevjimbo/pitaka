@@ -18,7 +18,8 @@ public class VerifyTransactionCategoryTest : IDisposable
     {
         _scope = factory.Services.CreateScope();
         _context = _scope.ServiceProvider.GetRequiredService<PitakaDbContext>();
-        _verifyTransactionCategory = _scope.ServiceProvider.GetRequiredService<VerifyTransactionCategory>();
+        _verifyTransactionCategory =
+            _scope.ServiceProvider.GetRequiredService<VerifyTransactionCategory>();
     }
 
     [Fact]
@@ -26,7 +27,11 @@ public class VerifyTransactionCategoryTest : IDisposable
     {
         var user = await UserFactory.CreateAsync(_context);
 
-        var verdict = await _verifyTransactionCategory.VerifyAsync(user, 999999, CategoryType.Income);
+        var verdict = await _verifyTransactionCategory.VerifyAsync(
+            user,
+            999999,
+            CategoryType.Income
+        );
 
         Assert.Equal(TransactionCategoryVerdict.NotFound, verdict);
     }
@@ -36,9 +41,17 @@ public class VerifyTransactionCategoryTest : IDisposable
     {
         var owner = await UserFactory.CreateAsync(_context);
         var other = await UserFactory.CreateAsync(_context);
-        var category = await CategoryFactory.CreateAsync(_context, owner.Id, type: CategoryType.Expense);
+        var category = await CategoryFactory.CreateAsync(
+            _context,
+            owner.Id,
+            type: CategoryType.Expense
+        );
 
-        var verdict = await _verifyTransactionCategory.VerifyAsync(other, category.Id, CategoryType.Expense);
+        var verdict = await _verifyTransactionCategory.VerifyAsync(
+            other,
+            category.Id,
+            CategoryType.Expense
+        );
 
         Assert.Equal(TransactionCategoryVerdict.NotFound, verdict);
     }
@@ -47,9 +60,17 @@ public class VerifyTransactionCategoryTest : IDisposable
     public async Task Verify_OwnCategoryOfTheWrongType_ReturnsTypeMismatch()
     {
         var user = await UserFactory.CreateAsync(_context);
-        var category = await CategoryFactory.CreateAsync(_context, user.Id, type: CategoryType.Income);
+        var category = await CategoryFactory.CreateAsync(
+            _context,
+            user.Id,
+            type: CategoryType.Income
+        );
 
-        var verdict = await _verifyTransactionCategory.VerifyAsync(user, category.Id, CategoryType.Expense);
+        var verdict = await _verifyTransactionCategory.VerifyAsync(
+            user,
+            category.Id,
+            CategoryType.Expense
+        );
 
         Assert.Equal(TransactionCategoryVerdict.TypeMismatch, verdict);
     }
@@ -58,9 +79,17 @@ public class VerifyTransactionCategoryTest : IDisposable
     public async Task Verify_SystemDefaultCategoryOfTheWrongType_ReturnsTypeMismatch()
     {
         var user = await UserFactory.CreateAsync(_context);
-        var category = await CategoryFactory.CreateAsync(_context, name: "Salary", type: CategoryType.Income);
+        var category = await CategoryFactory.CreateAsync(
+            _context,
+            name: "Salary",
+            type: CategoryType.Income
+        );
 
-        var verdict = await _verifyTransactionCategory.VerifyAsync(user, category.Id, CategoryType.Expense);
+        var verdict = await _verifyTransactionCategory.VerifyAsync(
+            user,
+            category.Id,
+            CategoryType.Expense
+        );
 
         Assert.Equal(TransactionCategoryVerdict.TypeMismatch, verdict);
     }
@@ -69,9 +98,17 @@ public class VerifyTransactionCategoryTest : IDisposable
     public async Task Verify_OwnCategoryOfTheExpectedType_ReturnsOk()
     {
         var user = await UserFactory.CreateAsync(_context);
-        var category = await CategoryFactory.CreateAsync(_context, user.Id, type: CategoryType.Expense);
+        var category = await CategoryFactory.CreateAsync(
+            _context,
+            user.Id,
+            type: CategoryType.Expense
+        );
 
-        var verdict = await _verifyTransactionCategory.VerifyAsync(user, category.Id, CategoryType.Expense);
+        var verdict = await _verifyTransactionCategory.VerifyAsync(
+            user,
+            category.Id,
+            CategoryType.Expense
+        );
 
         Assert.Equal(TransactionCategoryVerdict.Ok, verdict);
     }
@@ -82,7 +119,11 @@ public class VerifyTransactionCategoryTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         var category = await CategoryFactory.CreateAsync(_context, type: CategoryType.Income);
 
-        var verdict = await _verifyTransactionCategory.VerifyAsync(user, category.Id, CategoryType.Income);
+        var verdict = await _verifyTransactionCategory.VerifyAsync(
+            user,
+            category.Id,
+            CategoryType.Income
+        );
 
         Assert.Equal(TransactionCategoryVerdict.Ok, verdict);
     }

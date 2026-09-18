@@ -5,13 +5,9 @@ using PitakaApp.Api.Models;
 
 namespace PitakaApp.Api.Actions;
 
-public class UpdateAccountBalance
+public class UpdateAccountBalance(PitakaDbContext context)
 {
-    private readonly PitakaDbContext _context;
-    public UpdateAccountBalance(PitakaDbContext context)
-    {
-        _context = context;
-    }
+    private readonly PitakaDbContext _context = context;
 
     public async Task<Account> ApplyTransaction(Transaction transaction)
     {
@@ -32,7 +28,7 @@ public class UpdateAccountBalance
             default:
                 throw new InvalidOperationException($"Invalid type: {transaction.Type}");
         }
-        
+
         return account;
     }
 
@@ -55,7 +51,7 @@ public class UpdateAccountBalance
             default:
                 throw new InvalidOperationException($"Invalid type: {transaction.Type}");
         }
-        
+
         return account;
     }
 

@@ -12,25 +12,17 @@ namespace PitakaApp.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/[controller]")]
-public class GoalsController : ControllerBase
+public class GoalsController(
+    GoalService goalService,
+    GoalContributionService goalContributionService,
+    GetGoalCurrentAmount getGoalCurrentAmount,
+    CurrentUserAccessor currentUserAccessor
+) : ControllerBase
 {
-    private readonly GoalService _goalService;
-    private readonly GoalContributionService _goalContributionService;
-    private readonly GetGoalCurrentAmount _getGoalCurrentAmount;
-    private readonly CurrentUserAccessor _currentUserAccessor;
-
-    public GoalsController(
-        GoalService goalService,
-        GoalContributionService goalContributionService,
-        GetGoalCurrentAmount getGoalCurrentAmount,
-        CurrentUserAccessor currentUserAccessor
-    )
-    {
-        _goalService = goalService;
-        _goalContributionService = goalContributionService;
-        _getGoalCurrentAmount = getGoalCurrentAmount;
-        _currentUserAccessor = currentUserAccessor;
-    }
+    private readonly GoalService _goalService = goalService;
+    private readonly GoalContributionService _goalContributionService = goalContributionService;
+    private readonly GetGoalCurrentAmount _getGoalCurrentAmount = getGoalCurrentAmount;
+    private readonly CurrentUserAccessor _currentUserAccessor = currentUserAccessor;
 
     [HttpGet]
     public async Task<IActionResult> Get()
@@ -40,7 +32,7 @@ public class GoalsController : ControllerBase
 
         return Ok(GoalWithCurrentAmountResource.FromDtoCollection(goals));
     }
-    
+
     [HttpPost]
     public async Task<IActionResult> Create(GoalRequest request)
     {
@@ -48,14 +40,20 @@ public class GoalsController : ControllerBase
 
         if (await _goalService.NameExistsForUserAsync(user.Id, request.Name))
         {
-            return Problem(detail: "An goal with this name already exists.", statusCode: StatusCodes.Status409Conflict);
+            return Problem(
+                detail: "An goal with this name already exists.",
+                statusCode: StatusCodes.Status409Conflict
+            );
         }
 
         var goal = await _goalService.CreateAsync(user, request.ToInput());
         var currentAmount = await _getGoalCurrentAmount.GetAsync(goal);
-        return StatusCode(StatusCodes.Status201Created, GoalWithCurrentAmountResource.FromModel(goal, currentAmount));
+        return StatusCode(
+            StatusCodes.Status201Created,
+            GoalWithCurrentAmountResource.FromModel(goal, currentAmount)
+        );
     }
-    
+
     [HttpGet("{id}")]
     public async Task<IActionResult> Show(int id)
     {
@@ -81,7 +79,7 @@ public class GoalsController : ControllerBase
         {
             return NotFound();
         }
-        
+
         if (goal.UserId != user.Id)
         {
             return Forbid();
@@ -89,9 +87,12 @@ public class GoalsController : ControllerBase
 
         if (await _goalService.NameExistsForUserAsync(user.Id, request.Name, excludeId: id))
         {
-            return Problem(detail: "A goal with this name already exists.", statusCode: StatusCodes.Status409Conflict);
+            return Problem(
+                detail: "A goal with this name already exists.",
+                statusCode: StatusCodes.Status409Conflict
+            );
         }
-        
+
         await _goalService.UpdateAsync(goal, request.ToInput());
         var currentAmount = await _getGoalCurrentAmount.GetAsync(goal);
         return Ok(GoalWithCurrentAmountResource.FromModel(goal, currentAmount));
@@ -107,7 +108,7 @@ public class GoalsController : ControllerBase
         {
             return NotFound();
         }
-        
+
         if (goal.UserId != user.Id)
         {
             return Forbid();
@@ -118,7 +119,7 @@ public class GoalsController : ControllerBase
         return Ok(GoalWithCurrentAmountResource.FromModel(goal, currentAmount));
     }
 
-    [HttpDelete("{id}")] 
+    [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(int id)
     {
         var user = _currentUserAccessor.User!;
@@ -128,7 +129,7 @@ public class GoalsController : ControllerBase
         {
             return NotFound();
         }
-        
+
         if (goal.UserId != user.Id)
         {
             return Forbid();
@@ -137,7 +138,7 @@ public class GoalsController : ControllerBase
         await _goalService.DeleteAsync(goal);
         return NoContent();
     }
-    
+
     [HttpGet("{id}/contributions")]
     public async Task<IActionResult> GetContributions(int id)
     {
@@ -148,7 +149,7 @@ public class GoalsController : ControllerBase
         {
             return NotFound();
         }
-        
+
         var contributions = await _goalContributionService.GetAllForGoal(goal);
         return Ok(GoalContributionResource.Collection(contributions));
     }

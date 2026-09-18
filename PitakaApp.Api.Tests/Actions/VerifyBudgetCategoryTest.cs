@@ -36,7 +36,11 @@ public class VerifyBudgetCategoryTest : IDisposable
     {
         var owner = await UserFactory.CreateAsync(_context);
         var other = await UserFactory.CreateAsync(_context);
-        var category = await CategoryFactory.CreateAsync(_context, owner.Id, type: CategoryType.Expense);
+        var category = await CategoryFactory.CreateAsync(
+            _context,
+            owner.Id,
+            type: CategoryType.Expense
+        );
 
         var verdict = await _verifyBudgetCategory.VerifyAsync(other, category.Id);
 
@@ -47,7 +51,11 @@ public class VerifyBudgetCategoryTest : IDisposable
     public async Task Verify_OwnIncomeCategory_ReturnsNotExpense()
     {
         var user = await UserFactory.CreateAsync(_context);
-        var category = await CategoryFactory.CreateAsync(_context, user.Id, type: CategoryType.Income);
+        var category = await CategoryFactory.CreateAsync(
+            _context,
+            user.Id,
+            type: CategoryType.Income
+        );
 
         var verdict = await _verifyBudgetCategory.VerifyAsync(user, category.Id);
 
@@ -58,7 +66,11 @@ public class VerifyBudgetCategoryTest : IDisposable
     public async Task Verify_SystemDefaultIncomeCategory_ReturnsNotExpense()
     {
         var user = await UserFactory.CreateAsync(_context);
-        var category = await CategoryFactory.CreateAsync(_context, name: "Salary", type: CategoryType.Income);
+        var category = await CategoryFactory.CreateAsync(
+            _context,
+            name: "Salary",
+            type: CategoryType.Income
+        );
 
         var verdict = await _verifyBudgetCategory.VerifyAsync(user, category.Id);
 
@@ -69,7 +81,11 @@ public class VerifyBudgetCategoryTest : IDisposable
     public async Task Verify_OwnExpenseCategory_ReturnsOk()
     {
         var user = await UserFactory.CreateAsync(_context);
-        var category = await CategoryFactory.CreateAsync(_context, user.Id, type: CategoryType.Expense);
+        var category = await CategoryFactory.CreateAsync(
+            _context,
+            user.Id,
+            type: CategoryType.Expense
+        );
 
         var verdict = await _verifyBudgetCategory.VerifyAsync(user, category.Id);
 

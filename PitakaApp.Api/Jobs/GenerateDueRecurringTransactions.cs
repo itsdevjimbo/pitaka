@@ -4,58 +4,66 @@ using PitakaApp.Api.Data;
 
 namespace PitakaApp.Api.Jobs;
 
-public class GenerateDueRecurringTransactions
+public class GenerateDueRecurringTransactions(
+    PitakaDbContext context,
+    GetDueRecurringTransactions getDueRecurringTransactions,
+    UpdateAccountBalance updateAccountBalance,
+    GetNextRunDate getNextRunDate,
+    ILogger<GenerateDueRecurringTransactions> logger
+)
 {
-    private readonly PitakaDbContext _context;
+    private readonly PitakaDbContext _context = context;
 
-    private readonly GetDueRecurringTransactions _getDueRecurringTransactions;
+    private readonly GetDueRecurringTransactions _getDueRecurringTransactions =
+        getDueRecurringTransactions;
 
-    private readonly UpdateAccountBalance _updateAccountBalance;
+    private readonly UpdateAccountBalance _updateAccountBalance = updateAccountBalance;
 
-    private readonly GetNextRunDate _getNextRunDate;
+    private readonly GetNextRunDate _getNextRunDate = getNextRunDate;
 
-    private readonly ILogger<GenerateDueRecurringTransactions> _logger;
-
-    public GenerateDueRecurringTransactions(
-        PitakaDbContext context,
-        GetDueRecurringTransactions getDueRecurringTransactions,
-        UpdateAccountBalance updateAccountBalance,
-        GetNextRunDate getNextRunDate,
-        ILogger<GenerateDueRecurringTransactions> logger
-    )
-    {
-        _context = context;
-        _getDueRecurringTransactions = getDueRecurringTransactions;
-        _updateAccountBalance = updateAccountBalance;
-        _getNextRunDate = getNextRunDate;
-        _logger = logger;
-    }
+    private readonly ILogger<GenerateDueRecurringTransactions> _logger = logger;
 
     public async Task GenerateAsync(CancellationToken cancellationToken = default)
     {
         var dueRecurringTransactions = await _getDueRecurringTransactions.GetAsync();
-        
+
         foreach (var recurringTransaction in dueRecurringTransactions)
         {
-            if (cancellationToken.IsCancellationRequested) break;
+            if (cancellationToken.IsCancellationRequested)
+            {
+                break;
+            }
 
             try
             {
-                var freshRecurringTransaction = await _context.RecurringTransactions.Where(rt => rt.Id == recurringTransaction.Id).FirstOrDefaultAsync();
+                var freshRecurringTransaction = await _context
+                    .RecurringTransactions.Where(rt => rt.Id == recurringTransaction.Id)
+                    .FirstOrDefaultAsync();
 
                 if (freshRecurringTransaction == null)
                 {
-                    _logger.LogWarning("Missing recurring transaction: {Id}", recurringTransaction.Id);
+                    _logger.LogWarning(
+                        "Missing recurring transaction: {Id}",
+                        recurringTransaction.Id
+                    );
                     continue;
                 }
 
-                var transactionDate = freshRecurringTransaction.NextRunDate.ToDateTime(TimeOnly.MinValue);
-                var transaction = GenerateTransaction.GetTransaction(freshRecurringTransaction, transactionDate);
-                
+                var transactionDate = freshRecurringTransaction.NextRunDate.ToDateTime(
+                    TimeOnly.MinValue
+                );
+                var transaction = GenerateTransaction.GetTransaction(
+                    freshRecurringTransaction,
+                    transactionDate
+                );
+
                 await _updateAccountBalance.ApplyTransaction(transaction);
                 _context.Transactions.Add(transaction);
 
-                var nextRunDate = _getNextRunDate.ExclusiveOfToday(freshRecurringTransaction.StartDate, freshRecurringTransaction.Frequency);
+                var nextRunDate = _getNextRunDate.ExclusiveOfToday(
+                    freshRecurringTransaction.StartDate,
+                    freshRecurringTransaction.Frequency
+                );
 
                 if (nextRunDate > freshRecurringTransaction.EndDate)
                 {
@@ -73,7 +81,11 @@ public class GenerateDueRecurringTransactions
                 // Expected and self-healing: Account.Version lost an optimistic-concurrency
                 // race, so the next tick regenerates this schedule. Stays at Warning so a
                 // routine lost race doesn't read as an alert.
-                _logger.LogWarning(ex, "Recurring transaction {Id} lost a concurrency race; it will be retried next run.", recurringTransaction.Id);
+                _logger.LogWarning(
+                    ex,
+                    "Recurring transaction {Id} lost a concurrency race; it will be retried next run.",
+                    recurringTransaction.Id
+                );
                 _context.ChangeTracker.Clear();
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
@@ -83,10 +95,13 @@ public class GenerateDueRecurringTransactions
                 // mutation and the added Transaction that are still tracked, then move to the
                 // next schedule. A persistent failure now starves only itself, not every
                 // schedule ordered behind it. Cancellation is left to propagate.
-                _logger.LogError(ex, "Recurring transaction {Id} failed to generate; skipping it for this run.", recurringTransaction.Id);
+                _logger.LogError(
+                    ex,
+                    "Recurring transaction {Id} failed to generate; skipping it for this run.",
+                    recurringTransaction.Id
+                );
                 _context.ChangeTracker.Clear();
             }
         }
-
     }
 }

@@ -18,15 +18,14 @@ namespace PitakaApp.Api.Migrations
                 table: "categories",
                 type: "tinyint(1)",
                 nullable: false,
-                defaultValue: true);
+                defaultValue: true
+            );
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropColumn(
-                name: "is_active",
-                table: "categories");
+            migrationBuilder.DropColumn(name: "is_active", table: "categories");
         }
     }
 }

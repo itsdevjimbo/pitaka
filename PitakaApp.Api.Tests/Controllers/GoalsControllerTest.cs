@@ -23,7 +23,7 @@ public class GoalsControllerTest : IDisposable
         _context = _scope.ServiceProvider.GetRequiredService<PitakaDbContext>();
         _client = factory.CreateClient();
     }
-    
+
     [Fact]
     public async Task Get_WithoutLoggedInUser_ReturnsUnauthorized()
     {
@@ -38,17 +38,19 @@ public class GoalsControllerTest : IDisposable
         var userB = await UserFactory.CreateAsync(_context);
 
         await GoalFactory.CreateAsync(_context, userB.Id);
-        
+
         await GoalFactory.CreateAsync(_context, userA.Id, name: "Test goal 1");
         await GoalFactory.CreateAsync(_context, userA.Id, name: "Test goal 2");
         await GoalFactory.CreateAsync(_context, userA.Id, name: "Test goal 3");
-        
+
         _client.ActAsUser(userA);
 
         var response = await _client.GetAsync("/api/goals");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<List<GoalWithCurrentAmountResource>>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<List<GoalWithCurrentAmountResource>>(
+            TestJsonOptions.Default
+        );
         Assert.Equal(3, body!.Count);
     }
 
@@ -61,25 +63,23 @@ public class GoalsControllerTest : IDisposable
 
         await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id, amount: 300);
         await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id, amount: 500);
-        
+
         _client.ActAsUser(user);
 
         var response = await _client.GetAsync("/api/goals");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<List<GoalWithCurrentAmountResource>>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<List<GoalWithCurrentAmountResource>>(
+            TestJsonOptions.Default
+        );
         Assert.Equal(800, body!.First().CurrentAmount);
     }
 
     [Fact]
     public async Task Create_WithNoLoggedInUser_ReturnsUnauthorized()
     {
-        var request = new
-        {
-            Name = "New car",
-            TargetAmount = 5000,
-        };
-        
+        var request = new { Name = "New car", TargetAmount = 5000 };
+
         var response = await _client.PostAsJsonAsync("/api/goals", request);
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -91,11 +91,7 @@ public class GoalsControllerTest : IDisposable
         await GoalFactory.CreateAsync(_context, user.Id, "New car");
         _client.ActAsUser(user);
 
-        var request = new
-        {
-            Name = "New car",
-            TargetAmount = 5000,
-        };
+        var request = new { Name = "New car", TargetAmount = 5000 };
 
         var response = await _client.PostAsJsonAsync("/api/goals", request);
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
@@ -109,11 +105,7 @@ public class GoalsControllerTest : IDisposable
         await GoalFactory.CreateAsync(_context, userB.Id, "New car");
         _client.ActAsUser(userA);
 
-        var request = new
-        {
-            Name = "New car",
-            TargetAmount = 5000,
-        };
+        var request = new { Name = "New car", TargetAmount = 5000 };
 
         var response = await _client.PostAsJsonAsync("/api/goals", request);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
@@ -131,15 +123,20 @@ public class GoalsControllerTest : IDisposable
             TargetAmount = 5000,
             TargetDate = DateOnly.FromDateTime(DateTime.Now.AddDays(7)),
         };
-        
+
         var response = await _client.PostAsJsonAsync("/api/goals", request);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<GoalWithCurrentAmountResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<GoalWithCurrentAmountResource>(
+            TestJsonOptions.Default
+        );
 
         Assert.Equal("New car", body!.Name);
         Assert.Equal(5000, body!.TargetAmount);
-        Assert.Equal(DateOnly.FromDateTime(DateTime.Now.AddDays(7)).ToString(), body!.TargetDate.ToString());
+        Assert.Equal(
+            DateOnly.FromDateTime(DateTime.Now.AddDays(7)).ToString(),
+            body!.TargetDate.ToString()
+        );
         Assert.Equal("Active", body!.Status.ToString());
         Assert.Equal(0, body.CurrentAmount);
     }
@@ -182,7 +179,9 @@ public class GoalsControllerTest : IDisposable
         var response = await _client.GetAsync("/api/goals/" + goal.Id);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<GoalWithCurrentAmountResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<GoalWithCurrentAmountResource>(
+            TestJsonOptions.Default
+        );
 
         Assert.Equal(goal.Id, body!.Id);
         Assert.Equal("Test goal", body!.Name);
@@ -232,7 +231,7 @@ public class GoalsControllerTest : IDisposable
         var userA = await UserFactory.CreateAsync(_context);
         var userB = await UserFactory.CreateAsync(_context);
         _client.ActAsUser(userA);
-        
+
         var goal = await GoalFactory.CreateAsync(_context, userB.Id);
 
         var request = new
@@ -245,7 +244,7 @@ public class GoalsControllerTest : IDisposable
         var response = await _client.PutAsJsonAsync("/api/goals/" + goal.Id, request);
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
-    
+
     [Fact]
     public async Task Update_DuplicateNameForUser_ReturnsConflict()
     {
@@ -275,7 +274,7 @@ public class GoalsControllerTest : IDisposable
 
         await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id, amount: 300);
         await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id, amount: 500);
-        
+
         _client.ActAsUser(user);
 
         var request = new
@@ -287,8 +286,10 @@ public class GoalsControllerTest : IDisposable
 
         var response = await _client.PutAsJsonAsync("/api/goals/" + goal.Id, request);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        
-        var body = await response.Content.ReadFromJsonAsync<GoalWithCurrentAmountResource>(TestJsonOptions.Default);
+
+        var body = await response.Content.ReadFromJsonAsync<GoalWithCurrentAmountResource>(
+            TestJsonOptions.Default
+        );
 
         Assert.Equal("New car", body!.Name);
         Assert.Equal(5000, body!.TargetAmount);
@@ -304,28 +305,19 @@ public class GoalsControllerTest : IDisposable
 
         _client.ActAsUser(user);
 
-        var request = new
-        {
-            Name = "New car",
-            TargetAmount = 5000,
-        };
+        var request = new { Name = "New car", TargetAmount = 5000 };
 
         var response = await _client.PutAsJsonAsync("/api/goals/" + goal.Id, request);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
-
     [Fact]
     public async Task Patch_GoalStatusWithoutLoggedInUser_ReturnsUnauthorized()
     {
-        
         var user = await UserFactory.CreateAsync(_context);
         var goal = await GoalFactory.CreateAsync(_context, user.Id);
 
-        var request = new
-        {
-            Status = GoalStatus.Completed
-        };
+        var request = new { Status = GoalStatus.Completed };
 
         var response = await _client.PatchAsJsonAsync("/api/goals/" + goal.Id + "/status", request);
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
@@ -337,10 +329,7 @@ public class GoalsControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         _client.ActAsUser(user);
 
-        var request = new
-        {
-            Status = GoalStatus.Completed
-        };
+        var request = new { Status = GoalStatus.Completed };
 
         var response = await _client.PatchAsJsonAsync("/api/goals/999999/status", request);
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -355,10 +344,7 @@ public class GoalsControllerTest : IDisposable
 
         _client.ActAsUser(userA);
 
-        var request = new
-        {
-            Status = GoalStatus.Completed
-        };
+        var request = new { Status = GoalStatus.Completed };
 
         var response = await _client.PatchAsJsonAsync("/api/goals/" + goal.Id + "/status", request);
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
@@ -370,23 +356,33 @@ public class GoalsControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         var goal = await GoalFactory.CreateAsync(_context, user.Id);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
-        
+
         await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id, amount: 300);
         await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id, amount: 500);
 
         _client.ActAsUser(user);
 
-        var response = await _client.PatchAsJsonAsync("/api/goals/" + goal.Id + "/status", new { Status = GoalStatus.Completed });
+        var response = await _client.PatchAsJsonAsync(
+            "/api/goals/" + goal.Id + "/status",
+            new { Status = GoalStatus.Completed }
+        );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<GoalWithCurrentAmountResource>(TestJsonOptions.Default);
+        var body = await response.Content.ReadFromJsonAsync<GoalWithCurrentAmountResource>(
+            TestJsonOptions.Default
+        );
         Assert.Equal(800, body!.CurrentAmount);
         Assert.Equal(GoalStatus.Completed, body!.Status);
 
-        response = await _client.PatchAsJsonAsync("/api/goals/" + goal.Id + "/status", new { Status = GoalStatus.Abandoned });
+        response = await _client.PatchAsJsonAsync(
+            "/api/goals/" + goal.Id + "/status",
+            new { Status = GoalStatus.Abandoned }
+        );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        
-        body = await response.Content.ReadFromJsonAsync<GoalWithCurrentAmountResource>(TestJsonOptions.Default);
+
+        body = await response.Content.ReadFromJsonAsync<GoalWithCurrentAmountResource>(
+            TestJsonOptions.Default
+        );
         Assert.Equal(GoalStatus.Abandoned, body!.Status);
     }
 
@@ -434,9 +430,8 @@ public class GoalsControllerTest : IDisposable
         var userA = await UserFactory.CreateAsync(_context);
         var userB = await UserFactory.CreateAsync(_context);
         var goal = await GoalFactory.CreateAsync(_context, userB.Id);
-        
+
         _client.ActAsUser(userA);
-        
 
         var response = await _client.DeleteAsync("api/goals/" + goal.Id);
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
@@ -447,7 +442,7 @@ public class GoalsControllerTest : IDisposable
     {
         var user = await UserFactory.CreateAsync(_context);
         _client.ActAsUser(user);
-        
+
         var goal = await GoalFactory.CreateAsync(_context, user.Id);
 
         var response = await _client.DeleteAsync("api/goals/" + goal.Id);
@@ -468,7 +463,12 @@ public class GoalsControllerTest : IDisposable
 
         var response = await _client.DeleteAsync("api/goals/" + goal.Id);
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
-        Assert.Empty(await _context.GoalContributions.AsNoTracking().Where(gc => gc.GoalId == goal.Id).ToListAsync());
+        Assert.Empty(
+            await _context
+                .GoalContributions.AsNoTracking()
+                .Where(gc => gc.GoalId == goal.Id)
+                .ToListAsync()
+        );
     }
 
     [Theory]
@@ -496,29 +496,23 @@ public class GoalsControllerTest : IDisposable
 
     [Theory]
     [MemberData(nameof(InvalidBudgetRequests))]
-    public async Task Create_WithInvalidData_ReturnsBadRequest(
-        string? name,
-        decimal targetAmount
-    )
+    public async Task Create_WithInvalidData_ReturnsBadRequest(string? name, decimal targetAmount)
     {
         var user = await UserFactory.CreateAsync(_context);
         _client.ActAsUser(user);
 
-        var request = new { 
-            Name = name, 
-            TargetAmount = targetAmount,
-        };
-
+        var request = new { Name = name, TargetAmount = targetAmount };
 
         var response = await _client.PostAsJsonAsync("/api/goals", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
+
     public static IEnumerable<object?[]> InvalidBudgetRequests()
     {
         // Missing name
-        yield return new object?[] { null, 100m, };
+        yield return new object?[] { null, 100m };
         // TargetAmount <= 0
-        yield return new object?[] { "New car" , -100m};
+        yield return new object?[] { "New car", -100m };
     }
 
     [Fact]
@@ -586,9 +580,12 @@ public class GoalsControllerTest : IDisposable
 
         var response = await _client.GetAsync("/api/goals/" + goal.Id + "/contributions");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        
-        var body = await response.Content.ReadFromJsonAsync<List<GoalContributionResource>>(TestJsonOptions.Default);
+
+        var body = await response.Content.ReadFromJsonAsync<List<GoalContributionResource>>(
+            TestJsonOptions.Default
+        );
         Assert.Equal(3, body!.Count);
     }
+
     public void Dispose() => _scope.Dispose();
 }

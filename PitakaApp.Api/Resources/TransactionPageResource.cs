@@ -10,7 +10,9 @@ public record TransactionPageResource(
 )
 {
     public static TransactionPageResource From(
-        IEnumerable<Transaction> transactions, int page, int pageSize, int totalCount
-    ) =>
-        new(TransactionResource.Collection(transactions), page, pageSize, totalCount);
+        IEnumerable<Transaction> transactions,
+        int page,
+        int pageSize,
+        int totalCount
+    ) => new(TransactionResource.Collection(transactions), page, pageSize, totalCount);
 }

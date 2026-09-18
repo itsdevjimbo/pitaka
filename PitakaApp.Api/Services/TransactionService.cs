@@ -7,31 +7,24 @@ using PitakaApp.Api.Models;
 
 namespace PitakaApp.Api.Services;
 
-public class TransactionService
+public class TransactionService(PitakaDbContext context, UpdateAccountBalance updateAccountBalance)
 {
-    private readonly PitakaDbContext _context;
+    private readonly PitakaDbContext _context = context;
 
-    private readonly UpdateAccountBalance _updateAccountBalance;
+    private readonly UpdateAccountBalance _updateAccountBalance = updateAccountBalance;
 
-    public TransactionService(
-        PitakaDbContext context, 
-        UpdateAccountBalance updateAccountBalance
+    public async Task<(IReadOnlyList<Transaction> Items, int TotalCount)> GetPageForUser(
+        User user,
+        TransactionQueryInput query
     )
     {
-        _context = context;
-        _updateAccountBalance = updateAccountBalance;
-    }
-    
-    public async Task<(IReadOnlyList<Transaction> Items, int TotalCount)> GetPageForUser(
-        User user, TransactionQueryInput query)
-    {
-        var filtered = _context.Transactions
-            .AsNoTracking()
-            .Where(t => t.UserId == user.Id);
+        var filtered = _context.Transactions.AsNoTracking().Where(t => t.UserId == user.Id);
 
         if (query.AccountId is int accountId)
         {
-            filtered = filtered.Where(t => t.AccountId == accountId || t.TransferToAccountId == accountId);
+            filtered = filtered.Where(t =>
+                t.AccountId == accountId || t.TransferToAccountId == accountId
+            );
         }
 
         if (query.CategoryId is int categoryId)
@@ -53,7 +46,8 @@ public class TransactionService
         {
             var needle = descriptionContains.ToLowerInvariant();
             filtered = filtered.Where(t =>
-                t.Description != null && t.Description.ToLower().Contains(needle));
+                t.Description != null && t.Description.ToLower().Contains(needle)
+            );
         }
 
         // `from`/`to` are half-open bounds that each carry their own zone (ADR 0005).
@@ -69,7 +63,8 @@ public class TransactionService
             var fromWallClock = from.DateTime;
             filtered = filtered.Where(t =>
                 (t.RecurringTransactionId == null && t.TransactionDate >= fromInstant)
-                || (t.RecurringTransactionId != null && t.TransactionDate >= fromWallClock));
+                || (t.RecurringTransactionId != null && t.TransactionDate >= fromWallClock)
+            );
         }
 
         if (query.To is DateTimeOffset to)
@@ -78,7 +73,8 @@ public class TransactionService
             var toWallClock = to.DateTime;
             filtered = filtered.Where(t =>
                 (t.RecurringTransactionId == null && t.TransactionDate < toInstant)
-                || (t.RecurringTransactionId != null && t.TransactionDate < toWallClock));
+                || (t.RecurringTransactionId != null && t.TransactionDate < toWallClock)
+            );
         }
 
         var totalCount = await filtered.CountAsync();
@@ -100,15 +96,19 @@ public class TransactionService
     }
 
     public async Task<List<Transaction>> GetAllForAccount(Account account) =>
-        await _context.Transactions
-            .AsNoTracking()
+        await _context
+            .Transactions.AsNoTracking()
             .Include(t => t.Tags)
             .Where(t => t.AccountId == account.Id || t.TransferToAccountId == account.Id)
             .OrderByDescending(t => t.TransactionDate)
             .ThenByDescending(t => t.Id)
             .ToListAsync();
 
-    public async Task<Transaction> CreateAsync(Account account, CreateTransactionInput input, List<Tag>? tags = null)
+    public async Task<Transaction> CreateAsync(
+        Account account,
+        CreateTransactionInput input,
+        List<Tag>? tags = null
+    )
     {
         var transaction = new Transaction
         {
@@ -120,7 +120,7 @@ public class TransactionService
             TransactionDate = input.TransactionDate?.ToUniversalTime() ?? DateTime.UtcNow,
             Description = input.Description,
             TransferToAccountId = input.TransferToAccountId,
-            RecurringTransactionId = input.RecurringTransactionId
+            RecurringTransactionId = input.RecurringTransactionId,
         };
 
         _context.Transactions.Add(transaction);
@@ -129,32 +129,38 @@ public class TransactionService
         {
             AttachTag(transaction, tags);
         }
-        
+
         await _updateAccountBalance.ApplyTransaction(transaction);
-        
+
         await _context.SaveChangesAsync();
 
         return transaction;
     }
+
     public async Task<Transaction?> GetByIdForUser(User user, int id) =>
-        await _context.Transactions
-            .AsNoTracking()
+        await _context
+            .Transactions.AsNoTracking()
             .Include(t => t.Tags)
             .Where(t => t.Id == id && t.UserId == user.Id)
             .FirstOrDefaultAsync();
 
-    public async Task<Transaction?> GetTrackedByIdAsync(int id) => 
-        await _context.Transactions
-            .Include(t => t.Tags)
+    public async Task<Transaction?> GetTrackedByIdAsync(int id) =>
+        await _context
+            .Transactions.Include(t => t.Tags)
             .Where(c => c.Id == id)
             .FirstOrDefaultAsync();
 
-    public async Task<Transaction> UpdateAsync(Transaction transaction, UpdateTransactionInput input, List<Tag>? tags = null)
+    public async Task<Transaction> UpdateAsync(
+        Transaction transaction,
+        UpdateTransactionInput input,
+        List<Tag>? tags = null
+    )
     {
         transaction.CategoryId = input.CategoryId;
         transaction.Description = input.Description;
-        transaction.TransactionDate = input.TransactionDate?.ToUniversalTime() ?? transaction.TransactionDate;
-        
+        transaction.TransactionDate =
+            input.TransactionDate?.ToUniversalTime() ?? transaction.TransactionDate;
+
         if (tags != null)
         {
             SyncTags(transaction, tags);
@@ -168,19 +174,21 @@ public class TransactionService
     {
         await _updateAccountBalance.ReverseTransaction(transaction);
 
-        var contributions = await _context.GoalContributions
-            .Where(gc => gc.TransactionId == transaction.Id)
+        var contributions = await _context
+            .GoalContributions.Where(gc => gc.TransactionId == transaction.Id)
             .ToListAsync();
 
         _context.GoalContributions.RemoveRange(contributions);
         _context.Transactions.Remove(transaction);
-        
+
         await _context.SaveChangesAsync();
     }
 
     public async Task<bool> IsValidTransferTransaction(User user, int? transferToAccountId)
     {
-        return await _context.Accounts.AnyAsync(a => a.Id == transferToAccountId && a.UserId == user.Id && a.IsActive);
+        return await _context.Accounts.AnyAsync(a =>
+            a.Id == transferToAccountId && a.UserId == user.Id && a.IsActive
+        );
     }
 
     private void AttachTag(Transaction transaction, List<Tag> tags)
@@ -202,10 +210,8 @@ public class TransactionService
     private void SyncTags(Transaction transaction, List<Tag> tags)
     {
         var tagIds = tags.Select(tag => tag.Id);
-        var toRemoveTags = transaction.Tags
-            .Where(t => !tagIds.Contains(t.Id))
-            .ToList();
-            
+        var toRemoveTags = transaction.Tags.Where(t => !tagIds.Contains(t.Id)).ToList();
+
         if (toRemoveTags.Count > 0)
         {
             DetachTag(transaction, toRemoveTags);
@@ -213,7 +219,7 @@ public class TransactionService
 
         var tagIdsToSkip = transaction.Tags.Select(tag => tag.Id).ToArray();
         var toAttachTags = tags.Where(t => !tagIdsToSkip.Contains(t.Id)).ToList();
-        
+
         AttachTag(transaction, toAttachTags);
     }
 }

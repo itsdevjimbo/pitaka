@@ -10,9 +10,7 @@ namespace PitakaApp.Api.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropColumn(
-                name: "is_recurring",
-                table: "transactions");
+            migrationBuilder.DropColumn(name: "is_recurring", table: "transactions");
         }
 
         /// <inheritdoc />
@@ -27,7 +25,8 @@ namespace PitakaApp.Api.Migrations
                 table: "transactions",
                 type: "tinyint(1)",
                 nullable: false,
-                defaultValue: false);
+                defaultValue: false
+            );
         }
     }
 }

@@ -29,7 +29,11 @@ public enum RedeemEmailChangeOutcome
 // pending columns are cleared — all in one transaction, because Identity's own
 // primitive does not touch UserName and in this repo an Email and a UserName that
 // disagree is a person who cannot sign in.
-public class RedeemEmailChange
+public class RedeemEmailChange(
+    UserManager<User> userManager,
+    PitakaDbContext context,
+    TimeProvider timeProvider
+)
 {
     // The store's own uniqueness check catches an address already held; a Profile that
     // claims it after that check and before this redemption reaches the index is the
@@ -37,19 +41,9 @@ public class RedeemEmailChange
     // result or a unique-constraint DbUpdateException, and both routes answer 409.
     private static readonly string[] DuplicateCodes = ["DuplicateUserName", "DuplicateEmail"];
 
-    private readonly UserManager<User> _userManager;
-    private readonly PitakaDbContext _context;
-    private readonly TimeProvider _timeProvider;
-
-    public RedeemEmailChange(
-        UserManager<User> userManager,
-        PitakaDbContext context,
-        TimeProvider timeProvider)
-    {
-        _userManager = userManager;
-        _context = context;
-        _timeProvider = timeProvider;
-    }
+    private readonly UserManager<User> _userManager = userManager;
+    private readonly PitakaDbContext _context = context;
+    private readonly TimeProvider _timeProvider = timeProvider;
 
     public async Task<RedeemEmailChangeOutcome> ExecuteAsync(RedeemEmailChangeInput input)
     {

@@ -28,15 +28,15 @@ public class UpdateAccountBalanceTest : IDisposable
         var account = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 3000);
 
         var transaction = TransactionFactory.Make(
-            userId: user.Id, 
-            accountId: account.Id, 
-            type: TransactionType.Transfer, 
-            amount: 1000, 
+            userId: user.Id,
+            accountId: account.Id,
+            type: TransactionType.Transfer,
+            amount: 1000,
             transferToAccountId: 99999
         );
 
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => _updateAccountBalance.ReverseTransaction(transaction)
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _updateAccountBalance.ReverseTransaction(transaction)
         );
     }
 

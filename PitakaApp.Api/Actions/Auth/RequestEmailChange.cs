@@ -20,29 +20,25 @@ public enum RequestEmailChangeOutcome
 // email, mail a confirmation link to it, and send a courtesy notice to the live address
 // so the change does not happen in silence at the address being left behind (ticket 07).
 // Redeeming the link is ticket 03.
-public class RequestEmailChange
+public class RequestEmailChange(
+    UserManager<User> userManager,
+    IEmailSender emailSender,
+    TimeProvider timeProvider,
+    IOptions<EmailChangeOption> option
+)
 {
-    private readonly UserManager<User> _userManager;
-    private readonly IEmailSender _emailSender;
-    private readonly TimeProvider _timeProvider;
-    private readonly EmailChangeOption _option;
-
-    public RequestEmailChange(
-        UserManager<User> userManager,
-        IEmailSender emailSender,
-        TimeProvider timeProvider,
-        IOptions<EmailChangeOption> option)
-    {
-        _userManager = userManager;
-        _emailSender = emailSender;
-        _timeProvider = timeProvider;
-        _option = option.Value;
-    }
+    private readonly UserManager<User> _userManager = userManager;
+    private readonly IEmailSender _emailSender = emailSender;
+    private readonly TimeProvider _timeProvider = timeProvider;
+    private readonly EmailChangeOption _option = option.Value;
 
     // A bare outcome enum, no wrapping record: unlike LoginResult / RegisterResult there
     // is no payload to carry back. The controller renders three of the four as distinct
     // status codes. Nothing is stored or sent unless the outcome is Succeeded.
-    public async Task<RequestEmailChangeOutcome> ExecuteAsync(User user, RequestEmailChangeInput input)
+    public async Task<RequestEmailChangeOutcome> ExecuteAsync(
+        User user,
+        RequestEmailChangeInput input
+    )
     {
         // The password is the only thing in this flow that proves identity — the
         // confirmation link only proves control of the new address, which in the case
@@ -71,17 +67,17 @@ public class RequestEmailChange
         // tracks: the `user` off ResolveCurrentUserFilter is AsNoTracking, and
         // UpdateAsync's own uniqueness re-check would otherwise track a second copy of
         // the same row and collide. Same shape as ResetPassword / ConfirmEmail.
-        var managed = await _userManager.FindByIdAsync(user.Id.ToString());
-        if (managed is null)
-        {
-            throw new InvalidOperationException($"Profile {user.Id} vanished mid-request.");
-        }
+        var managed =
+            await _userManager.FindByIdAsync(user.Id.ToString())
+            ?? throw new InvalidOperationException($"Profile {user.Id} vanished mid-request.");
 
         // Overwrites any pending change already in flight, in place. The live Email, the
         // UserName mirror and EmailConfirmed are all left untouched — the caller stays
         // signed in and their current address keeps working.
         managed.PendingEmail = input.NewEmail;
-        managed.PendingEmailExpiresAt = _timeProvider.GetUtcNow().UtcDateTime.Add(_option.TokenLifespan);
+        managed.PendingEmailExpiresAt = _timeProvider
+            .GetUtcNow()
+            .UtcDateTime.Add(_option.TokenLifespan);
 
         var stored = await _userManager.UpdateAsync(managed);
         if (!stored.Succeeded)
@@ -89,7 +85,8 @@ public class RequestEmailChange
             // The invariant is "nothing sent unless it was stored". A failed persist here
             // must not fall through to sending the confirmation link.
             throw new InvalidOperationException(
-                $"Storing the pending email failed: {string.Join(", ", stored.Errors.Select(e => e.Description))}");
+                $"Storing the pending email failed: {string.Join(", ", stored.Errors.Select(e => e.Description))}"
+            );
         }
 
         var token = await _userManager.GenerateChangeEmailTokenAsync(managed, input.NewEmail);
@@ -103,7 +100,8 @@ public class RequestEmailChange
             input.NewEmail,
             "Confirm your new Pitaka Profile email",
             ComposeTextBody(url),
-            ComposeHtmlBody(url));
+            ComposeHtmlBody(url)
+        );
 
         // The only warning the real owner gets if someone with a live session tries to
         // redirect their Profile (ADR 0014). Notice only: it names the requested address
@@ -114,7 +112,8 @@ public class RequestEmailChange
             managed.Email!,
             "A change was requested for your Pitaka Profile email",
             ComposeNoticeTextBody(input.NewEmail),
-            ComposeNoticeHtmlBody(input.NewEmail));
+            ComposeNoticeHtmlBody(input.NewEmail)
+        );
 
         return RequestEmailChangeOutcome.Succeeded;
     }
@@ -125,17 +124,17 @@ public class RequestEmailChange
     // unchanged.
     private static string ComposeTextBody(string url) =>
         $"""
-        Hi,
+            Hi,
 
-        We received a request to move your Pitaka Profile to this email address.
-        Confirm it to finish the change:
-        {url}
+            We received a request to move your Pitaka Profile to this email address.
+            Confirm it to finish the change:
+            {url}
 
-        If you ignore this message, your Profile keeps its current address — nothing
-        changes until this link is used.
+            If you ignore this message, your Profile keeps its current address — nothing
+            changes until this link is used.
 
-        — Pitaka
-        """;
+            — Pitaka
+            """;
 
     private static string ComposeHtmlBody(string url)
     {
@@ -155,19 +154,19 @@ public class RequestEmailChange
     // not ask for this: act from the Profile they can still sign in to.
     private static string ComposeNoticeTextBody(string requestedEmail) =>
         $"""
-        Hi,
+            Hi,
 
-        Someone asked to move your Pitaka Profile to a new email address:
-        {requestedEmail}
+            Someone asked to move your Pitaka Profile to a new email address:
+            {requestedEmail}
 
-        The change is not finished — it only completes when that address is confirmed
-        from the link we sent there. Your Profile keeps its current address until then.
+            The change is not finished — it only completes when that address is confirmed
+            from the link we sent there. Your Profile keeps its current address until then.
 
-        If this was you, no action is needed. If it was not, sign in to your Profile and
-        cancel the pending change.
+            If this was you, no action is needed. If it was not, sign in to your Profile and
+            cancel the pending change.
 
-        — Pitaka
-        """;
+            — Pitaka
+            """;
 
     private static string ComposeNoticeHtmlBody(string requestedEmail)
     {

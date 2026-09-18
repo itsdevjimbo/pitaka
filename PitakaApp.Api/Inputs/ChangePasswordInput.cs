@@ -1,6 +1,3 @@
 namespace PitakaApp.Api.Inputs;
 
-public record ChangePasswordInput(
-    string OldPassword,
-    string NewPassword
-);
+public record ChangePasswordInput(string OldPassword, string NewPassword);
