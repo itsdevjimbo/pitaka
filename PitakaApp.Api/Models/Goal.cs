@@ -6,6 +6,8 @@ namespace PitakaApp.Api.Models;
 
 public class Goal : TimestampedEntity
 {
+    public uint Version { get; set; }
+
     public required int UserId { get; set; }
 
     [MaxLength(255)]

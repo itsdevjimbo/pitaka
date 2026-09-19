@@ -34,6 +34,7 @@ public static class ApplicationServiceExtensions
         // Account
         services.AddScoped<AccountService>();
         services.AddScoped<UpdateAccountBalance>();
+        services.AddScoped<ContributionGuards>();
 
         // Transaction
         services.AddScoped<TransactionService>();

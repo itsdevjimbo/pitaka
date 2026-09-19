@@ -296,7 +296,10 @@ public class GoalContributionsControllerTest
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
         var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
-        Assert.Equal("Cannot make a contribution based on this transaction", problem!.Detail);
+        Assert.Equal(
+            "Linked contributions must be created through the transaction split operation",
+            problem!.Detail
+        );
     }
 
     [Fact]
@@ -333,7 +336,10 @@ public class GoalContributionsControllerTest
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
         var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
-        Assert.Equal("Cannot make a contribution based on this transaction", problem!.Detail);
+        Assert.Equal(
+            "Linked contributions must be created through the transaction split operation",
+            problem!.Detail
+        );
     }
 
     [Fact]
@@ -366,7 +372,10 @@ public class GoalContributionsControllerTest
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
         var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
-        Assert.Equal("Cannot make a contribution based on this transaction", problem!.Detail);
+        Assert.Equal(
+            "Linked contributions must be created through the transaction split operation",
+            problem!.Detail
+        );
     }
 
     [Fact]
@@ -398,7 +407,10 @@ public class GoalContributionsControllerTest
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
         var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
-        Assert.Equal("Cannot make a contribution based on this transaction", problem!.Detail);
+        Assert.Equal(
+            "Linked contributions must be created through the transaction split operation",
+            problem!.Detail
+        );
     }
 
     [Fact]
@@ -493,7 +505,7 @@ public class GoalContributionsControllerTest
     }
 
     [Fact]
-    public async Task Create_WithTransaction_ReturnsCreated()
+    public async Task Create_WithTransaction_ReturnsBadRequestAndCreatesNothing()
     {
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 5000);
@@ -516,11 +528,22 @@ public class GoalContributionsControllerTest
         };
 
         var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal(
+            "Linked contributions must be created through the transaction split operation",
+            problem!.Detail
+        );
+        Assert.False(
+            await _context
+                .GoalContributions.AsNoTracking()
+                .AnyAsync(gc => gc.TransactionId == transaction.Id)
+        );
     }
 
     [Fact]
-    public async Task Create_WithValidTransferTransaction_ReturnsCreated()
+    public async Task Create_WithValidTransferTransaction_ReturnsBadRequestAndCreatesNothing()
     {
         var user = await UserFactory.CreateAsync(_context);
         var sourceAccount = await AccountFactory.CreateAsync(
@@ -556,21 +579,12 @@ public class GoalContributionsControllerTest
         };
 
         var response = await _client.PostAsJsonAsync("/api/goal-contributions", request);
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-
-        var goalContribution = await _context
-            .GoalContributions.Where(gc => gc.GoalId == goal.Id)
-            .FirstAsync();
-
-        var body = await response.Content.ReadFromJsonAsync<GoalContributionResource>();
-
-        Assert.Equal(goalContribution.Id, body!.Id);
-        Assert.Equal(goal.Id, body.GoalId);
-        Assert.Equal(destinationAccount.Id, body.AccountId);
-        Assert.Equal(30, body.Amount);
-        Assert.Equal(transaction.Id, body.TransactionId);
-        Assert.Equal(now, body.ContributionDate);
-        Assert.Null(body.Note);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.False(
+            await _context
+                .GoalContributions.AsNoTracking()
+                .AnyAsync(gc => gc.TransactionId == transaction.Id)
+        );
     }
 
     [Fact]
