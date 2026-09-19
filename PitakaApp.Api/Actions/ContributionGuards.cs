@@ -110,14 +110,15 @@ public sealed class ContributionGuards(PitakaDbContext context)
 public sealed record ContributionGuardSnapshot(
     AccountHeadroomObservation? AccountHeadroom,
     TransactionCapacityObservation? TransactionCapacity,
-    IncomeEligibilityObservation? Income,
+    IncomeEligibilityObservation? IncomeEligibility,
     IReadOnlyList<GoalContributionObservation> Goals
 );
 
 public sealed record IncomeEligibilityObservation(Transaction Transaction, Account Account)
 {
     public bool IsEligible =>
-        Transaction.Type == TransactionType.Income
+        Account.IsActive
+        && Transaction.Type == TransactionType.Income
         && Transaction.AccountId == Account.Id
         && Transaction.UserId == Account.UserId;
 }

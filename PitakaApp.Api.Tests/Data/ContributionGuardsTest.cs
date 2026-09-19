@@ -1,9 +1,11 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using PitakaApp.Api.Actions;
 using PitakaApp.Api.Data;
 using PitakaApp.Api.Enums;
 using PitakaApp.Api.Inputs;
+using PitakaApp.Api.Jobs;
 using PitakaApp.Api.Models;
 using PitakaApp.Api.Services;
 using PitakaApp.Api.Tests.Factories;
@@ -45,7 +47,7 @@ public class ContributionGuardsTest(PitakaWebApplicationFactory factory)
         var guards = new ContributionGuards(context);
         var snapshot = await guards.CaptureAsync(user.Id, account.Id, [goal.Id], transaction.Id);
 
-        Assert.True(snapshot.Income!.IsEligible);
+        Assert.True(snapshot.IncomeEligibility!.IsEligible);
         Assert.Equal(250m, snapshot.TransactionCapacity!.LinkedTotal);
         Assert.Equal(350m, snapshot.TransactionCapacity.RemainingCapacity);
         Assert.Equal(550m, snapshot.AccountHeadroom!.EarmarkedTotal);
@@ -58,6 +60,31 @@ public class ContributionGuardsTest(PitakaWebApplicationFactory factory)
         Assert.Equal(500m, overrun.TargetAmount);
         Assert.Equal(550m, overrun.ProposedAmount);
         Assert.True(overrun.ExceedsTarget);
+    }
+
+    [Fact]
+    public async Task Capture_RetiredAccountIsNotIncomeEligible()
+    {
+        using var scope = factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<PitakaDbContext>();
+        var user = await UserFactory.CreateAsync(context);
+        var account = await AccountFactory.CreateAsync(context, user.Id, initialBalance: 500);
+        var goal = await GoalFactory.CreateAsync(context, user.Id);
+        var transaction = await TransactionFactory.CreateAsync(
+            context,
+            user.Id,
+            account.Id,
+            TransactionType.Income,
+            amount: 100
+        );
+        account.Deactivate();
+        await context.SaveChangesAsync();
+        context.ChangeTracker.Clear();
+
+        var guards = new ContributionGuards(context);
+        var snapshot = await guards.CaptureAsync(user.Id, account.Id, [goal.Id], transaction.Id);
+
+        Assert.False(snapshot.IncomeEligibility!.IsEligible);
     }
 
     [Fact]
@@ -213,6 +240,39 @@ public class ContributionGuardsTest(PitakaWebApplicationFactory factory)
     }
 
     [Fact]
+    public async Task AccountReactivationAfterCapture_RejectsCreation()
+    {
+        using var seedScope = factory.Services.CreateScope();
+        var seedContext = seedScope.ServiceProvider.GetRequiredService<PitakaDbContext>();
+        var user = await UserFactory.CreateAsync(seedContext);
+        var account = await AccountFactory.CreateAsync(seedContext, user.Id, initialBalance: 500);
+        var goal = await GoalFactory.CreateAsync(seedContext, user.Id);
+        account.Deactivate();
+        await seedContext.SaveChangesAsync();
+
+        using var createScope = factory.Services.CreateScope();
+        using var reactivateScope = factory.Services.CreateScope();
+        var createContext = createScope.ServiceProvider.GetRequiredService<PitakaDbContext>();
+        var reactivateContext =
+            reactivateScope.ServiceProvider.GetRequiredService<PitakaDbContext>();
+        var guards = new ContributionGuards(createContext);
+        var snapshot = await guards.CaptureAsync(user.Id, account.Id, [goal.Id]);
+
+        var reactivatedAccount = await reactivateContext.Accounts.SingleAsync(a =>
+            a.Id == account.Id
+        );
+        reactivatedAccount.Activate();
+        await reactivateContext.SaveChangesAsync();
+
+        AddContribution(createContext, goal.Id, account.Id);
+        guards.MarkConcurrencyGuardsModified(snapshot);
+
+        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() =>
+            createContext.SaveChangesAsync()
+        );
+    }
+
+    [Fact]
     public async Task GoalLifecycleChangeAfterCapture_RejectsCreation()
     {
         using var seedScope = factory.Services.CreateScope();
@@ -231,6 +291,34 @@ public class ContributionGuardsTest(PitakaWebApplicationFactory factory)
         var changedGoal = await lifecycleContext.Goals.SingleAsync(g => g.Id == goal.Id);
         changedGoal.Status = GoalStatus.Abandoned;
         await lifecycleContext.SaveChangesAsync();
+
+        AddContribution(createContext, goal.Id, account.Id);
+        guards.MarkConcurrencyGuardsModified(snapshot);
+
+        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() =>
+            createContext.SaveChangesAsync()
+        );
+    }
+
+    [Fact]
+    public async Task GoalTargetChangeAfterCapture_RejectsCreation()
+    {
+        using var seedScope = factory.Services.CreateScope();
+        var seedContext = seedScope.ServiceProvider.GetRequiredService<PitakaDbContext>();
+        var user = await UserFactory.CreateAsync(seedContext);
+        var account = await AccountFactory.CreateAsync(seedContext, user.Id, initialBalance: 500);
+        var goal = await GoalFactory.CreateAsync(seedContext, user.Id, targetAmount: 500);
+
+        using var createScope = factory.Services.CreateScope();
+        using var targetScope = factory.Services.CreateScope();
+        var createContext = createScope.ServiceProvider.GetRequiredService<PitakaDbContext>();
+        var targetContext = targetScope.ServiceProvider.GetRequiredService<PitakaDbContext>();
+        var guards = new ContributionGuards(createContext);
+        var snapshot = await guards.CaptureAsync(user.Id, account.Id, [goal.Id]);
+
+        var changedGoal = await targetContext.Goals.SingleAsync(g => g.Id == goal.Id);
+        changedGoal.TargetAmount = 50;
+        await targetContext.SaveChangesAsync();
 
         AddContribution(createContext, goal.Id, account.Id);
         guards.MarkConcurrencyGuardsModified(snapshot);
@@ -316,6 +404,95 @@ public class ContributionGuardsTest(PitakaWebApplicationFactory factory)
         );
     }
 
+    [Fact]
+    public async Task GeneratedTransactionCreationAfterCapture_RejectsContributionCreation()
+    {
+        using var seedScope = factory.Services.CreateScope();
+        var seedContext = seedScope.ServiceProvider.GetRequiredService<PitakaDbContext>();
+        var user = await UserFactory.CreateAsync(seedContext);
+        var account = await AccountFactory.CreateAsync(seedContext, user.Id, initialBalance: 500);
+        var goal = await GoalFactory.CreateAsync(seedContext, user.Id);
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            seedContext,
+            user.Id,
+            account.Id,
+            type: RecurringTransactionType.Expense,
+            amount: 50,
+            startDate: today.AddDays(-1),
+            nextRunDate: today
+        );
+
+        using var contributionScope = factory.Services.CreateScope();
+        using var generationScope = factory.Services.CreateScope();
+        var contributionContext =
+            contributionScope.ServiceProvider.GetRequiredService<PitakaDbContext>();
+        var generationContext =
+            generationScope.ServiceProvider.GetRequiredService<PitakaDbContext>();
+        var guards = new ContributionGuards(contributionContext);
+        var snapshot = await guards.CaptureAsync(user.Id, account.Id, [goal.Id]);
+
+        var generator =
+            generationScope.ServiceProvider.GetRequiredService<GenerateDueRecurringTransactions>();
+        await generator.GenerateAsync();
+        Assert.True(
+            await generationContext.Transactions.AnyAsync(t =>
+                t.RecurringTransactionId == recurringTransaction.Id
+            )
+        );
+
+        AddContribution(contributionContext, goal.Id, account.Id);
+        guards.MarkConcurrencyGuardsModified(snapshot);
+
+        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() =>
+            contributionContext.SaveChangesAsync()
+        );
+    }
+
+    [Fact]
+    public async Task AccountMutationAfterVersionCaptureBeforeObservation_RejectsCreation()
+    {
+        using var seedScope = factory.Services.CreateScope();
+        var seedContext = seedScope.ServiceProvider.GetRequiredService<PitakaDbContext>();
+        var user = await UserFactory.CreateAsync(seedContext);
+        var account = await AccountFactory.CreateAsync(seedContext, user.Id, initialBalance: 500);
+        var goal = await GoalFactory.CreateAsync(seedContext, user.Id);
+        var mutationApplied = false;
+        var interceptor = new AccountMaterializedInterceptor(
+            account.Id,
+            () =>
+            {
+                using var mutationScope = factory.Services.CreateScope();
+                var mutationContext =
+                    mutationScope.ServiceProvider.GetRequiredService<PitakaDbContext>();
+                var changedAccount = mutationContext.Accounts.Single(a => a.Id == account.Id);
+                changedAccount.Decrease(50);
+                mutationContext.SaveChanges();
+                mutationApplied = true;
+            }
+        );
+        var options = new DbContextOptionsBuilder<PitakaDbContext>()
+            .UseMySql(
+                PitakaWebApplicationFactory.TestConnectionString,
+                ServerVersion.AutoDetect(PitakaWebApplicationFactory.TestConnectionString)
+            )
+            .UseSnakeCaseNamingConvention()
+            .AddInterceptors(interceptor)
+            .Options;
+        await using var createContext = new PitakaDbContext(options);
+        var guards = new ContributionGuards(createContext);
+
+        var snapshot = await guards.CaptureAsync(user.Id, account.Id, [goal.Id]);
+        Assert.True(mutationApplied);
+
+        AddContribution(createContext, goal.Id, account.Id);
+        guards.MarkConcurrencyGuardsModified(snapshot);
+
+        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() =>
+            createContext.SaveChangesAsync()
+        );
+    }
+
     private static void AddContribution(PitakaDbContext context, int goalId, int accountId)
     {
         context.GoalContributions.Add(
@@ -327,5 +504,25 @@ public class ContributionGuardsTest(PitakaWebApplicationFactory factory)
                 ContributionDate = DateOnly.FromDateTime(DateTime.UtcNow),
             }
         );
+    }
+
+    private sealed class AccountMaterializedInterceptor(int accountId, Action onMaterialized)
+        : IMaterializationInterceptor
+    {
+        private bool _hasRun;
+
+        public object InitializedInstance(
+            MaterializationInterceptionData materializationData,
+            object entity
+        )
+        {
+            if (!_hasRun && entity is Account account && account.Id == accountId)
+            {
+                _hasRun = true;
+                onMaterialized();
+            }
+
+            return entity;
+        }
     }
 }
