@@ -55,6 +55,40 @@ public class RecurringTransaction : TimestampedEntity
         Status = RecurringTransactionStatus.Completed;
         return true;
     }
+
+    public ExtendRecurringTransactionVerdict TryExtend(DateOnly? endDate, DateOnly nextRunDate)
+    {
+        if (endDate is DateOnly finiteEndDate)
+        {
+            if (EndDate is not DateOnly currentEndDate || finiteEndDate <= currentEndDate)
+            {
+                return ExtendRecurringTransactionVerdict.EndDateIsNotLater;
+            }
+
+            if (!CanSetEndDate(finiteEndDate))
+            {
+                return ExtendRecurringTransactionVerdict.InvalidEndDate;
+            }
+
+            if (finiteEndDate < nextRunDate)
+            {
+                return ExtendRecurringTransactionVerdict.EndDateExcludesNextOccurrence;
+            }
+        }
+
+        EndDate = endDate;
+        NextRunDate = nextRunDate;
+        Status = RecurringTransactionStatus.Active;
+        return ExtendRecurringTransactionVerdict.Success;
+    }
+}
+
+public enum ExtendRecurringTransactionVerdict
+{
+    Success,
+    InvalidEndDate,
+    EndDateIsNotLater,
+    EndDateExcludesNextOccurrence,
 }
 
 public sealed record RecurringTransactionRead(
