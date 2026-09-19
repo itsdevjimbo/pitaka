@@ -5,6 +5,7 @@ namespace PitakaApp.Api.Inputs;
 public record TransactionQueryInput(
     int? AccountId,
     int? CategoryId,
+    int? RecurringTransactionId,
     TransactionType? Type,
     string? Description,
     DateTimeOffset? From,
