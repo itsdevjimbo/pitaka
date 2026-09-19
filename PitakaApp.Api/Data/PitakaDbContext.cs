@@ -23,6 +23,7 @@ public class PitakaDbContext(DbContextOptions<PitakaDbContext> options)
     public DbSet<Budget> Budgets { get; set; }
     public DbSet<Goal> Goals { get; set; }
     public DbSet<GoalContribution> GoalContributions { get; set; }
+    public DbSet<LinkedContributionOperation> LinkedContributionOperations { get; set; }
     public DbSet<Tag> Tags { get; set; }
     public DbSet<DataProtectionKey> DataProtectionKeys { get; set; }
 
@@ -83,6 +84,11 @@ public class PitakaDbContext(DbContextOptions<PitakaDbContext> options)
             property.SetValueConverter(converter);
             property.SetColumnType("varchar(100)");
         }
+
+        modelBuilder
+            .Entity<LinkedContributionOperation>()
+            .HasIndex(o => new { o.UserId, o.Key })
+            .IsUnique();
 
         modelBuilder.Entity<Account>().Property(a => a.Version).IsConcurrencyToken();
         modelBuilder.Entity<Goal>().Property(g => g.Version).IsConcurrencyToken();
