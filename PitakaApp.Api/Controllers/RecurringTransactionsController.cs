@@ -119,7 +119,7 @@ public class RecurringTransactionsController(
 
         return StatusCode(
             StatusCodes.Status201Created,
-            RecurringTransactionResource.FromModel(recurringTransaction)
+            RecurringTransactionResource.FromModel(recurringTransaction, 0)
         );
     }
 
@@ -134,7 +134,12 @@ public class RecurringTransactionsController(
             return NotFound();
         }
 
-        return Ok(RecurringTransactionResource.FromModel(recurringTransaction));
+        return Ok(
+            RecurringTransactionResource.FromModel(
+                recurringTransaction.RecurringTransaction,
+                recurringTransaction.GeneratedTransactionCount
+            )
+        );
     }
 
     [HttpPut("{id}")]
@@ -195,7 +200,12 @@ public class RecurringTransactionsController(
 
         await _recurringTransactionService.UpdateAsync(recurringTransaction, request.ToInput());
 
-        return Ok(RecurringTransactionResource.FromModel(recurringTransaction));
+        return Ok(
+            RecurringTransactionResource.FromModel(
+                recurringTransaction,
+                await _recurringTransactionService.GetGeneratedTransactionCountAsync(id)
+            )
+        );
     }
 
     [HttpPatch("{id}/status")]
@@ -215,7 +225,12 @@ public class RecurringTransactionsController(
         }
 
         await _recurringTransactionService.PatchStatusAsync(recurringTransaction, request.Status);
-        return Ok(RecurringTransactionResource.FromModel(recurringTransaction));
+        return Ok(
+            RecurringTransactionResource.FromModel(
+                recurringTransaction,
+                await _recurringTransactionService.GetGeneratedTransactionCountAsync(id)
+            )
+        );
     }
 
     [HttpDelete("{id}")]
@@ -234,7 +249,7 @@ public class RecurringTransactionsController(
             return Forbid();
         }
 
-        if (await _recurringTransactionService.HasGeneratedTransactionsAsync(id))
+        if (!await _recurringTransactionService.TryDeleteUnusedAsync(id))
         {
             return Problem(
                 detail: "This recurring transaction has generated transactions and cannot be deleted.",
@@ -242,7 +257,6 @@ public class RecurringTransactionsController(
             );
         }
 
-        await _recurringTransactionService.DeleteAsync(recurringTransaction);
         return NoContent();
     }
 }

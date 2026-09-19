@@ -18,7 +18,8 @@ public class RecurringTransactionFactory
         DateOnly? startDate = null,
         DateOnly? endDate = null,
         DateOnly? nextRunDate = null,
-        RecurringTransactionStatus? status = null
+        RecurringTransactionStatus? status = null,
+        bool hasGeneratedTransactions = false
     )
     {
         return new RecurringTransaction
@@ -35,6 +36,7 @@ public class RecurringTransactionFactory
             EndDate = endDate,
             NextRunDate = nextRunDate ?? DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)),
             Status = status ?? RecurringTransactionStatus.Active,
+            HasGeneratedTransactions = hasGeneratedTransactions,
         };
     }
 
@@ -51,7 +53,8 @@ public class RecurringTransactionFactory
         DateOnly? startDate = null,
         DateOnly? endDate = null,
         DateOnly? nextRunDate = null,
-        RecurringTransactionStatus? status = null
+        RecurringTransactionStatus? status = null,
+        bool hasGeneratedTransactions = false
     )
     {
         var recurringTransaction = Make(
@@ -66,7 +69,8 @@ public class RecurringTransactionFactory
             startDate,
             endDate,
             nextRunDate,
-            status
+            status,
+            hasGeneratedTransactions
         );
         context.RecurringTransactions.Add(recurringTransaction);
         await context.SaveChangesAsync();

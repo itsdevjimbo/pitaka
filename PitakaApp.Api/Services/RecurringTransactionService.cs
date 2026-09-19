@@ -13,16 +13,26 @@ public class RecurringTransactionService(PitakaDbContext context, GetNextRunDate
 
     private readonly GetNextRunDate _getNextRunDate = getNextRunDate;
 
-    public async Task<List<RecurringTransaction>> GetAllForUser(User user) =>
-        await _context
-            .RecurringTransactions.AsNoTracking()
-            .Where(a => a.UserId == user.Id)
+    private IQueryable<RecurringTransactionRead> WithGeneratedTransactionCount(
+        IQueryable<RecurringTransaction> recurringTransactions
+    ) =>
+        recurringTransactions.Select(rt => new RecurringTransactionRead(
+            rt,
+            _context.Transactions.Count(t => t.RecurringTransactionId == rt.Id)
+        ));
+
+    public async Task<List<RecurringTransactionRead>> GetAllForUser(User user) =>
+        await WithGeneratedTransactionCount(
+                _context.RecurringTransactions.AsNoTracking().Where(rt => rt.UserId == user.Id)
+            )
             .ToListAsync();
 
-    public async Task<RecurringTransaction?> GetByIdForUser(User user, int id) =>
-        await _context
-            .RecurringTransactions.AsNoTracking()
-            .Where(a => a.Id == id && a.UserId == user.Id)
+    public async Task<RecurringTransactionRead?> GetByIdForUser(User user, int id) =>
+        await WithGeneratedTransactionCount(
+                _context
+                    .RecurringTransactions.AsNoTracking()
+                    .Where(rt => rt.Id == id && rt.UserId == user.Id)
+            )
             .FirstOrDefaultAsync();
 
     public async Task<RecurringTransaction?> GetTrackedByIdAsync(int id) =>
@@ -112,18 +122,15 @@ public class RecurringTransactionService(PitakaDbContext context, GetNextRunDate
         return recurringTransaction;
     }
 
-    public async Task DeleteAsync(RecurringTransaction recurringTransaction)
-    {
-        _context.RecurringTransactions.Remove(recurringTransaction);
-        await _context.SaveChangesAsync();
-    }
+    public async Task<bool> TryDeleteUnusedAsync(int recurringTransactionId) =>
+        await _context
+            .RecurringTransactions.Where(rt =>
+                rt.Id == recurringTransactionId && !rt.HasGeneratedTransactions
+            )
+            .ExecuteDeleteAsync() == 1;
 
-    // A recurring transaction is in use once a Transaction points at it. No user scoping:
-    // the controller has already established ownership, and a Transaction cannot point at
-    // another user's schedule. Nothing else in the model references a RecurringTransaction,
-    // so this is the whole question.
-    public async Task<bool> HasGeneratedTransactionsAsync(int recurringTransactionId) =>
+    public async Task<int> GetGeneratedTransactionCountAsync(int recurringTransactionId) =>
         await _context
             .Transactions.AsNoTracking()
-            .AnyAsync(t => t.RecurringTransactionId == recurringTransactionId);
+            .CountAsync(t => t.RecurringTransactionId == recurringTransactionId);
 }

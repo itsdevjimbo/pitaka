@@ -127,6 +127,14 @@ public class AccountsController(
             );
         }
 
+        if (await _accountService.HasGeneratedRecurringTransactionsAsync(id))
+        {
+            return Problem(
+                detail: "This account has recurring transactions with generated history and cannot be deleted.",
+                statusCode: StatusCodes.Status409Conflict
+            );
+        }
+
         await _accountService.DeleteAsync(account);
         return NoContent();
     }

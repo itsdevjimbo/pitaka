@@ -74,6 +74,52 @@ public class RecurringTransactionsControllerTest : IDisposable
     }
 
     [Fact]
+    public async Task Get_ReturnsSurvivingGeneratedTransactionCountAndDeletionEligibility()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var unused = await RecurringTransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            name: "Unused"
+        );
+        var used = await RecurringTransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            name: "Used"
+        );
+        await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            recurringTransactionId: used.Id
+        );
+        await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            recurringTransactionId: used.Id
+        );
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync("/api/recurring-transactions");
+        var body = await response.Content.ReadFromJsonAsync<List<RecurringTransactionResource>>(
+            TestJsonOptions.Default
+        );
+
+        var unusedResource = Assert.Single(body!, rt => rt.Id == unused.Id);
+        Assert.Equal(0, unusedResource.GeneratedTransactionCount);
+        Assert.True(unusedResource.CanDelete);
+
+        var usedResource = Assert.Single(body!, rt => rt.Id == used.Id);
+        Assert.Equal(2, usedResource.GeneratedTransactionCount);
+        Assert.False(usedResource.CanDelete);
+    }
+
+    [Fact]
     public async Task Create_WithNoLoggedInUser_ReturnsUnauthorized()
     {
         var request = new
@@ -439,6 +485,8 @@ public class RecurringTransactionsControllerTest : IDisposable
         Assert.Equal(DateOnly.FromDateTime(DateTime.UtcNow.AddDays(3)), body.EndDate);
         Assert.Equal(DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)), body.NextRunDate);
         Assert.Equal(RecurringTransactionStatus.Active, body.Status);
+        Assert.Equal(0, body.GeneratedTransactionCount);
+        Assert.True(body.CanDelete);
     }
 
     [Fact]
@@ -651,6 +699,41 @@ public class RecurringTransactionsControllerTest : IDisposable
         Assert.Null(body.EndDate);
         Assert.Equal(DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)), body.NextRunDate);
         Assert.Equal(RecurringTransactionStatus.Active, body.Status);
+        Assert.Equal(0, body.GeneratedTransactionCount);
+        Assert.True(body.CanDelete);
+    }
+
+    [Fact]
+    public async Task Show_AfterGeneratedTransactionsRemoved_ReturnsZeroButRemainsUndeletable()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id
+        );
+        var transaction = await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            recurringTransactionId: recurringTransaction.Id
+        );
+        var transactionService = _scope.ServiceProvider.GetRequiredService<TransactionService>();
+        await transactionService.DeleteAsync(transaction);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync(
+            "/api/recurring-transactions/" + recurringTransaction.Id
+        );
+        var body = await response.Content.ReadFromJsonAsync<RecurringTransactionResource>(
+            TestJsonOptions.Default
+        );
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(0, body!.GeneratedTransactionCount);
+        Assert.False(body.CanDelete);
     }
 
     [Fact]
@@ -1355,7 +1438,7 @@ public class RecurringTransactionsControllerTest : IDisposable
     }
 
     [Fact]
-    public async Task Delete_AfterGeneratedTransactionsRemoved_ReturnsNoContent()
+    public async Task Delete_AfterGeneratedTransactionsRemoved_ReturnsConflict()
     {
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
@@ -1379,9 +1462,9 @@ public class RecurringTransactionsControllerTest : IDisposable
         var response = await _client.DeleteAsync(
             "api/recurring-transactions/" + recurringTransaction.Id
         );
-        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
 
-        Assert.False(
+        Assert.True(
             await _context.RecurringTransactions.AnyAsync(rt => rt.Id == recurringTransaction.Id)
         );
     }
