@@ -39,8 +39,17 @@ public class GoalContributionsController(
     public async Task<IActionResult> Create(CreateGoalContributionRequest request)
     {
         var user = _currentUserAccessor.User!;
-        var goal = await _goalService.GetByIdForUser(user, request.GoalId);
+
+        if (request.TransactionId is not null)
+        {
+            return Problem(
+                detail: "Linked contributions must be created through the transaction split operation",
+                statusCode: StatusCodes.Status400BadRequest
+            );
+        }
+
         var account = await _accountService.GetByIdForUser(user, request.AccountId);
+        var goal = await _goalService.GetByIdForUser(user, request.GoalId);
 
         if (account == null)
         {
@@ -70,16 +79,6 @@ public class GoalContributionsController(
         {
             return Problem(
                 detail: "Cannot make contributions to an abandoned goal",
-                statusCode: StatusCodes.Status400BadRequest
-            );
-        }
-
-        if (
-            !await _goalContributionService.CanEarmarkTransaction(account.Id, request.TransactionId)
-        )
-        {
-            return Problem(
-                detail: "Cannot make a contribution based on this transaction",
                 statusCode: StatusCodes.Status400BadRequest
             );
         }

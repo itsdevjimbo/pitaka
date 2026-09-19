@@ -1,14 +1,15 @@
 using Microsoft.EntityFrameworkCore;
+using PitakaApp.Api.Actions;
 using PitakaApp.Api.Data;
-using PitakaApp.Api.Enums;
 using PitakaApp.Api.Inputs;
 using PitakaApp.Api.Models;
 
 namespace PitakaApp.Api.Services;
 
-public class GoalContributionService(PitakaDbContext context)
+public class GoalContributionService(PitakaDbContext context, ContributionGuards contributionGuards)
 {
     private readonly PitakaDbContext _context = context;
+    private readonly ContributionGuards _contributionGuards = contributionGuards;
 
     public async Task<List<GoalContribution>> GetAllForUser(User user) =>
         await _context
@@ -50,27 +51,11 @@ public class GoalContributionService(PitakaDbContext context)
             Note = input.Note,
         };
 
-        _context.Entry(account).State = EntityState.Modified;
+        _contributionGuards.Advance(account, [goal]);
         _context.GoalContributions.Add(goalContribution);
 
         await _context.SaveChangesAsync();
         return goalContribution;
-    }
-
-    public async Task<bool> CanEarmarkTransaction(int accountId, int? transactionId)
-    {
-        if (transactionId is not int id)
-        {
-            return true;
-        }
-
-        return await _context.Transactions.AnyAsync(t =>
-            t.Id == id
-            && (
-                (t.Type == TransactionType.Income && t.AccountId == accountId)
-                || (t.Type == TransactionType.Transfer && t.TransferToAccountId == accountId)
-            )
-        );
     }
 
     public async Task<bool> CanEarmarkAmount(Account account, decimal amount)

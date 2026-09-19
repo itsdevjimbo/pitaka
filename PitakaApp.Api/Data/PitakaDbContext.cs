@@ -85,6 +85,7 @@ public class PitakaDbContext(DbContextOptions<PitakaDbContext> options)
         }
 
         modelBuilder.Entity<Account>().Property(a => a.Version).IsConcurrencyToken();
+        modelBuilder.Entity<Goal>().Property(g => g.Version).IsConcurrencyToken();
 
         modelBuilder
             .Entity<Transaction>()
@@ -142,8 +143,8 @@ public class PitakaDbContext(DbContextOptions<PitakaDbContext> options)
         modelBuilder
             .Entity<GoalContribution>()
             .HasOne(gc => gc.Transaction)
-            .WithOne(t => t.GoalContribution)
-            .HasForeignKey<GoalContribution>(gc => gc.TransactionId)
+            .WithMany(t => t.GoalContributions)
+            .HasForeignKey(gc => gc.TransactionId)
             .OnDelete(DeleteBehavior.Restrict);
 
         modelBuilder
@@ -173,6 +174,13 @@ public class PitakaDbContext(DbContextOptions<PitakaDbContext> options)
             entry.Entity.Version += 1;
         }
 
+        foreach (
+            var entry in ChangeTracker.Entries<Goal>().Where(e => e.State == EntityState.Modified)
+        )
+        {
+            entry.Entity.Version += 1;
+        }
+
         return base.SaveChanges(acceptAllChangesOnSuccess);
     }
 
@@ -194,6 +202,13 @@ public class PitakaDbContext(DbContextOptions<PitakaDbContext> options)
             var entry in ChangeTracker
                 .Entries<Account>()
                 .Where(e => e.State == EntityState.Modified)
+        )
+        {
+            entry.Entity.Version += 1;
+        }
+
+        foreach (
+            var entry in ChangeTracker.Entries<Goal>().Where(e => e.State == EntityState.Modified)
         )
         {
             entry.Entity.Version += 1;
