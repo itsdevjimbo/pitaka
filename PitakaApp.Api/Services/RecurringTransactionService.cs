@@ -123,6 +123,26 @@ public class RecurringTransactionService(PitakaDbContext context, GetNextRunDate
         return recurringTransaction;
     }
 
+    public async Task<ExtendRecurringTransactionVerdict> ExtendAsync(
+        RecurringTransaction recurringTransaction,
+        DateOnly? endDate
+    )
+    {
+        var nextRunDate = _getNextRunDate.InclusiveOfToday(
+            recurringTransaction.StartDate,
+            recurringTransaction.Frequency
+        );
+
+        var verdict = recurringTransaction.TryExtend(endDate, nextRunDate);
+        if (verdict != ExtendRecurringTransactionVerdict.Success)
+        {
+            return verdict;
+        }
+
+        await _context.SaveChangesAsync();
+        return ExtendRecurringTransactionVerdict.Success;
+    }
+
     public async Task<bool> TryDeleteUnusedAsync(int recurringTransactionId) =>
         await _context
             .RecurringTransactions.Where(rt =>

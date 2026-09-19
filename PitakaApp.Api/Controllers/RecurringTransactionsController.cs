@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using PitakaApp.Api.Actions;
 using PitakaApp.Api.Enums;
 using PitakaApp.Api.Filters;
+using PitakaApp.Api.Models;
 using PitakaApp.Api.Requests;
 using PitakaApp.Api.Resources;
 using PitakaApp.Api.Services;
@@ -234,12 +235,88 @@ public class RecurringTransactionsController(
             return Forbid();
         }
 
+        if (request.Status == RecurringTransactionStatus.Active)
+        {
+            var account = await _accountService.GetByIdForUser(
+                user,
+                recurringTransaction.AccountId
+            );
+            if (account is { IsActive: false })
+            {
+                return Problem(
+                    detail: "Account is retired. Reactivate the Account before resuming this recurring transaction.",
+                    statusCode: StatusCodes.Status409Conflict
+                );
+            }
+        }
+
         await _recurringTransactionService.PatchStatusAsync(recurringTransaction, request.Status);
         return Ok(
             RecurringTransactionResource.FromModel(
                 recurringTransaction,
                 await _recurringTransactionService.GetGeneratedTransactionCountAsync(id)
             )
+        );
+    }
+
+    [HttpPost("{id}/extend")]
+    public async Task<IActionResult> Extend(int id, ExtendRecurringTransactionRequest request)
+    {
+        var user = _currentUserAccessor.User!;
+        var recurringTransaction = await _recurringTransactionService.GetTrackedByIdAsync(id);
+
+        if (recurringTransaction == null)
+        {
+            return NotFound();
+        }
+
+        if (recurringTransaction.UserId != user.Id)
+        {
+            return Forbid();
+        }
+
+        if (recurringTransaction.Status != RecurringTransactionStatus.Completed)
+        {
+            return Problem(
+                detail: "Only a completed recurring transaction can be extended.",
+                statusCode: StatusCodes.Status409Conflict
+            );
+        }
+
+        var account = await _accountService.GetByIdForUser(user, recurringTransaction.AccountId);
+        if (account is { IsActive: false })
+        {
+            return Problem(
+                detail: "Account is retired. Reactivate the Account before extending this recurring transaction.",
+                statusCode: StatusCodes.Status409Conflict
+            );
+        }
+
+        // Extension never generates or removes Transactions, so the pre-mutation count is
+        // also the response count. Read it before the write so no response-building failure
+        // can occur after a successful extension has committed.
+        var generatedTransactionCount =
+            await _recurringTransactionService.GetGeneratedTransactionCountAsync(id);
+        var verdict = await _recurringTransactionService.ExtendAsync(
+            recurringTransaction,
+            request.EndDate
+        );
+        if (verdict != ExtendRecurringTransactionVerdict.Success)
+        {
+            var detail = verdict switch
+            {
+                ExtendRecurringTransactionVerdict.EndDateIsNotLater =>
+                    "End date must be after the current end date",
+                ExtendRecurringTransactionVerdict.EndDateExcludesNextOccurrence =>
+                    "End date must include the next occurrence",
+                _ => "End date must be after start date",
+            };
+
+            return Problem(detail: detail, statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        return Ok(
+            RecurringTransactionResource.FromModel(recurringTransaction, generatedTransactionCount)
         );
     }
 
