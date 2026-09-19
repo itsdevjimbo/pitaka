@@ -88,9 +88,7 @@ public class RecurringTransactionService(PitakaDbContext context, GetNextRunDate
 
         if (recurringTransaction.Status != RecurringTransactionStatus.Cancelled)
         {
-            recurringTransaction.CompleteIfOccurrenceIsBeyondEnd(
-                recurringTransaction.NextRunDate
-            );
+            recurringTransaction.CompleteIfOccurrenceIsBeyondEnd(recurringTransaction.NextRunDate);
         }
 
         await _context.SaveChangesAsync();
