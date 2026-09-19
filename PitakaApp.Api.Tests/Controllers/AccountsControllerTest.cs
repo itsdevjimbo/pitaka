@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using PitakaApp.Api.Data;
 using PitakaApp.Api.Enums;
 using PitakaApp.Api.Resources;
+using PitakaApp.Api.Services;
 using PitakaApp.Api.Tests.Factories;
 using PitakaApp.Api.Tests.Fixtures;
 
@@ -776,6 +777,38 @@ public class AccountsControllerTest : IDisposable
 
         var response = await _client.DeleteAsync("/api/accounts/" + account.Id);
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Delete_AfterGeneratedTransactionRemoved_ReturnsConflict()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id
+        );
+        var transaction = await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            recurringTransactionId: recurringTransaction.Id
+        );
+        var transactionService = _scope.ServiceProvider.GetRequiredService<TransactionService>();
+        await transactionService.DeleteAsync(transaction);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.DeleteAsync("/api/accounts/" + account.Id);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.True(await _context.Accounts.AsNoTracking().AnyAsync(a => a.Id == account.Id));
+        Assert.True(
+            await _context
+                .RecurringTransactions.AsNoTracking()
+                .AnyAsync(rt => rt.Id == recurringTransaction.Id)
+        );
     }
 
     [Fact]

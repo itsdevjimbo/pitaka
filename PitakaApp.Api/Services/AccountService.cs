@@ -92,4 +92,9 @@ public class AccountService(PitakaDbContext context)
 
     public async Task<bool> HasGoalContributionsAsync(int accountId) =>
         await _context.GoalContributions.AsNoTracking().AnyAsync(t => t.AccountId == accountId);
+
+    public async Task<bool> HasGeneratedRecurringTransactionsAsync(int accountId) =>
+        await _context
+            .RecurringTransactions.AsNoTracking()
+            .AnyAsync(rt => rt.AccountId == accountId && rt.HasGeneratedTransactions);
 }

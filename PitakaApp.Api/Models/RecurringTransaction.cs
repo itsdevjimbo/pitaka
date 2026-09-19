@@ -32,6 +32,8 @@ public class RecurringTransaction : TimestampedEntity
 
     public RecurringTransactionStatus Status { get; set; } = RecurringTransactionStatus.Active;
 
+    public bool HasGeneratedTransactions { get; set; }
+
     public User User { get; set; } = null!;
 
     public Account Account { get; set; } = null!;
@@ -43,3 +45,8 @@ public class RecurringTransaction : TimestampedEntity
         return endDate > StartDate;
     }
 }
+
+public sealed record RecurringTransactionRead(
+    RecurringTransaction RecurringTransaction,
+    int GeneratedTransactionCount
+);

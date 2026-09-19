@@ -15,10 +15,15 @@ public record RecurringTransactionResource(
     DateOnly StartDate,
     DateOnly? EndDate,
     DateOnly NextRunDate,
-    RecurringTransactionStatus Status
+    RecurringTransactionStatus Status,
+    int GeneratedTransactionCount,
+    bool CanDelete
 )
 {
-    public static RecurringTransactionResource FromModel(RecurringTransaction rt) =>
+    public static RecurringTransactionResource FromModel(
+        RecurringTransaction rt,
+        int generatedTransactionCount
+    ) =>
         new(
             rt.Id,
             rt.AccountId,
@@ -31,10 +36,17 @@ public record RecurringTransactionResource(
             rt.StartDate,
             rt.EndDate,
             rt.NextRunDate,
-            rt.Status
+            rt.Status,
+            generatedTransactionCount,
+            !rt.HasGeneratedTransactions
         );
 
     public static List<RecurringTransactionResource> Collection(
-        IEnumerable<RecurringTransaction> recurringTransactions
-    ) => [.. recurringTransactions.Select(FromModel)];
+        IEnumerable<RecurringTransactionRead> recurringTransactions
+    ) =>
+        [
+            .. recurringTransactions.Select(rt =>
+                FromModel(rt.RecurringTransaction, rt.GeneratedTransactionCount)
+            ),
+        ];
 }

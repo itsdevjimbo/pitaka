@@ -4,6 +4,33 @@ status: accepted
 
 # A recurring transaction in use cannot be deleted
 
+## Amendment (2026-09-19): use is permanent after first generation
+
+The original decision treated the surviving foreign-key link as the whole rule and allowed
+deletion after the last generated Transaction was removed. Schedule management needs a
+stable answer to a different question: whether a recurring transaction has **ever**
+generated. A recurring transaction is therefore permanently in use after its first
+successful generation, independently of the number of generated Transactions that still
+survive.
+
+`RecurringTransaction.HasGeneratedTransactions` records that historical fact in the same
+database save that creates the first generated Transaction. Recurring transaction responses
+expose the surviving count separately as `generatedTransactionCount` and derive `canDelete`
+from the durable flag. `DELETE` conditionally deletes only a row whose durable flag is still
+false, so generation cannot race a stale eligibility read. Account deletion also refuses an
+Account carrying a recurring transaction whose flag is true; the Account concurrency token
+turns a concurrent generation into a conflict. The restrictive foreign key remains the
+final guard while generated Transactions survive.
+
+The migration cannot distinguish a genuinely unused pre-migration recurring transaction
+from one whose entire generated history was already removed. It conservatively marks every
+existing recurring transaction as having generated. This avoids falsely offering deletion,
+at the cost of keeping some unused existing recurring transactions permanently.
+
+This amendment supersedes the sections below wherever they say that removing all generated
+Transactions restores deletion eligibility or that the foreign-key link alone defines use.
+`CONTEXT.md` already states the amended domain rule.
+
 `DELETE /api/recurring-transactions/{id}` succeeds unconditionally on a person's own schedule (`RecurringTransactionsController.cs:184`). One relationship absorbs the consequences — `Transaction.RecurringTransaction` is configured `OnDelete(DeleteBehavior.SetNull)` (`PitakaDbContext.cs:101`) — so a single `204` nulls `RecurringTransactionId` on every Transaction the schedule ever generated. Nothing else in the model points at a `RecurringTransaction`, so that one foreign key is the whole blast radius.
 
 **A recurring transaction is in use once a Transaction points at it, and one in use cannot be deleted.** One `409`, one sentence, and the schedule is cancelled instead.

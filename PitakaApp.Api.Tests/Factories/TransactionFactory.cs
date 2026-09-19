@@ -56,6 +56,18 @@ public class TransactionFactory
         );
 
         context.Transactions.Add(transaction);
+
+        if (recurringTransactionId is int sourceRecurringTransactionId)
+        {
+            var recurringTransaction = await context.RecurringTransactions.FindAsync(
+                sourceRecurringTransactionId
+            );
+            if (recurringTransaction is not null)
+            {
+                recurringTransaction.HasGeneratedTransactions = true;
+            }
+        }
+
         await context.SaveChangesAsync();
 
         return transaction;

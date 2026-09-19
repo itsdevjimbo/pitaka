@@ -59,6 +59,7 @@ public class GenerateDueRecurringTransactions(
 
                 await _updateAccountBalance.ApplyTransaction(transaction);
                 _context.Transactions.Add(transaction);
+                freshRecurringTransaction.HasGeneratedTransactions = true;
 
                 var nextRunDate = _getNextRunDate.ExclusiveOfToday(
                     freshRecurringTransaction.StartDate,

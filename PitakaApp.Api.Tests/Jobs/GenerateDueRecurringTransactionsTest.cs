@@ -57,6 +57,7 @@ public class GenerateDueRecurringTransactionsTest : IDisposable
                 t.RecurringTransactionId == recurringTransaction.Id
             )
         );
+        Assert.True(recurringTransaction.HasGeneratedTransactions);
         Assert.Equal(RecurringTransactionStatus.Active, recurringTransaction.Status);
         Assert.Equal(date.AddDays(1), recurringTransaction.NextRunDate);
     }
@@ -323,6 +324,16 @@ public class GenerateDueRecurringTransactionsTest : IDisposable
             .Accounts.AsNoTracking()
             .FirstAsync(a => a.Id == overflowingAccount.Id);
         Assert.Equal(DecimalColumnCeiling, overflowingAfter.CurrentBalance);
+
+        var failingAfter = await _context
+            .RecurringTransactions.AsNoTracking()
+            .FirstAsync(rt => rt.Id == failing.Id);
+        Assert.False(failingAfter.HasGeneratedTransactions);
+
+        var healthyRecurringTransactionAfter = await _context
+            .RecurringTransactions.AsNoTracking()
+            .FirstAsync(rt => rt.Id == healthy.Id);
+        Assert.True(healthyRecurringTransactionAfter.HasGeneratedTransactions);
     }
 
     public void Dispose()
