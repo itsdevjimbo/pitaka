@@ -38,6 +38,7 @@ public static class ApplicationServiceExtensions
 
         // Transaction
         services.AddScoped<TransactionService>();
+        services.AddScoped<LinkedContributionSplitService>();
 
         // Budget
         services.AddScoped<BudgetService>();
