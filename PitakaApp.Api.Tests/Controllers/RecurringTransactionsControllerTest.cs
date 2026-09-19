@@ -1080,6 +1080,83 @@ public class RecurringTransactionsControllerTest : IDisposable
     }
 
     [Fact]
+    public async Task Update_ShortenedEndBeforeNextOccurrence_CompletesAndPreservesHistory()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            startDate: today.AddDays(-7),
+            nextRunDate: today.AddDays(7),
+            endDate: today.AddDays(14)
+        );
+        var generatedTransaction = await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            recurringTransactionId: recurringTransaction.Id
+        );
+        _client.ActAsUser(user);
+
+        var response = await _client.PutAsJsonAsync(
+            "/api/recurring-transactions/" + recurringTransaction.Id,
+            new
+            {
+                recurringTransaction.Name,
+                recurringTransaction.Amount,
+                EndDate = today.AddDays(3),
+            }
+        );
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<RecurringTransactionResource>(
+            TestJsonOptions.Default
+        );
+        Assert.Equal(RecurringTransactionStatus.Completed, body!.Status);
+        Assert.Equal(today.AddDays(3), body.EndDate);
+        Assert.Equal(1, body.GeneratedTransactionCount);
+        Assert.True(await _context.Transactions.AnyAsync(t => t.Id == generatedTransaction.Id));
+    }
+
+    [Fact]
+    public async Task Update_EndOnNextOccurrence_KeepsRecurringTransactionActive()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var nextRunDate = today.AddDays(7);
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            startDate: today.AddDays(-7),
+            nextRunDate: nextRunDate,
+            endDate: today.AddDays(14)
+        );
+        _client.ActAsUser(user);
+
+        var response = await _client.PutAsJsonAsync(
+            "/api/recurring-transactions/" + recurringTransaction.Id,
+            new
+            {
+                recurringTransaction.Name,
+                recurringTransaction.Amount,
+                EndDate = nextRunDate,
+            }
+        );
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<RecurringTransactionResource>(
+            TestJsonOptions.Default
+        );
+        Assert.Equal(RecurringTransactionStatus.Active, body!.Status);
+        Assert.Equal(nextRunDate, body.EndDate);
+    }
+
+    [Fact]
     public async Task Update_WithSameName_ReturnsOk()
     {
         var user = await UserFactory.CreateAsync(_context);

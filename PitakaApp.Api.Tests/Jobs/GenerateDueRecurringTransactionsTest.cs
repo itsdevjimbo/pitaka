@@ -127,6 +127,75 @@ public class GenerateDueRecurringTransactionsTest : IDisposable
     }
 
     [Fact]
+    public async Task Generate_OverdueOccurrenceBeyondEndDate_CompletesWithoutGenerating()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 500);
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            startDate: today.AddDays(-7),
+            nextRunDate: today.AddDays(-1),
+            endDate: today.AddDays(-2),
+            amount: 100
+        );
+
+        await _generateDueRecurringTransactions.GenerateAsync();
+
+        await _context.Entry(recurringTransaction).ReloadAsync();
+        await _context.Entry(account).ReloadAsync();
+
+        Assert.False(
+            await _context.Transactions.AnyAsync(t =>
+                t.RecurringTransactionId == recurringTransaction.Id
+            )
+        );
+        Assert.Equal(500, account.CurrentBalance);
+        Assert.Equal(RecurringTransactionStatus.Completed, recurringTransaction.Status);
+        Assert.Equal(today.AddDays(-1), recurringTransaction.NextRunDate);
+    }
+
+    [Fact]
+    public async Task Generate_AfterAccountReactivationWithOccurrenceBeyondEnd_CompletesWithoutGenerating()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 500);
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            startDate: today.AddDays(-7),
+            nextRunDate: today.AddDays(-1),
+            endDate: today.AddDays(-2),
+            amount: 100
+        );
+        account.Deactivate();
+        await _context.SaveChangesAsync();
+
+        await _generateDueRecurringTransactions.GenerateAsync();
+        Assert.Equal(RecurringTransactionStatus.Active, recurringTransaction.Status);
+
+        account.Activate();
+        await _context.SaveChangesAsync();
+        await _generateDueRecurringTransactions.GenerateAsync();
+
+        await _context.Entry(recurringTransaction).ReloadAsync();
+        await _context.Entry(account).ReloadAsync();
+
+        Assert.False(
+            await _context.Transactions.AnyAsync(t =>
+                t.RecurringTransactionId == recurringTransaction.Id
+            )
+        );
+        Assert.Equal(500, account.CurrentBalance);
+        Assert.Equal(RecurringTransactionStatus.Completed, recurringTransaction.Status);
+    }
+
+    [Fact]
     public async Task Generate_PausedRecurringTransactions_GeneratesNothing()
     {
         var user = await UserFactory.CreateAsync(_context);
@@ -184,6 +253,39 @@ public class GenerateDueRecurringTransactionsTest : IDisposable
 
         await _context.Entry(recurringTransaction).ReloadAsync();
         Assert.Equal(date.AddDays(1), recurringTransaction.NextRunDate);
+    }
+
+    [Theory]
+    [InlineData(Frequency.Daily)]
+    [InlineData(Frequency.Weekly)]
+    [InlineData(Frequency.Monthly)]
+    [InlineData(Frequency.Yearly)]
+    public async Task Generate_NextOccurrenceRemainsAnchoredToFirstGeneration(Frequency frequency)
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var (startDate, expectedNextRunDate) = frequency switch
+        {
+            Frequency.Daily => (today.AddDays(-10), today.AddDays(1)),
+            Frequency.Weekly => (today.AddDays(-14), today.AddDays(7)),
+            Frequency.Monthly => (today.AddMonths(-2), today.AddMonths(1)),
+            Frequency.Yearly => (today.AddYears(-2), today.AddYears(1)),
+            _ => throw new ArgumentOutOfRangeException(nameof(frequency)),
+        };
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            frequency: frequency,
+            startDate: startDate,
+            nextRunDate: today
+        );
+
+        await _generateDueRecurringTransactions.GenerateAsync();
+
+        await _context.Entry(recurringTransaction).ReloadAsync();
+        Assert.Equal(expectedNextRunDate, recurringTransaction.NextRunDate);
     }
 
     [Fact]
