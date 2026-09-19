@@ -223,7 +223,7 @@ public class GenerateDueRecurringTransactionsTest : IDisposable
     }
 
     [Fact]
-    public async Task Generate_OverdueRecurringTransaction_MovesToFutureOccurence()
+    public async Task Generate_AfterAccountRestoration_GeneratesOneOverdueOccurrenceAndMovesToFuture()
     {
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
@@ -238,6 +238,21 @@ public class GenerateDueRecurringTransactionsTest : IDisposable
             nextRunDate: date.AddDays(-3)
         );
 
+        account.Deactivate();
+        await _context.SaveChangesAsync();
+        await _generateDueRecurringTransactions.GenerateAsync();
+        await _context.Entry(recurringTransaction).ReloadAsync();
+        Assert.Equal(RecurringTransactionStatus.Active, recurringTransaction.Status);
+        Assert.Equal(date.AddDays(-3), recurringTransaction.NextRunDate);
+        Assert.False(
+            await _context.Transactions.AnyAsync(t =>
+                t.RecurringTransactionId == recurringTransaction.Id
+            )
+        );
+
+        account.Activate();
+        await _context.SaveChangesAsync();
+        await _generateDueRecurringTransactions.GenerateAsync();
         await _generateDueRecurringTransactions.GenerateAsync();
 
         Assert.Single(
