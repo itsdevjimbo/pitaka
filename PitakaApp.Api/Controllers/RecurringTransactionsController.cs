@@ -234,6 +234,21 @@ public class RecurringTransactionsController(
             return Forbid();
         }
 
+        if (request.Status == RecurringTransactionStatus.Active)
+        {
+            var account = await _accountService.GetByIdForUser(
+                user,
+                recurringTransaction.AccountId
+            );
+            if (account is { IsActive: false })
+            {
+                return Problem(
+                    detail: "Account is retired. Reactivate the Account before resuming this recurring transaction.",
+                    statusCode: StatusCodes.Status409Conflict
+                );
+            }
+        }
+
         await _recurringTransactionService.PatchStatusAsync(recurringTransaction, request.Status);
         return Ok(
             RecurringTransactionResource.FromModel(
