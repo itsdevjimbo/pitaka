@@ -146,5 +146,66 @@ public class AccountConcurrencyTest : IDisposable
         );
     }
 
+    [Fact]
+    public async Task TransferRemovalWithStaleDestinationVersion_RollsBackBothBalancesAndRemoval()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var source = await AccountFactory.CreateAsync(
+            _context,
+            user.Id,
+            "Removal source",
+            initialBalance: 500
+        );
+        var destination = await AccountFactory.CreateAsync(
+            _context,
+            user.Id,
+            "Removal destination",
+            initialBalance: 500
+        );
+        var seedService = _scope.ServiceProvider.GetRequiredService<TransactionService>();
+        var transaction = await seedService.CreateAsync(
+            source,
+            new CreateTransactionInput(
+                TransactionType.Transfer,
+                100,
+                TransferToAccountId: destination.Id
+            )
+        );
+
+        using var removalScope = _factory.Services.CreateScope();
+        using var competingScope = _factory.Services.CreateScope();
+        var removalContext = removalScope.ServiceProvider.GetRequiredService<PitakaDbContext>();
+        var competingContext = competingScope.ServiceProvider.GetRequiredService<PitakaDbContext>();
+        var removalService = removalScope.ServiceProvider.GetRequiredService<TransactionService>();
+        var transactionToRemove = await removalContext.Transactions.SingleAsync(t =>
+            t.Id == transaction.Id
+        );
+        await removalContext
+            .Accounts.Where(a => a.Id == source.Id || a.Id == destination.Id)
+            .LoadAsync();
+
+        var competingDestination = await competingContext.Accounts.SingleAsync(a =>
+            a.Id == destination.Id
+        );
+        competingDestination.Increase(25);
+        await competingContext.SaveChangesAsync();
+
+        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() =>
+            removalService.DeleteAsync(transactionToRemove)
+        );
+
+        using var assertScope = _factory.Services.CreateScope();
+        var assertContext = assertScope.ServiceProvider.GetRequiredService<PitakaDbContext>();
+        Assert.Equal(
+            400m,
+            (await assertContext.Accounts.SingleAsync(a => a.Id == source.Id)).CurrentBalance
+        );
+        Assert.Equal(
+            625m,
+            (await assertContext.Accounts.SingleAsync(a => a.Id == destination.Id)).CurrentBalance
+        );
+        Assert.True(await assertContext.Transactions.AnyAsync(t => t.Id == transaction.Id));
+    }
+
     public void Dispose() => _scope.Dispose();
 }

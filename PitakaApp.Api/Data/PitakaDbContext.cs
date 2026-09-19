@@ -156,30 +156,7 @@ public class PitakaDbContext(DbContextOptions<PitakaDbContext> options)
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
-        foreach (
-            var entry in ChangeTracker
-                .Entries<ITimestamped>()
-                .Where(e => e.State == EntityState.Modified)
-        )
-        {
-            entry.Entity.UpdatedAt = DateTime.UtcNow;
-        }
-
-        foreach (
-            var entry in ChangeTracker
-                .Entries<Account>()
-                .Where(e => e.State == EntityState.Modified)
-        )
-        {
-            entry.Entity.Version += 1;
-        }
-
-        foreach (
-            var entry in ChangeTracker.Entries<Goal>().Where(e => e.State == EntityState.Modified)
-        )
-        {
-            entry.Entity.Version += 1;
-        }
+        PrepareTrackedEntitiesForSave();
 
         return base.SaveChanges(acceptAllChangesOnSuccess);
     }
@@ -188,6 +165,13 @@ public class PitakaDbContext(DbContextOptions<PitakaDbContext> options)
         bool acceptAllChangesOnSuccess,
         CancellationToken cancellationToken = default
     )
+    {
+        PrepareTrackedEntitiesForSave();
+
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    private void PrepareTrackedEntitiesForSave()
     {
         foreach (
             var entry in ChangeTracker
@@ -213,7 +197,5 @@ public class PitakaDbContext(DbContextOptions<PitakaDbContext> options)
         {
             entry.Entity.Version += 1;
         }
-
-        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
     }
 }

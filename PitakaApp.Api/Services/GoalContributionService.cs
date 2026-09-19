@@ -51,7 +51,7 @@ public class GoalContributionService(PitakaDbContext context, ContributionGuards
             Note = input.Note,
         };
 
-        _contributionGuards.Advance(account, [goal]);
+        _contributionGuards.MarkConcurrencyGuardsModified(account, [goal]);
         _context.GoalContributions.Add(goalContribution);
 
         await _context.SaveChangesAsync();

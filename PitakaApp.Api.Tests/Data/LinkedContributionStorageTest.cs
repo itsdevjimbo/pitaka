@@ -99,6 +99,14 @@ public class LinkedContributionStorageTest(PitakaWebApplicationFactory factory)
                     (700001, 700001, {account.Id}, {transaction.Id}, 125.00, '2026-09-18', 'kept', {now}, NULL)
                 """
             );
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                INSERT INTO goal_contributions
+                    (id, goal_id, account_id, transaction_id, amount, contribution_date, note, created_at, updated_at)
+                VALUES
+                    (700002, 700001, {account.Id}, NULL, 75.00, '2026-09-17', 'ordinary', {now}, NULL)
+                """
+            );
 
             context.ChangeTracker.Clear();
             await migrator.MigrateAsync();
@@ -110,6 +118,13 @@ public class LinkedContributionStorageTest(PitakaWebApplicationFactory factory)
             Assert.Equal(125m, preserved.Amount);
             Assert.Equal(new DateOnly(2026, 9, 18), preserved.ContributionDate);
             Assert.Equal("kept", preserved.Note);
+
+            var ordinary = await context
+                .GoalContributions.AsNoTracking()
+                .SingleAsync(gc => gc.Id == 700002);
+            Assert.Null(ordinary.TransactionId);
+            Assert.Equal(75m, ordinary.Amount);
+            Assert.Equal("ordinary", ordinary.Note);
 
             context.Transactions.Remove(
                 await context.Transactions.SingleAsync(t => t.Id == transaction.Id)

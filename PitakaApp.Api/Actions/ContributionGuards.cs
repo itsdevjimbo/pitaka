@@ -85,15 +85,15 @@ public sealed class ContributionGuards(PitakaDbContext context)
         );
     }
 
-    public void Advance(ContributionGuardSnapshot snapshot)
+    public void MarkConcurrencyGuardsModified(ContributionGuardSnapshot snapshot)
     {
-        Advance(
+        MarkConcurrencyGuardsModified(
             snapshot.AccountHeadroom?.Account,
             snapshot.Goals.Select(observation => observation.Goal)
         );
     }
 
-    public void Advance(Account? account, IEnumerable<Goal> goals)
+    public void MarkConcurrencyGuardsModified(Account? account, IEnumerable<Goal> goals)
     {
         if (account is not null)
         {
