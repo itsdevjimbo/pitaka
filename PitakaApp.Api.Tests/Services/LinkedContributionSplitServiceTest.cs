@@ -2,10 +2,12 @@ using System.Data.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
+using MySqlConnector;
 using PitakaApp.Api.Data;
 using PitakaApp.Api.Enums;
 using PitakaApp.Api.Inputs;
 using PitakaApp.Api.Jobs;
+using PitakaApp.Api.Models;
 using PitakaApp.Api.Services;
 using PitakaApp.Api.Tests.Factories;
 using PitakaApp.Api.Tests.Fixtures;
@@ -111,15 +113,7 @@ public class LinkedContributionSplitServiceTest(PitakaWebApplicationFactory fact
     {
         using var scope = factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<PitakaDbContext>();
-        var user = await UserFactory.CreateAsync(context);
-        var account = await AccountFactory.CreateAsync(context, user.Id, initialBalance: 500);
-        var source = await TransactionFactory.CreateAsync(
-            context,
-            user.Id,
-            account.Id,
-            amount: 500
-        );
-        var goal = await GoalFactory.CreateAsync(context, user.Id);
+        var (user, account, source, goal) = await SeedSplitAsync(context);
         var second = await GoalFactory.CreateAsync(context, user.Id, name: "Other");
         var service = scope.ServiceProvider.GetRequiredService<LinkedContributionSplitService>();
         var key = Guid.NewGuid();
@@ -222,15 +216,7 @@ public class LinkedContributionSplitServiceTest(PitakaWebApplicationFactory fact
     {
         using var scope = factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<PitakaDbContext>();
-        var user = await UserFactory.CreateAsync(context);
-        var account = await AccountFactory.CreateAsync(context, user.Id, initialBalance: 500);
-        var source = await TransactionFactory.CreateAsync(
-            context,
-            user.Id,
-            account.Id,
-            amount: 500
-        );
-        var goal = await GoalFactory.CreateAsync(context, user.Id);
+        var (user, account, source, goal) = await SeedSplitAsync(context);
         var reserved = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var winner = Service(
@@ -242,7 +228,7 @@ public class LinkedContributionSplitServiceTest(PitakaWebApplicationFactory fact
                     await release.Task.WaitAsync(TimeSpan.FromSeconds(10));
                     if (scenario == "rollback")
                     {
-                        throw new IOException("Injected winner rollback");
+                        throw new InvalidOperationException("Injected winner rollback");
                     }
                 }
             )
@@ -274,7 +260,7 @@ public class LinkedContributionSplitServiceTest(PitakaWebApplicationFactory fact
         release.SetResult();
         if (scenario == "rollback")
         {
-            await Assert.ThrowsAsync<IOException>(() => first);
+            await Assert.ThrowsAsync<InvalidOperationException>(() => first);
             Assert.Equal(100, Assert.IsType<SplitSucceeded>(await second).Response.LinkedTotal);
             return;
         }
@@ -294,15 +280,7 @@ public class LinkedContributionSplitServiceTest(PitakaWebApplicationFactory fact
     {
         using var scope = factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<PitakaDbContext>();
-        var user = await UserFactory.CreateAsync(context);
-        var account = await AccountFactory.CreateAsync(context, user.Id, initialBalance: 500);
-        var source = await TransactionFactory.CreateAsync(
-            context,
-            user.Id,
-            account.Id,
-            amount: 500
-        );
-        var goal = await GoalFactory.CreateAsync(context, user.Id);
+        var (user, account, source, goal) = await SeedSplitAsync(context);
         var reserved = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var winner = Service(
@@ -387,15 +365,7 @@ public class LinkedContributionSplitServiceTest(PitakaWebApplicationFactory fact
     {
         using var scope = factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<PitakaDbContext>();
-        var user = await UserFactory.CreateAsync(context);
-        var account = await AccountFactory.CreateAsync(context, user.Id, initialBalance: 500);
-        var source = await TransactionFactory.CreateAsync(
-            context,
-            user.Id,
-            account.Id,
-            amount: 500
-        );
-        var goal = await GoalFactory.CreateAsync(context, user.Id);
+        var (user, account, source, goal) = await SeedSplitAsync(context);
         var key = Guid.NewGuid();
         var input = new LinkedContributionSplitInput(new(2026, 9, 19), [new(goal.Id, 100)]);
         var result = await Service(new CommitFault(afterCommit))
@@ -456,15 +426,7 @@ public class LinkedContributionSplitServiceTest(PitakaWebApplicationFactory fact
     {
         using var scope = factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<PitakaDbContext>();
-        var user = await UserFactory.CreateAsync(context);
-        var account = await AccountFactory.CreateAsync(context, user.Id, initialBalance: 500);
-        var source = await TransactionFactory.CreateAsync(
-            context,
-            user.Id,
-            account.Id,
-            amount: 500
-        );
-        var goal = await GoalFactory.CreateAsync(context, user.Id);
+        var (user, account, source, goal) = await SeedSplitAsync(context);
         var second = await GoalFactory.CreateAsync(context, user.Id, name: "Second");
         var key = Guid.NewGuid();
         var input = new LinkedContributionSplitInput(
@@ -474,9 +436,18 @@ public class LinkedContributionSplitServiceTest(PitakaWebApplicationFactory fact
         var service = Service(
             new AfterSave(failedSave, () => throw new IOException("Injected save failure"))
         );
-        await Assert.ThrowsAsync<IOException>(() =>
-            service.ExecuteAsync(user.Id, source.Id, key, input)
-        );
+        if (failedSave == 1)
+        {
+            Assert.IsType<SplitOutcomeUnknown>(
+                await service.ExecuteAsync(user.Id, source.Id, key, input)
+            );
+        }
+        else
+        {
+            await Assert.ThrowsAsync<IOException>(() =>
+                service.ExecuteAsync(user.Id, source.Id, key, input)
+            );
+        }
         // A previously observed ordinary writer can still use its versions: failed guards rolled back.
         var ordinary = scope.ServiceProvider.GetRequiredService<GoalContributionService>();
         await ordinary.CreateAsync(
@@ -678,15 +649,7 @@ public class LinkedContributionSplitServiceTest(PitakaWebApplicationFactory fact
     {
         using var scope = factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<PitakaDbContext>();
-        var user = await UserFactory.CreateAsync(context);
-        var account = await AccountFactory.CreateAsync(context, user.Id, initialBalance: 500);
-        var source = await TransactionFactory.CreateAsync(
-            context,
-            user.Id,
-            account.Id,
-            amount: 500
-        );
-        var goal = await GoalFactory.CreateAsync(context, user.Id);
+        var (user, account, source, goal) = await SeedSplitAsync(context);
         var key = Guid.NewGuid();
         var input = new LinkedContributionSplitInput(
             new(1999, 12, 31),
@@ -724,6 +687,8 @@ public class LinkedContributionSplitServiceTest(PitakaWebApplicationFactory fact
         await scope
             .ServiceProvider.GetRequiredService<AccountService>()
             .PatchActiveStatus(trackedAccount, new(false));
+        var transactions = scope.ServiceProvider.GetRequiredService<TransactionService>();
+        await transactions.DeleteAsync((await transactions.GetTrackedByIdAsync(source.Id))!);
         var replay = Assert.IsType<SplitSucceeded>(
             await Service().ExecuteAsync(user.Id, source.Id, key, input)
         );
@@ -872,15 +837,7 @@ public class LinkedContributionSplitServiceTest(PitakaWebApplicationFactory fact
     {
         using var scope = factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<PitakaDbContext>();
-        var user = await UserFactory.CreateAsync(context);
-        var account = await AccountFactory.CreateAsync(context, user.Id, initialBalance: 500);
-        var source = await TransactionFactory.CreateAsync(
-            context,
-            user.Id,
-            account.Id,
-            amount: 500
-        );
-        var goal = await GoalFactory.CreateAsync(context, user.Id);
+        var (user, account, source, goal) = await SeedSplitAsync(context);
         var input = new LinkedContributionSplitInput(new(2026, 9, 19), [new(goal.Id, 100)]);
         var original = Assert.IsType<SplitSucceeded>(
             await Service().ExecuteAsync(user.Id, source.Id, Guid.NewGuid(), input)
@@ -1032,15 +989,7 @@ public class LinkedContributionSplitServiceTest(PitakaWebApplicationFactory fact
     {
         using var scope = factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<PitakaDbContext>();
-        var user = await UserFactory.CreateAsync(context);
-        var account = await AccountFactory.CreateAsync(context, user.Id, initialBalance: 500);
-        var source = await TransactionFactory.CreateAsync(
-            context,
-            user.Id,
-            account.Id,
-            amount: 500
-        );
-        var goal = await GoalFactory.CreateAsync(context, user.Id);
+        var (user, account, source, goal) = await SeedSplitAsync(context);
         var key = Guid.NewGuid();
         var input = new LinkedContributionSplitInput(new(2026, 9, 19), [new(goal.Id, 100)]);
         var committed = false;
@@ -1102,6 +1051,195 @@ public class LinkedContributionSplitServiceTest(PitakaWebApplicationFactory fact
         Assert.Equal(0, next.Response.Account.AvailableHeadroom);
         Assert.Equal(0, next.Response.RemainingCapacity);
     }
+
+    [Theory]
+    [InlineData("inactive")]
+    [InlineData("overrun")]
+    [InlineData("unavailable")]
+    public async Task InvalidLaterRow_RefusesEntireSplitAndLeavesKeyReusable(string failure)
+    {
+        using var scope = factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<PitakaDbContext>();
+        var user = await UserFactory.CreateAsync(context);
+        var account = await AccountFactory.CreateAsync(context, user.Id, initialBalance: 500);
+        var source = await TransactionFactory.CreateAsync(
+            context,
+            user.Id,
+            account.Id,
+            amount: 500
+        );
+        var first = await GoalFactory.CreateAsync(context, user.Id);
+        var second = await GoalFactory.CreateAsync(
+            context,
+            user.Id,
+            name: "Second",
+            status: failure == "inactive" ? GoalStatus.Completed : GoalStatus.Active,
+            targetAmount: failure == "overrun" ? 50 : 10000
+        );
+        var key = Guid.NewGuid();
+        var input = new LinkedContributionSplitInput(
+            new(2026, 9, 19),
+            [new(first.Id, 100), new(failure == "unavailable" ? int.MaxValue : second.Id, 100)]
+        );
+        var result = await Service().ExecuteAsync(user.Id, source.Id, key, input);
+        if (failure == "unavailable")
+        {
+            Assert.Contains(
+                "contributions[1].goalId",
+                Assert.IsType<SplitInvalid>(result).Errors.Keys
+            );
+        }
+        else
+        {
+            var row = Assert.Single(Assert.IsType<SplitRefused>(result).Failures);
+            Assert.Equal(1, row.RowIndex);
+            Assert.Equal(second.Id, row.GoalId);
+        }
+        Assert.Empty(
+            await scope
+                .ServiceProvider.GetRequiredService<GoalContributionService>()
+                .GetAllForUser(user)
+        );
+        Assert.IsType<SplitSucceeded>(
+            await Service()
+                .ExecuteAsync(
+                    user.Id,
+                    source.Id,
+                    key,
+                    input with
+                    {
+                        Contributions = [new(first.Id, 1)],
+                    }
+                )
+        );
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task WriteConnectionUnavailable_ReturnsUnknownBeforeReservation(bool canceled)
+    {
+        var service = Service(new WriteConnectionUnavailable(canceled));
+        var result = await service.ExecuteAsync(
+            1,
+            1,
+            Guid.NewGuid(),
+            new(new(2026, 9, 19), [new(1, 1)])
+        );
+        Assert.IsType<SplitOutcomeUnknown>(result);
+    }
+
+    private sealed class WriteConnectionUnavailable(bool canceled) : DbConnectionInterceptor
+    {
+        private int connections;
+
+        public override ValueTask<InterceptionResult> ConnectionOpeningAsync(
+            DbConnection connection,
+            ConnectionEventData eventData,
+            InterceptionResult result,
+            CancellationToken cancellationToken = default
+        )
+        {
+            if (Interlocked.Increment(ref connections) == 2)
+            {
+                if (canceled)
+                {
+                    throw new OperationCanceledException("Injected arbitration deadline");
+                }
+
+                throw new IOException("Injected write connection failure");
+            }
+            return ValueTask.FromResult(result);
+        }
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public async Task ReservationTransportFailure_RecoversWithoutRetryingWrite(
+        bool wrappedProviderFailure,
+        bool disposalFails
+    )
+    {
+        using var scope = factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<PitakaDbContext>();
+        var (user, account, source, goal) = await SeedSplitAsync(context);
+        Exception failure = new IOException("Injected reservation connection failure");
+        if (wrappedProviderFailure)
+        {
+            var unavailable = new MySqlConnectionStringBuilder(
+                PitakaWebApplicationFactory.TestConnectionString
+            )
+            {
+                Port = 1,
+                ConnectionTimeout = 1,
+                Pooling = false,
+            };
+            await using var connection = new MySqlConnection(unavailable.ConnectionString);
+            var providerFailure = await Assert.ThrowsAsync<MySqlException>(() =>
+                connection.OpenAsync()
+            );
+            Assert.True(providerFailure.IsTransient);
+            failure = new DbUpdateException("Injected provider failure", providerFailure);
+        }
+        var writes = 0;
+        var service = Service(
+            new BeforeSave(
+                1,
+                () =>
+                {
+                    writes++;
+                    throw failure;
+                }
+            ),
+            new DisposalFault(disposalFails)
+        );
+        var key = Guid.NewGuid();
+        var input = new LinkedContributionSplitInput(new(2026, 9, 19), [new(goal.Id, 100)]);
+        Assert.IsType<SplitOutcomeUnknown>(
+            await service.ExecuteAsync(user.Id, source.Id, key, input)
+        );
+        Assert.Equal(1, writes);
+        var retry = Assert.IsType<SplitSucceeded>(
+            await Service().ExecuteAsync(user.Id, source.Id, key, input)
+        );
+        Assert.Equal(100, retry.Response.LinkedTotal);
+    }
+
+    private sealed class DisposalFault(bool enabled) : DbConnectionInterceptor
+    {
+        private int disposals;
+
+        public override Task ConnectionDisposedAsync(
+            DbConnection connection,
+            ConnectionEndEventData eventData
+        )
+        {
+            if (Interlocked.Increment(ref disposals) == 2 && enabled)
+            {
+                throw new InvalidOperationException("Injected context disposal failure");
+            }
+
+            return Task.CompletedTask;
+        }
+    }
+
+    private static async Task<SplitSeed> SeedSplitAsync(PitakaDbContext context)
+    {
+        var user = await UserFactory.CreateAsync(context);
+        var account = await AccountFactory.CreateAsync(context, user.Id, initialBalance: 500);
+        var source = await TransactionFactory.CreateAsync(
+            context,
+            user.Id,
+            account.Id,
+            amount: 500
+        );
+        var goal = await GoalFactory.CreateAsync(context, user.Id);
+        return new(user, account, source, goal);
+    }
+
+    private sealed record SplitSeed(User User, Account Account, Transaction Transaction, Goal Goal);
 
     private static LinkedContributionSplitService Service(params IInterceptor[] interceptors) =>
         new(

@@ -30,18 +30,16 @@ public sealed class LinkedContributionSplitService(DbContextOptions<PitakaDbCont
             return new SplitInvalid(errors);
         }
         // userId is supplied by the authenticated caller, never bound from request data.
-        var normalizedKey = key.ToString("D");
-        var fingerprint = Fingerprint(transactionId, input);
+        var identity = new OperationIdentity(
+            userId,
+            key.ToString("D"),
+            Fingerprint(transactionId, input)
+        );
         using var arbitration = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         arbitration.CancelAfter(TimeSpan.FromSeconds(5));
         try
         {
-            var previous = await ReadResultAsync(
-                userId,
-                normalizedKey,
-                fingerprint,
-                arbitration.Token
-            );
+            var previous = await ReadResultAsync(identity, arbitration.Token);
             if (previous is not null)
             {
                 return previous;
@@ -56,10 +54,8 @@ public sealed class LinkedContributionSplitService(DbContextOptions<PitakaDbCont
         try
         {
             return await ExecuteNewAsync(
-                userId,
+                identity,
                 transactionId,
-                normalizedKey,
-                fingerprint,
                 input,
                 attempt,
                 arbitration.Token,
@@ -71,43 +67,49 @@ public sealed class LinkedContributionSplitService(DbContextOptions<PitakaDbCont
             // The connection may have failed after MySQL committed. Disposal also runs before
             // this recovery, and its failure must not turn an uncertain commit into a refusal.
             using var recovery = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-            return await RecoverAsync(userId, normalizedKey, fingerprint, recovery.Token);
+            return await RecoverAsync(identity, recovery.Token);
         }
-        catch (ReservationCollision)
+        catch (Exception exception)
+            when (!attempt.ReservationStarted
+                && exception is DbException or OperationCanceledException or IOException
+            )
         {
-            return await RecoverAsync(userId, normalizedKey, fingerprint, arbitration.Token);
+            return new SplitOutcomeUnknown();
+        }
+        catch (Exception) when (attempt.ReservationRecoveryRequired)
+        {
+            return await RecoverAsync(identity, arbitration.Token);
         }
     }
 
     private async Task<LinkedContributionSplitResult?> ReadResultAsync(
-        int userId,
-        string key,
-        string fingerprint,
+        OperationIdentity identity,
         CancellationToken cancellationToken
     )
     {
         await using var context = new PitakaDbContext(options);
         var previous = await context
             .LinkedContributionOperations.AsNoTracking()
-            .SingleOrDefaultAsync(o => o.UserId == userId && o.Key == key, cancellationToken);
+            .SingleOrDefaultAsync(
+                o => o.UserId == identity.UserId && o.Key == identity.Key,
+                cancellationToken
+            );
         if (previous is null)
         {
             return null;
         }
 
-        if (previous.Fingerprint != fingerprint)
+        if (previous.Fingerprint != identity.Fingerprint)
         {
-            return new SplitIdempotencyMismatch(Guid.Parse(key));
+            return new SplitIdempotencyMismatch(Guid.Parse(identity.Key));
         }
 
         return new SplitSucceeded(previous.ResponseBody!, previous.StatusCode!.Value);
     }
 
     private async Task<LinkedContributionSplitResult> ExecuteNewAsync(
-        int userId,
+        OperationIdentity identity,
         int transactionId,
-        string normalizedKey,
-        string fingerprint,
         LinkedContributionSplitInput input,
         WriteAttempt attempt,
         CancellationToken arbitrationToken,
@@ -121,25 +123,27 @@ public sealed class LinkedContributionSplitService(DbContextOptions<PitakaDbCont
         );
         var operation = new LinkedContributionOperation
         {
-            UserId = userId,
-            Key = normalizedKey,
-            Fingerprint = fingerprint,
+            UserId = identity.UserId,
+            Key = identity.Key,
+            Fingerprint = identity.Fingerprint,
         };
         context.Add(operation);
+        attempt.ReservationStarted = true;
         try
         {
             await context.SaveChangesAsync(arbitrationToken);
         }
-        catch (Exception exception)
-            when (exception is OperationCanceledException || IsContention(exception))
+        catch (Exception exception) when (ReservationNeedsRecovery(exception))
         {
-            throw new ReservationCollision();
+            attempt.ReservationRecoveryRequired = true;
+            throw;
         }
         catch (DbUpdateException exception)
             when (exception.InnerException is MySqlException { Number: 1062 })
         {
             // This save contains only the reservation, so the collision cannot come from a Contribution.
-            throw new ReservationCollision();
+            attempt.ReservationRecoveryRequired = true;
+            throw;
         }
         int? accountId = null;
         try
@@ -147,7 +151,7 @@ public sealed class LinkedContributionSplitService(DbContextOptions<PitakaDbCont
             var source = await context
                 .Transactions.AsNoTracking()
                 .SingleOrDefaultAsync(
-                    t => t.Id == transactionId && t.UserId == userId,
+                    t => t.Id == transactionId && t.UserId == identity.UserId,
                     cancellationToken
                 );
             if (source is null)
@@ -163,7 +167,7 @@ public sealed class LinkedContributionSplitService(DbContextOptions<PitakaDbCont
             accountId = source.AccountId;
             var guards = new ContributionGuards(context);
             var snapshot = await guards.CaptureAsync(
-                userId,
+                identity.UserId,
                 source.AccountId,
                 [.. input.Contributions.Select(r => r.GoalId)],
                 transactionId,
@@ -269,16 +273,13 @@ public sealed class LinkedContributionSplitService(DbContextOptions<PitakaDbCont
     }
 
     private async Task<LinkedContributionSplitResult> RecoverAsync(
-        int userId,
-        string key,
-        string fingerprint,
+        OperationIdentity identity,
         CancellationToken cancellationToken
     )
     {
         try
         {
-            return await ReadResultAsync(userId, key, fingerprint, cancellationToken)
-                ?? new SplitOutcomeUnknown();
+            return await ReadResultAsync(identity, cancellationToken) ?? new SplitOutcomeUnknown();
         }
         catch (Exception exception)
             when (exception
@@ -297,12 +298,30 @@ public sealed class LinkedContributionSplitService(DbContextOptions<PitakaDbCont
             is 1205
                 or 1213;
 
+    private sealed record OperationIdentity(int UserId, string Key, string Fingerprint);
+
     private sealed class WriteAttempt
     {
+        public bool ReservationStarted { get; set; }
+        public bool ReservationRecoveryRequired { get; set; }
         public bool CommitAttempted { get; set; }
     }
 
-    private sealed class ReservationCollision : Exception;
+    private static bool ReservationNeedsRecovery(Exception exception)
+    {
+        if (exception is OperationCanceledException or IOException)
+        {
+            return true;
+        }
+
+        if (exception is MySqlException { IsTransient: true })
+        {
+            return true;
+        }
+
+        return exception.InnerException is not null
+            && ReservationNeedsRecovery(exception.InnerException);
+    }
 
     private static Dictionary<string, string[]> Validate(LinkedContributionSplitInput input)
     {
