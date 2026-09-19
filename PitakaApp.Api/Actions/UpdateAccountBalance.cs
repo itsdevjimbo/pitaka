@@ -11,7 +11,11 @@ public class UpdateAccountBalance(PitakaDbContext context)
 
     public async Task<Account> ApplyTransaction(Transaction transaction)
     {
-        var account = await GetTrackedAccountOrThrowAsync(transaction.AccountId);
+        var accounts = await GetTrackedAccountsOrThrowAsync(
+            transaction.AccountId,
+            transaction.TransferToAccountId
+        );
+        var account = accounts[transaction.AccountId];
 
         switch (transaction.Type)
         {
@@ -22,7 +26,7 @@ public class UpdateAccountBalance(PitakaDbContext context)
                 account.Decrease(transaction.Amount);
                 break;
             case TransactionType.Transfer:
-                await TransferToAccount(transaction.Amount, transaction.TransferToAccountId);
+                accounts[transaction.TransferToAccountId!.Value].Increase(transaction.Amount);
                 account.Decrease(transaction.Amount);
                 break;
             default:
@@ -34,7 +38,11 @@ public class UpdateAccountBalance(PitakaDbContext context)
 
     public async Task<Account> ReverseTransaction(Transaction transaction)
     {
-        var account = await GetTrackedAccountOrThrowAsync(transaction.AccountId);
+        var accounts = await GetTrackedAccountsOrThrowAsync(
+            transaction.AccountId,
+            transaction.TransferToAccountId
+        );
+        var account = accounts[transaction.AccountId];
 
         switch (transaction.Type)
         {
@@ -45,7 +53,10 @@ public class UpdateAccountBalance(PitakaDbContext context)
                 account.Increase(transaction.Amount);
                 break;
             case TransactionType.Transfer:
-                await ReverseTransfer(transaction.Amount, transaction.TransferToAccountId);
+                if (transaction.TransferToAccountId is int destinationAccountId)
+                {
+                    accounts[destinationAccountId].Decrease(transaction.Amount);
+                }
                 account.Increase(transaction.Amount);
                 break;
             default:
@@ -55,29 +66,29 @@ public class UpdateAccountBalance(PitakaDbContext context)
         return account;
     }
 
-    private async Task<Account> TransferToAccount(decimal amount, int? accountId)
+    private async Task<Dictionary<int, Account>> GetTrackedAccountsOrThrowAsync(
+        int sourceAccountId,
+        int? destinationAccountId
+    )
     {
-        var account = await GetTrackedAccountOrThrowAsync(accountId);
+        var accountIds = new[] { sourceAccountId, destinationAccountId }
+            .OfType<int>()
+            .Distinct()
+            .Order()
+            .ToArray();
+        var accounts = await _context
+            .Accounts.Where(account => accountIds.Contains(account.Id))
+            .OrderBy(account => account.Id)
+            .ToDictionaryAsync(account => account.Id);
 
-        account.Increase(amount);
-
-        return account;
-    }
-
-    private async Task ReverseTransfer(decimal amount, int? accountId)
-    {
-        if (accountId == null)
+        foreach (var accountId in accountIds)
         {
-            return;
+            if (!accounts.ContainsKey(accountId))
+            {
+                throw new InvalidOperationException($"Account {accountId} not found.");
+            }
         }
 
-        var account = await GetTrackedAccountOrThrowAsync(accountId);
-        account.Decrease(amount);
-    }
-
-    private async Task<Account> GetTrackedAccountOrThrowAsync(int? accountId)
-    {
-        var account = await _context.Accounts.FirstOrDefaultAsync(a => a.Id == accountId);
-        return account ?? throw new InvalidOperationException($"Account {accountId} not found.");
+        return accounts;
     }
 }

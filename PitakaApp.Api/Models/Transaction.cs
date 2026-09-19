@@ -34,7 +34,7 @@ public class Transaction : TimestampedEntity
 
     public RecurringTransaction? RecurringTransaction { get; set; }
 
-    public GoalContribution? GoalContribution { get; set; }
+    public ICollection<GoalContribution> GoalContributions { get; set; } = [];
 
     public ICollection<Tag> Tags { get; set; } = [];
 }
