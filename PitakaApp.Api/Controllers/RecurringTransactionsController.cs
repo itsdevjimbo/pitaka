@@ -55,6 +55,10 @@ public class RecurringTransactionsController(
                 detail: "A recurring transaction's category must be of the same type as the transaction.",
                 statusCode: StatusCodes.Status400BadRequest
             ),
+            TransactionCategoryVerdict.Retired => Problem(
+                detail: "Category is retired",
+                statusCode: StatusCodes.Status400BadRequest
+            ),
             _ => null,
         };
 
@@ -92,7 +96,7 @@ public class RecurringTransactionsController(
         if (
             request.CategoryId is int categoryId
             && RejectRecurringTransactionCategory(
-                await _verifyTransactionCategory.VerifyAsync(
+                await _verifyTransactionCategory.VerifyNewAssignmentAsync(
                     user,
                     categoryId,
                     ExpectedCategoryType(request.Type)
@@ -161,19 +165,25 @@ public class RecurringTransactionsController(
         // Type is read from the stored row: UpdateRecurringTransactionRequest carries no
         // Type, but its CategoryId is mutable, so a PUT can still move the row onto a
         // mismatched category. Enforced whenever a category is supplied (ADR 0003 / #67).
-        if (
-            request.CategoryId is int categoryId
-            && RejectRecurringTransactionCategory(
-                await _verifyTransactionCategory.VerifyAsync(
-                    user,
-                    categoryId,
-                    ExpectedCategoryType(recurringTransaction.Type)
-                )
-            )
-                is { } rejection
-        )
+        if (request.CategoryId is int categoryId)
         {
-            return rejection;
+            var categoryVerdict =
+                categoryId == recurringTransaction.CategoryId
+                    ? await _verifyTransactionCategory.VerifyAsync(
+                        user,
+                        categoryId,
+                        ExpectedCategoryType(recurringTransaction.Type)
+                    )
+                    : await _verifyTransactionCategory.VerifyNewAssignmentAsync(
+                        user,
+                        categoryId,
+                        ExpectedCategoryType(recurringTransaction.Type)
+                    );
+
+            if (RejectRecurringTransactionCategory(categoryVerdict) is { } rejection)
+            {
+                return rejection;
+            }
         }
 
         if (request.EndDate is DateOnly endDate && !recurringTransaction.CanSetEndDate(endDate))

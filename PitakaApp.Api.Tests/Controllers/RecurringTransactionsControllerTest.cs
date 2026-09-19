@@ -225,6 +225,33 @@ public class RecurringTransactionsControllerTest : IDisposable
     }
 
     [Fact]
+    public async Task Create_WithRetiredCategory_ReturnsBadRequest()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var category = await CategoryFactory.CreateAsync(_context, user.Id, isActive: false);
+
+        _client.ActAsUser(user);
+
+        var request = new
+        {
+            AccountId = account.Id,
+            CategoryId = category.Id,
+            Name = "Test recurring transaction",
+            Type = RecurringTransactionType.Income,
+            Frequency = Frequency.Daily,
+            Amount = 500,
+            StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)),
+        };
+
+        var response = await _client.PostAsJsonAsync("/api/recurring-transactions", request);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal("Category is retired", problem!.Detail);
+    }
+
+    [Fact]
     public async Task Create_WithCategoryBelongsToOtherUser_ReturnsBadRequest()
     {
         var userA = await UserFactory.CreateAsync(_context);
@@ -901,6 +928,106 @@ public class RecurringTransactionsControllerTest : IDisposable
             request
         );
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Update_AssigningRetiredCategory_ReturnsBadRequest()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var retiredCategory = await CategoryFactory.CreateAsync(_context, user.Id, isActive: false);
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id
+        );
+
+        _client.ActAsUser(user);
+
+        var request = new
+        {
+            Name = "Test 1",
+            Amount = 501,
+            CategoryId = retiredCategory.Id,
+        };
+
+        var response = await _client.PutAsJsonAsync(
+            "/api/recurring-transactions/" + recurringTransaction.Id,
+            request
+        );
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal("Category is retired", problem!.Detail);
+    }
+
+    [Fact]
+    public async Task Update_KeepingRetiredCategory_ReturnsOk()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var retiredCategory = await CategoryFactory.CreateAsync(_context, user.Id, isActive: false);
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            categoryId: retiredCategory.Id
+        );
+
+        _client.ActAsUser(user);
+
+        var request = new
+        {
+            Name = "Updated name",
+            Amount = 501,
+            CategoryId = retiredCategory.Id,
+        };
+
+        var response = await _client.PutAsJsonAsync(
+            "/api/recurring-transactions/" + recurringTransaction.Id,
+            request
+        );
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<RecurringTransactionResource>(
+            TestJsonOptions.Default
+        );
+        Assert.Equal(retiredCategory.Id, body!.CategoryId);
+        Assert.Equal("Updated name", body.Name);
+    }
+
+    [Fact]
+    public async Task Update_ClearingRetiredCategory_ReturnsOk()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var retiredCategory = await CategoryFactory.CreateAsync(_context, user.Id, isActive: false);
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            categoryId: retiredCategory.Id
+        );
+
+        _client.ActAsUser(user);
+
+        var request = new
+        {
+            Name = "Test recurring transaction",
+            Amount = 501,
+            CategoryId = (int?)null,
+        };
+
+        var response = await _client.PutAsJsonAsync(
+            "/api/recurring-transactions/" + recurringTransaction.Id,
+            request
+        );
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<RecurringTransactionResource>(
+            TestJsonOptions.Default
+        );
+        Assert.Null(body!.CategoryId);
     }
 
     [Fact]
