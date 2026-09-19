@@ -29,299 +29,315 @@ public sealed class LinkedContributionSplitService(DbContextOptions<PitakaDbCont
         {
             return new SplitInvalid(errors);
         }
+
         // userId is supplied by the authenticated caller, never bound from request data.
         var identity = new OperationIdentity(
             userId,
             key.ToString("D"),
             Fingerprint(transactionId, input)
         );
-        using var arbitration = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        arbitration.CancelAfter(TimeSpan.FromSeconds(5));
-        try
-        {
-            var previous = await ReadResultAsync(identity, arbitration.Token);
-            if (previous is not null)
-            {
-                return previous;
-            }
-        }
-        catch (Exception exception)
-            when (exception is DbException or OperationCanceledException or IOException)
-        {
-            return new SplitOutcomeUnknown();
-        }
-        var attempt = new WriteAttempt();
-        try
-        {
-            return await ExecuteNewAsync(
-                identity,
-                transactionId,
-                input,
-                attempt,
-                arbitration.Token,
-                cancellationToken
-            );
-        }
-        catch (Exception) when (attempt.CommitAttempted)
-        {
-            // The connection may have failed after MySQL committed. Disposal also runs before
-            // this recovery, and its failure must not turn an uncertain commit into a refusal.
-            using var recovery = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-            return await RecoverAsync(identity, recovery.Token);
-        }
-        catch (Exception exception)
-            when (!attempt.ReservationStarted
-                && exception is DbException or OperationCanceledException or IOException
-            )
-        {
-            return new SplitOutcomeUnknown();
-        }
-        catch (Exception) when (attempt.ReservationRecoveryRequired)
-        {
-            return await RecoverAsync(identity, arbitration.Token);
-        }
+
+        return await new SplitOperation(
+            options,
+            identity,
+            transactionId,
+            input,
+            cancellationToken
+        ).ExecuteAsync();
     }
 
-    private async Task<LinkedContributionSplitResult?> ReadResultAsync(
-        OperationIdentity identity,
-        CancellationToken cancellationToken
-    )
-    {
-        await using var context = new PitakaDbContext(options);
-        var previous = await context
-            .LinkedContributionOperations.AsNoTracking()
-            .SingleOrDefaultAsync(
-                o => o.UserId == identity.UserId && o.Key == identity.Key,
-                cancellationToken
-            );
-        if (previous is null)
-        {
-            return null;
-        }
-
-        if (previous.Fingerprint != identity.Fingerprint)
-        {
-            return new SplitIdempotencyMismatch(Guid.Parse(identity.Key));
-        }
-
-        return new SplitSucceeded(previous.ResponseBody!, previous.StatusCode!.Value);
-    }
-
-    private async Task<LinkedContributionSplitResult> ExecuteNewAsync(
+    private sealed class SplitOperation(
+        DbContextOptions<PitakaDbContext> options,
         OperationIdentity identity,
         int transactionId,
         LinkedContributionSplitInput input,
-        WriteAttempt attempt,
-        CancellationToken arbitrationToken,
         CancellationToken cancellationToken
     )
     {
-        await using var context = new PitakaDbContext(options);
-        await using var transaction = await context.Database.BeginTransactionAsync(
-            IsolationLevel.RepeatableRead,
-            arbitrationToken
-        );
-        var operation = new LinkedContributionOperation
-        {
-            UserId = identity.UserId,
-            Key = identity.Key,
-            Fingerprint = identity.Fingerprint,
-        };
-        context.Add(operation);
-        attempt.ReservationStarted = true;
-        try
-        {
-            await context.SaveChangesAsync(arbitrationToken);
-        }
-        catch (Exception exception) when (ReservationNeedsRecovery(exception))
-        {
-            attempt.ReservationRecoveryRequired = true;
-            throw;
-        }
-        catch (DbUpdateException exception)
-            when (exception.InnerException is MySqlException { Number: 1062 })
-        {
-            // This save contains only the reservation, so the collision cannot come from a Contribution.
-            attempt.ReservationRecoveryRequired = true;
-            throw;
-        }
-        int? accountId = null;
-        try
-        {
-            var source = await context
-                .Transactions.AsNoTracking()
-                .SingleOrDefaultAsync(
-                    t => t.Id == transactionId && t.UserId == identity.UserId,
-                    cancellationToken
-                );
-            if (source is null)
-            {
-                return new SplitRefused([
-                    new(
-                        "transaction_missing",
-                        new Dictionary<string, object?> { ["transactionId"] = transactionId }
-                    ),
-                ]);
-            }
+        private OperationPhase phase = OperationPhase.BeforeReservation;
 
-            accountId = source.AccountId;
-            var guards = new ContributionGuards(context);
-            var snapshot = await guards.CaptureAsync(
-                identity.UserId,
-                source.AccountId,
-                [.. input.Contributions.Select(r => r.GoalId)],
-                transactionId,
+        public async Task<LinkedContributionSplitResult> ExecuteAsync()
+        {
+            using var arbitration = CancellationTokenSource.CreateLinkedTokenSource(
                 cancellationToken
             );
-            if (snapshot.AccountHeadroom is null)
+            arbitration.CancelAfter(TimeSpan.FromSeconds(5));
+            try
+            {
+                var previous = await ReadResultAsync(arbitration.Token);
+                if (previous is not null)
+                {
+                    return previous;
+                }
+            }
+            catch (Exception exception)
+                when (exception is DbException or OperationCanceledException or IOException)
+            {
+                return new SplitOutcomeUnknown();
+            }
+
+            try
+            {
+                return await ExecuteNewAsync(arbitration.Token);
+            }
+            catch (Exception) when (phase == OperationPhase.CommitAttempted)
+            {
+                // The connection may have failed after MySQL committed. Disposal also runs before
+                // this recovery, and its failure must not turn an uncertain commit into a refusal.
+                using var recovery = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                return await RecoverAsync(recovery.Token);
+            }
+            catch (Exception exception)
+                when (phase == OperationPhase.BeforeReservation
+                    && exception is DbException or OperationCanceledException or IOException
+                )
+            {
+                return new SplitOutcomeUnknown();
+            }
+            catch (Exception) when (phase == OperationPhase.ReservationOutcomeUnknown)
+            {
+                return await RecoverAsync(arbitration.Token);
+            }
+        }
+
+        private async Task<LinkedContributionSplitResult?> ReadResultAsync(
+            CancellationToken lookupToken
+        )
+        {
+            await using var context = new PitakaDbContext(options);
+            var previous = await context
+                .LinkedContributionOperations.AsNoTracking()
+                .SingleOrDefaultAsync(
+                    o => o.UserId == identity.UserId && o.Key == identity.Key,
+                    lookupToken
+                );
+            if (previous is null)
+            {
+                return null;
+            }
+
+            if (previous.Fingerprint != identity.Fingerprint)
+            {
+                return new SplitIdempotencyMismatch(Guid.Parse(identity.Key));
+            }
+
+            return new SplitSucceeded(previous.ResponseBody!, previous.StatusCode!.Value);
+        }
+
+        private async Task<LinkedContributionSplitResult> ExecuteNewAsync(
+            CancellationToken arbitrationToken
+        )
+        {
+            await using var context = new PitakaDbContext(options);
+            await using var transaction = await context.Database.BeginTransactionAsync(
+                IsolationLevel.RepeatableRead,
+                arbitrationToken
+            );
+            var operation = new LinkedContributionOperation
+            {
+                UserId = identity.UserId,
+                Key = identity.Key,
+                Fingerprint = identity.Fingerprint,
+            };
+            context.Add(operation);
+            phase = OperationPhase.Reserving;
+            try
+            {
+                await context.SaveChangesAsync(arbitrationToken);
+                phase = OperationPhase.Reserved;
+            }
+            catch (Exception exception) when (ReservationNeedsRecovery(exception))
+            {
+                phase = OperationPhase.ReservationOutcomeUnknown;
+                throw;
+            }
+            catch (DbUpdateException exception)
+                when (exception.InnerException is MySqlException { Number: 1062 })
+            {
+                // This save contains only the reservation, so the collision cannot come from a Contribution.
+                phase = OperationPhase.ReservationOutcomeUnknown;
+                throw;
+            }
+
+            int? accountId = null;
+            try
+            {
+                var source = await context
+                    .Transactions.AsNoTracking()
+                    .SingleOrDefaultAsync(
+                        t => t.Id == transactionId && t.UserId == identity.UserId,
+                        cancellationToken
+                    );
+                if (source is null)
+                {
+                    return new SplitRefused([
+                        new(
+                            "transaction_missing",
+                            new Dictionary<string, object?> { ["transactionId"] = transactionId }
+                        ),
+                    ]);
+                }
+
+                accountId = source.AccountId;
+                var guards = new ContributionGuards(context);
+                var snapshot = await guards.CaptureAsync(
+                    identity.UserId,
+                    source.AccountId,
+                    [.. input.Contributions.Select(r => r.GoalId)],
+                    transactionId,
+                    cancellationToken
+                );
+                if (snapshot.AccountHeadroom is null)
+                {
+                    return new SplitRefused([
+                        new(
+                            "transaction_missing",
+                            new Dictionary<string, object?> { ["transactionId"] = transactionId }
+                        ),
+                    ]);
+                }
+
+                var missingGoals = input
+                    .Contributions.Select((row, index) => (row, index))
+                    .Where(x => snapshot.Goals.All(g => g.Goal.Id != x.row.GoalId))
+                    .ToDictionary(
+                        x => $"contributions[{x.index}].goalId",
+                        _ => new[] { "Goal is unavailable." }
+                    );
+                if (missingGoals.Count > 0)
+                {
+                    return new SplitInvalid(missingGoals);
+                }
+
+                var failures = Evaluate(snapshot, input);
+                guards.MarkConcurrencyGuardsModified(snapshot);
+                // Verify the observations even on refusal; these guard writes are rolled back.
+                await context.SaveChangesAsync(cancellationToken);
+                if (failures.Count > 0)
+                {
+                    return new SplitRefused(failures);
+                }
+
+                var contributions = input
+                    .Contributions.Select(row => new GoalContribution
+                    {
+                        GoalId = row.GoalId,
+                        AccountId = source.AccountId,
+                        TransactionId = transactionId,
+                        Amount = row.Amount,
+                        Note = row.Note,
+                        ContributionDate = input.ContributionDate,
+                    })
+                    .ToList();
+                context.GoalContributions.AddRange(contributions);
+                await context.SaveChangesAsync(cancellationToken);
+                var total = contributions.Sum(c => c.Amount);
+                var account = snapshot.AccountHeadroom!;
+                var capacity = snapshot.TransactionCapacity!;
+                var response = new SplitSuccessSnapshot(
+                    transactionId,
+                    source.Amount,
+                    capacity.LinkedTotal + total,
+                    capacity.RemainingCapacity - total,
+                    new(
+                        account.Account.Id,
+                        account.Account.Name,
+                        account.Account.CurrentBalance,
+                        account.EarmarkedTotal + total,
+                        account.AvailableHeadroom - total,
+                        account.Account.IsActive
+                    ),
+                    [
+                        .. contributions.Select(c => new SplitContributionSnapshot(
+                            c.Id,
+                            c.GoalId,
+                            c.AccountId,
+                            transactionId,
+                            c.Amount,
+                            c.ContributionDate,
+                            c.Note
+                        )),
+                    ]
+                );
+                var success = SplitSucceeded.FromSnapshot(response);
+                operation.StatusCode = success.StatusCode;
+                operation.ResponseBody = success.ResponseBody;
+                await context.SaveChangesAsync(cancellationToken);
+                phase = OperationPhase.CommitAttempted;
+                await transaction.CommitAsync(cancellationToken);
+                return success;
+            }
+            catch (Exception exception)
+                when (phase != OperationPhase.CommitAttempted
+                    && (exception is DbUpdateConcurrencyException || IsContention(exception))
+                )
             {
                 return new SplitRefused([
                     new(
-                        "transaction_missing",
-                        new Dictionary<string, object?> { ["transactionId"] = transactionId }
+                        "concurrent_state_changed",
+                        new Dictionary<string, object?>
+                        {
+                            ["transactionId"] = transactionId,
+                            ["accountId"] = accountId,
+                            ["goalIds"] = input.Contributions.Select(r => r.GoalId).ToArray(),
+                        }
                     ),
                 ]);
             }
+        }
 
-            var missingGoals = input
-                .Contributions.Select((row, index) => (row, index))
-                .Where(x => snapshot.Goals.All(g => g.Goal.Id != x.row.GoalId))
-                .ToDictionary(
-                    x => $"contributions[{x.index}].goalId",
-                    _ => new[] { "Goal is unavailable." }
-                );
-            if (missingGoals.Count > 0)
+        private async Task<LinkedContributionSplitResult> RecoverAsync(
+            CancellationToken recoveryToken
+        )
+        {
+            try
             {
-                return new SplitInvalid(missingGoals);
+                return await ReadResultAsync(recoveryToken) ?? new SplitOutcomeUnknown();
+            }
+            catch (Exception exception)
+                when (exception
+                        is DbException
+                            or DbUpdateException
+                            or OperationCanceledException
+                            or IOException
+                )
+            {
+                return new SplitOutcomeUnknown();
+            }
+        }
+
+        private static bool IsContention(Exception exception) =>
+            (exception as MySqlException ?? exception.InnerException as MySqlException)?.Number
+                is 1205
+                    or 1213;
+
+        private static bool ReservationNeedsRecovery(Exception exception)
+        {
+            if (exception is OperationCanceledException or IOException)
+            {
+                return true;
             }
 
-            var failures = Evaluate(snapshot, input);
-            guards.MarkConcurrencyGuardsModified(snapshot);
-            // Verify the observations even on refusal; these guard writes are rolled back.
-            await context.SaveChangesAsync(cancellationToken);
-            if (failures.Count > 0)
+            if (exception is MySqlException { IsTransient: true })
             {
-                return new SplitRefused(failures);
+                return true;
             }
 
-            var contributions = input
-                .Contributions.Select(row => new GoalContribution
-                {
-                    GoalId = row.GoalId,
-                    AccountId = source.AccountId,
-                    TransactionId = transactionId,
-                    Amount = row.Amount,
-                    Note = row.Note,
-                    ContributionDate = input.ContributionDate,
-                })
-                .ToList();
-            context.GoalContributions.AddRange(contributions);
-            await context.SaveChangesAsync(cancellationToken);
-            var total = contributions.Sum(c => c.Amount);
-            var account = snapshot.AccountHeadroom!;
-            var capacity = snapshot.TransactionCapacity!;
-            var response = new SplitSuccessSnapshot(
-                transactionId,
-                source.Amount,
-                capacity.LinkedTotal + total,
-                capacity.RemainingCapacity - total,
-                new(
-                    account.Account.Id,
-                    account.Account.Name,
-                    account.Account.CurrentBalance,
-                    account.EarmarkedTotal + total,
-                    account.AvailableHeadroom - total,
-                    account.Account.IsActive
-                ),
-                [
-                    .. contributions.Select(c => new SplitContributionSnapshot(
-                        c.Id,
-                        c.GoalId,
-                        c.AccountId,
-                        transactionId,
-                        c.Amount,
-                        c.ContributionDate,
-                        c.Note
-                    )),
-                ]
-            );
-            var success = SplitSucceeded.FromSnapshot(response);
-            operation.StatusCode = success.StatusCode;
-            operation.ResponseBody = success.ResponseBody;
-            await context.SaveChangesAsync(cancellationToken);
-            attempt.CommitAttempted = true;
-            await transaction.CommitAsync(cancellationToken);
-            return success;
+            return exception.InnerException is not null
+                && ReservationNeedsRecovery(exception.InnerException);
         }
-        catch (Exception exception)
-            when (!attempt.CommitAttempted
-                && (exception is DbUpdateConcurrencyException || IsContention(exception))
-            )
+
+        private enum OperationPhase
         {
-            return new SplitRefused([
-                new(
-                    "concurrent_state_changed",
-                    new Dictionary<string, object?>
-                    {
-                        ["transactionId"] = transactionId,
-                        ["accountId"] = accountId,
-                        ["goalIds"] = input.Contributions.Select(r => r.GoalId).ToArray(),
-                    }
-                ),
-            ]);
+            BeforeReservation,
+            Reserving,
+            ReservationOutcomeUnknown,
+            Reserved,
+            CommitAttempted,
         }
     }
-
-    private async Task<LinkedContributionSplitResult> RecoverAsync(
-        OperationIdentity identity,
-        CancellationToken cancellationToken
-    )
-    {
-        try
-        {
-            return await ReadResultAsync(identity, cancellationToken) ?? new SplitOutcomeUnknown();
-        }
-        catch (Exception exception)
-            when (exception
-                    is DbException
-                        or DbUpdateException
-                        or OperationCanceledException
-                        or IOException
-            )
-        {
-            return new SplitOutcomeUnknown();
-        }
-    }
-
-    private static bool IsContention(Exception exception) =>
-        (exception as MySqlException ?? exception.InnerException as MySqlException)?.Number
-            is 1205
-                or 1213;
 
     private sealed record OperationIdentity(int UserId, string Key, string Fingerprint);
-
-    private sealed class WriteAttempt
-    {
-        public bool ReservationStarted { get; set; }
-        public bool ReservationRecoveryRequired { get; set; }
-        public bool CommitAttempted { get; set; }
-    }
-
-    private static bool ReservationNeedsRecovery(Exception exception)
-    {
-        if (exception is OperationCanceledException or IOException)
-        {
-            return true;
-        }
-
-        if (exception is MySqlException { IsTransient: true })
-        {
-            return true;
-        }
-
-        return exception.InnerException is not null
-            && ReservationNeedsRecovery(exception.InnerException);
-    }
 
     private static Dictionary<string, string[]> Validate(LinkedContributionSplitInput input)
     {
