@@ -44,6 +44,17 @@ public class RecurringTransaction : TimestampedEntity
     {
         return endDate > StartDate;
     }
+
+    public bool CompleteIfOccurrenceIsBeyondEnd(DateOnly occurrence)
+    {
+        if (EndDate is not DateOnly endDate || occurrence <= endDate)
+        {
+            return false;
+        }
+
+        Status = RecurringTransactionStatus.Completed;
+        return true;
+    }
 }
 
 public sealed record RecurringTransactionRead(

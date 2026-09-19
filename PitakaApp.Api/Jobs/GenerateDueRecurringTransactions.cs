@@ -49,6 +49,16 @@ public class GenerateDueRecurringTransactions(
                     continue;
                 }
 
+                if (
+                    freshRecurringTransaction.CompleteIfOccurrenceIsBeyondEnd(
+                        freshRecurringTransaction.NextRunDate
+                    )
+                )
+                {
+                    await _context.SaveChangesAsync();
+                    continue;
+                }
+
                 var transactionDate = freshRecurringTransaction.NextRunDate.ToDateTime(
                     TimeOnly.MinValue
                 );
@@ -66,11 +76,7 @@ public class GenerateDueRecurringTransactions(
                     freshRecurringTransaction.Frequency
                 );
 
-                if (nextRunDate > freshRecurringTransaction.EndDate)
-                {
-                    freshRecurringTransaction.Status = Enums.RecurringTransactionStatus.Completed;
-                }
-                else
+                if (!freshRecurringTransaction.CompleteIfOccurrenceIsBeyondEnd(nextRunDate))
                 {
                     freshRecurringTransaction.NextRunDate = nextRunDate;
                 }
