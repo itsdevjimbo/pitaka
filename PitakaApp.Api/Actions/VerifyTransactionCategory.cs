@@ -10,6 +10,7 @@ public enum TransactionCategoryVerdict
     Ok,
     NotFound,
     TypeMismatch,
+    Retired,
 }
 
 // A Transaction's Category, when present, must be visible to the user (their own or a system
@@ -25,10 +26,23 @@ public class VerifyTransactionCategory(PitakaDbContext context)
 {
     private readonly PitakaDbContext _context = context;
 
-    public async Task<TransactionCategoryVerdict> VerifyAsync(
+    public Task<TransactionCategoryVerdict> VerifyAsync(
         User user,
         int categoryId,
         CategoryType expectedType
+    ) => VerifyAsync(user, categoryId, expectedType, requireActive: false);
+
+    public Task<TransactionCategoryVerdict> VerifyNewAssignmentAsync(
+        User user,
+        int categoryId,
+        CategoryType expectedType
+    ) => VerifyAsync(user, categoryId, expectedType, requireActive: true);
+
+    private async Task<TransactionCategoryVerdict> VerifyAsync(
+        User user,
+        int categoryId,
+        CategoryType expectedType,
+        bool requireActive
     )
     {
         var category = await _context
@@ -40,8 +54,13 @@ public class VerifyTransactionCategory(PitakaDbContext context)
             return TransactionCategoryVerdict.NotFound;
         }
 
-        return category.Type == expectedType
-            ? TransactionCategoryVerdict.Ok
-            : TransactionCategoryVerdict.TypeMismatch;
+        if (category.Type != expectedType)
+        {
+            return TransactionCategoryVerdict.TypeMismatch;
+        }
+
+        return requireActive && !category.IsActive
+            ? TransactionCategoryVerdict.Retired
+            : TransactionCategoryVerdict.Ok;
     }
 }
