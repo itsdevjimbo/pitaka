@@ -72,13 +72,18 @@ public class GoalContributionService(PitakaDbContext context, ContributionGuards
         UpdateGoalContributionInput input
     )
     {
-        goalContribution.ContributionDate =
-            input.ContributionDate ?? goalContribution.ContributionDate;
         goalContribution.Note = input.Note;
 
         await _context.SaveChangesAsync();
         return goalContribution;
     }
+
+    // A single database statement makes a concurrent deletion indistinguishable from an
+    // already-absent row, while the ownership predicate avoids disclosing another User's row.
+    public async Task<bool> DeleteForUserAsync(int userId, int id) =>
+        await _context
+            .GoalContributions.Where(gc => gc.Id == id && gc.Goal.UserId == userId)
+            .ExecuteDeleteAsync() == 1;
 
     public async Task DeleteAsync(GoalContribution goalContribution)
     {

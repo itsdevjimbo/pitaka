@@ -43,10 +43,16 @@ public class GoalContributionsControllerTest
 
         var goalA = await GoalFactory.CreateAsync(_context, userA.Id, targetAmount: 10000);
         var goalB = await GoalFactory.CreateAsync(_context, userB.Id, targetAmount: 10000);
+        var transaction = await TransactionFactory.CreateAsync(_context, userA.Id, accountA.Id);
 
         await GoalContributionFactory.CreateAsync(_context, goalB.Id, accountB.Id);
 
-        await GoalContributionFactory.CreateAsync(_context, goalA.Id, accountA.Id);
+        var linked = await GoalContributionFactory.CreateAsync(
+            _context,
+            goalA.Id,
+            accountA.Id,
+            transaction.Id
+        );
         await GoalContributionFactory.CreateAsync(_context, goalA.Id, accountA.Id);
         await GoalContributionFactory.CreateAsync(_context, goalA.Id, accountA.Id);
 
@@ -59,6 +65,7 @@ public class GoalContributionsControllerTest
             TestJsonOptions.Default
         );
         Assert.Equal(3, body!.Count);
+        Assert.Equal(transaction.Id, body.Single(row => row.Id == linked.Id).TransactionId);
     }
 
     [Fact]
@@ -781,19 +788,32 @@ public class GoalContributionsControllerTest
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    [Fact]
-    public async Task Update_ReturnsOk()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Update_OrdinaryOrLinkedContribution_ChangesOnlyNoteAndIgnoresUnknownDate(
+        bool linked
+    )
     {
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
         var goal = await GoalFactory.CreateAsync(_context, user.Id);
-        var contribution = await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id);
+        var transaction = linked
+            ? await TransactionFactory.CreateAsync(_context, user.Id, account.Id)
+            : null;
+        var contribution = await GoalContributionFactory.CreateAsync(
+            _context,
+            goal.Id,
+            account.Id,
+            transaction?.Id
+        );
 
         _client.ActAsUser(user);
 
-        var contributionDate = DateOnly.FromDateTime(DateTime.Now).AddDays(-3);
+        var originalDate = contribution.ContributionDate;
+        var attemptedDate = originalDate.AddDays(-3);
 
-        var request = new { ContributionDate = contributionDate, Note = "Test note" };
+        var request = new { ContributionDate = attemptedDate, Note = "Test note" };
 
         var response = await _client.PutAsJsonAsync(
             "/api/goal-contributions/" + contribution.Id,
@@ -805,8 +825,14 @@ public class GoalContributionsControllerTest
 
         Assert.Equal(contribution.AccountId, body!.AccountId);
         Assert.Equal(contribution.Amount, body.Amount);
-        Assert.Equal(contributionDate, body.ContributionDate);
+        Assert.Equal(transaction?.Id, body.TransactionId);
+        Assert.Equal(originalDate, body.ContributionDate);
         Assert.Equal("Test note", body.Note);
+
+        _context.ChangeTracker.Clear();
+        var stored = await _context.GoalContributions.FindAsync(contribution.Id);
+        Assert.Equal(originalDate, stored!.ContributionDate);
+        Assert.Equal(transaction?.Id, stored.TransactionId);
     }
 
     [Fact]
@@ -832,7 +858,7 @@ public class GoalContributionsControllerTest
     }
 
     [Fact]
-    public async Task Delete_GoalContributionBelongsToOtherUser_ReturnsForbidden()
+    public async Task Delete_GoalContributionBelongsToOtherUser_ReturnsNotFound()
     {
         var userA = await UserFactory.CreateAsync(_context);
         var userB = await UserFactory.CreateAsync(_context);
@@ -843,7 +869,7 @@ public class GoalContributionsControllerTest
         _client.ActAsUser(userA);
 
         var response = await _client.DeleteAsync("api/goal-contributions/" + contribution.Id);
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Fact]
@@ -858,5 +884,183 @@ public class GoalContributionsControllerTest
 
         var response = await _client.DeleteAsync("api/goal-contributions/" + contribution.Id);
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+
+        var repeatedResponse = await _client.DeleteAsync(
+            "api/goal-contributions/" + contribution.Id
+        );
+        Assert.Equal(HttpStatusCode.NotFound, repeatedResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task Delete_ConcurrentRequests_ReturnNoContentAndEstablishedAbsence()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var goal = await GoalFactory.CreateAsync(_context, user.Id);
+        var contribution = await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id);
+        _client.ActAsUser(user);
+
+        var responses = await Task.WhenAll(
+            _client.DeleteAsync($"api/goal-contributions/{contribution.Id}"),
+            _client.DeleteAsync($"api/goal-contributions/{contribution.Id}")
+        );
+
+        Assert.Equal(
+            [HttpStatusCode.NoContent, HttpStatusCode.NotFound],
+            responses.Select(response => response.StatusCode).Order().ToArray()
+        );
+    }
+
+    [Fact]
+    public async Task Delete_OrdinaryContribution_ReleasesOnlyAccountHeadroom()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 500);
+        var goal = await GoalFactory.CreateAsync(_context, user.Id);
+        var transaction = await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            amount: 300
+        );
+        var linked = await GoalContributionFactory.CreateAsync(
+            _context,
+            goal.Id,
+            account.Id,
+            transaction.Id,
+            amount: 100
+        );
+        var ordinary = await GoalContributionFactory.CreateAsync(
+            _context,
+            goal.Id,
+            account.Id,
+            amount: 150
+        );
+        _client.ActAsUser(user);
+
+        var response = await _client.DeleteAsync($"api/goal-contributions/{ordinary.Id}");
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        var snapshotResponse = await _client.GetAsync(
+            $"api/transactions/{transaction.Id}/linked-contributions"
+        );
+        var snapshot =
+            await snapshotResponse.Content.ReadFromJsonAsync<LinkedContributionSnapshotResource>(
+                TestJsonOptions.Default
+            );
+        Assert.Equal(100, snapshot!.Account.EarmarkedTotal);
+        Assert.Equal(400, snapshot.Account.AvailableHeadroom);
+        Assert.Equal(100, snapshot.LinkedTotal);
+        Assert.Equal(linked.Id, Assert.Single(snapshot.LinkedContributions).Id);
+    }
+
+    [Theory]
+    [InlineData(GoalStatus.Completed)]
+    [InlineData(GoalStatus.Abandoned)]
+    public async Task Delete_LinkedContributionFromIneligibleHistory_RemovesOnlyChosenRow(
+        GoalStatus status
+    )
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(
+            _context,
+            user.Id,
+            initialBalance: 500,
+            isActive: false
+        );
+        var goal = await GoalFactory.CreateAsync(_context, user.Id, status: status);
+        var siblingGoal = await GoalFactory.CreateAsync(_context, user.Id, name: "Sibling goal");
+        var transaction = await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            amount: 400
+        );
+        var chosen = await GoalContributionFactory.CreateAsync(
+            _context,
+            goal.Id,
+            account.Id,
+            transaction.Id,
+            amount: 150
+        );
+        var sibling = await GoalContributionFactory.CreateAsync(
+            _context,
+            siblingGoal.Id,
+            account.Id,
+            transaction.Id,
+            amount: 100
+        );
+        var originalBalance = account.CurrentBalance;
+        var sourceFacts = new
+        {
+            transaction.Type,
+            transaction.Amount,
+            transaction.TransactionDate,
+            transaction.Description,
+        };
+        var siblingFacts = new
+        {
+            sibling.GoalId,
+            sibling.AccountId,
+            sibling.TransactionId,
+            sibling.Amount,
+            sibling.ContributionDate,
+            sibling.Note,
+        };
+        _client.ActAsUser(user);
+
+        var response = await _client.DeleteAsync($"api/goal-contributions/{chosen.Id}");
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        _context.ChangeTracker.Clear();
+        Assert.Null(await _context.GoalContributions.FindAsync(chosen.Id));
+        var storedSibling = await _context.GoalContributions.FindAsync(sibling.Id);
+        var storedTransaction = await _context.Transactions.FindAsync(transaction.Id);
+        Assert.Equal(
+            siblingFacts,
+            new
+            {
+                storedSibling!.GoalId,
+                storedSibling.AccountId,
+                storedSibling.TransactionId,
+                storedSibling.Amount,
+                storedSibling.ContributionDate,
+                storedSibling.Note,
+            }
+        );
+        Assert.Equal(
+            sourceFacts,
+            new
+            {
+                storedTransaction!.Type,
+                storedTransaction.Amount,
+                storedTransaction.TransactionDate,
+                storedTransaction.Description,
+            }
+        );
+        Assert.Equal(
+            originalBalance,
+            (await _context.Accounts.FindAsync(account.Id))!.CurrentBalance
+        );
+        Assert.Equal(status, (await _context.Goals.FindAsync(goal.Id))!.Status);
+
+        var snapshotResponse = await _client.GetAsync(
+            $"api/transactions/{transaction.Id}/linked-contributions"
+        );
+        var snapshot =
+            await snapshotResponse.Content.ReadFromJsonAsync<LinkedContributionSnapshotResource>(
+                TestJsonOptions.Default
+            );
+        Assert.Equal(100, snapshot!.LinkedTotal);
+        Assert.Equal(300, snapshot.RemainingCapacity);
+        Assert.Equal(100, snapshot.Account.EarmarkedTotal);
+        Assert.Equal(400, snapshot.Account.AvailableHeadroom);
+
+        var goalResponse = await _client.GetAsync($"api/goals/{goal.Id}");
+        var goalResource =
+            await goalResponse.Content.ReadFromJsonAsync<GoalWithCurrentAmountResource>(
+                TestJsonOptions.Default
+            );
+        Assert.Equal(0, goalResource!.CurrentAmount);
     }
 }

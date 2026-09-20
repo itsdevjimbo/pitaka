@@ -17,6 +17,7 @@ namespace PitakaApp.Api.Controllers;
 public class TransactionsController(
     AccountService accountService,
     TransactionService transactionService,
+    LinkedContributionReadService linkedContributionReadService,
     TagService tagService,
     VerifyTransactionCategory verifyTransactionCategory,
     CurrentUserAccessor currentUserAccessor
@@ -24,6 +25,8 @@ public class TransactionsController(
 {
     private readonly AccountService _accountService = accountService;
     private readonly TransactionService _transactionService = transactionService;
+    private readonly LinkedContributionReadService _linkedContributionReadService =
+        linkedContributionReadService;
 
     private readonly TagService _tagService = tagService;
 
@@ -152,6 +155,20 @@ public class TransactionsController(
         }
 
         return Ok(TransactionResource.FromModel(transaction));
+    }
+
+    [HttpGet("{id}/linked-contributions")]
+    public async Task<IActionResult> GetLinkedContributions(int id)
+    {
+        var user = _currentUserAccessor.User!;
+        var snapshot = await _linkedContributionReadService.GetForTransactionAsync(user.Id, id);
+
+        if (snapshot is null)
+        {
+            return NotFound();
+        }
+
+        return Ok(LinkedContributionSnapshotResource.FromSnapshot(snapshot));
     }
 
     [HttpPut("{id}")]

@@ -141,19 +141,8 @@ public class GoalContributionsController(
     public async Task<IActionResult> Delete(int id)
     {
         var user = _currentUserAccessor.User!;
-        var goalContribution = await _goalContributionService.GetTrackedByIdAsync(id);
-
-        if (goalContribution == null)
-        {
-            return NotFound();
-        }
-
-        if (goalContribution.Goal.UserId != user.Id)
-        {
-            return Forbid();
-        }
-
-        await _goalContributionService.DeleteAsync(goalContribution);
-        return NoContent();
+        return await _goalContributionService.DeleteForUserAsync(user.Id, id)
+            ? NoContent()
+            : NotFound();
     }
 }

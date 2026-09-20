@@ -521,7 +521,6 @@ public class GoalsControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
         var goal = await GoalFactory.CreateAsync(_context, user.Id);
-
         await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id);
         await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id);
         await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id);
@@ -536,7 +535,6 @@ public class GoalsControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
         var goal = await GoalFactory.CreateAsync(_context, user.Id);
-
         await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id);
         await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id);
         await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id);
@@ -571,8 +569,14 @@ public class GoalsControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
         var goal = await GoalFactory.CreateAsync(_context, user.Id);
+        var transaction = await TransactionFactory.CreateAsync(_context, user.Id, account.Id);
 
-        await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id);
+        var linked = await GoalContributionFactory.CreateAsync(
+            _context,
+            goal.Id,
+            account.Id,
+            transaction.Id
+        );
         await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id);
         await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id);
 
@@ -585,6 +589,7 @@ public class GoalsControllerTest : IDisposable
             TestJsonOptions.Default
         );
         Assert.Equal(3, body!.Count);
+        Assert.Equal(transaction.Id, body.Single(row => row.Id == linked.Id).TransactionId);
     }
 
     public void Dispose() => _scope.Dispose();
