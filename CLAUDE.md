@@ -1,5 +1,9 @@
 # PitakaApp
 
+## Coding standards
+
+Before implementing or reviewing code, read `docs/coding-standards.md` for rules, examples, and existing exceptions.
+
 ## Agent skills
 
 ### Issue tracker

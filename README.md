@@ -2,6 +2,9 @@
 
 A personal expense tracker API built with ASP.NET Core, EF Core, and MySQL.
 
+See [Coding standards](docs/coding-standards.md) for implementation and review rules, examples,
+and existing exceptions.
+
 ## Two dev loops
 
 There are two supported ways to run the API, and they carry different guarantees:
