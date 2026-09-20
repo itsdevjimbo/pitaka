@@ -974,7 +974,8 @@ public class GoalContributionsControllerTest
             _context,
             user.Id,
             account.Id,
-            amount: 400
+            amount: 400,
+            transactionDate: new DateTime(2026, 9, 20, 2, 48, 29, DateTimeKind.Utc).AddTicks(3)
         );
         var chosen = await GoalContributionFactory.CreateAsync(
             _context,
@@ -991,6 +992,7 @@ public class GoalContributionsControllerTest
             amount: 100
         );
         var originalBalance = account.CurrentBalance;
+        await _context.Entry(transaction).ReloadAsync();
         var sourceFacts = new
         {
             transaction.Type,
