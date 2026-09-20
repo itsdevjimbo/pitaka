@@ -38,7 +38,15 @@ builder
         options.JsonSerializerOptions.RespectRequiredConstructorParameters = true;
     });
 
-builder.Services.AddOpenApi();
+// OpenAPI reads the HTTP JSON options rather than MVC's JsonOptions above. Keep enum schemas on the
+// same string representation the controller serializer uses.
+builder.Services.ConfigureHttpJsonOptions(options =>
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter())
+);
+
+builder.Services.AddOpenApi(options =>
+    options.AddSchemaTransformer<LinkedContributionOpenApiSchemaTransformer>()
+);
 builder.Services.AddDbContext<PitakaDbContext>(
     (serviceProvider, options) =>
     {

@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PitakaApp.Api.Actions;
@@ -18,6 +19,7 @@ public class TransactionsController(
     AccountService accountService,
     TransactionService transactionService,
     LinkedContributionReadService linkedContributionReadService,
+    LinkedContributionSplitService linkedContributionSplitService,
     TagService tagService,
     VerifyTransactionCategory verifyTransactionCategory,
     CurrentUserAccessor currentUserAccessor
@@ -27,6 +29,8 @@ public class TransactionsController(
     private readonly TransactionService _transactionService = transactionService;
     private readonly LinkedContributionReadService _linkedContributionReadService =
         linkedContributionReadService;
+    private readonly LinkedContributionSplitService _linkedContributionSplitService =
+        linkedContributionSplitService;
 
     private readonly TagService _tagService = tagService;
 
@@ -157,11 +161,14 @@ public class TransactionsController(
         return Ok(TransactionResource.FromModel(transaction));
     }
 
-    [HttpGet("{id}/linked-contributions")]
-    public async Task<IActionResult> GetLinkedContributions(int id)
+    [HttpGet("{transactionId}/linked-contributions")]
+    public async Task<IActionResult> GetLinkedContributions(int transactionId)
     {
         var user = _currentUserAccessor.User!;
-        var snapshot = await _linkedContributionReadService.GetForTransactionAsync(user.Id, id);
+        var snapshot = await _linkedContributionReadService.GetForTransactionAsync(
+            user.Id,
+            transactionId
+        );
 
         if (snapshot is null)
         {
@@ -170,6 +177,79 @@ public class TransactionsController(
 
         return Ok(LinkedContributionSnapshotResource.FromSnapshot(snapshot));
     }
+
+    [HttpPost("{transactionId}/linked-contributions")]
+    [ProducesResponseType(typeof(SplitSuccessSnapshot), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(
+        typeof(LinkedContributionSplitConflictProblemDetails),
+        StatusCodes.Status409Conflict
+    )]
+    [ProducesResponseType(
+        typeof(LinkedContributionSplitOutcomeUnknownProblemDetails),
+        StatusCodes.Status503ServiceUnavailable
+    )]
+    public async Task<IActionResult> CreateLinkedContributions(
+        int transactionId,
+        [FromHeader(Name = "Idempotency-Key"), Required] Guid? idempotencyKey,
+        CreateLinkedContributionSplitRequest request,
+        CancellationToken cancellationToken
+    )
+    {
+        var user = _currentUserAccessor.User!;
+        var result = await _linkedContributionSplitService.ExecuteAsync(
+            user.Id,
+            transactionId,
+            idempotencyKey!.Value,
+            request.ToInput(),
+            cancellationToken
+        );
+
+        return result switch
+        {
+            SplitSucceeded success => new ContentResult
+            {
+                StatusCode = success.StatusCode,
+                ContentType = "application/json",
+                Content = success.ResponseBody,
+            },
+            SplitInvalid invalid => ValidationProblem(
+                new ValidationProblemDetails(
+                    invalid.Errors.ToDictionary(error => error.Key, error => error.Value)
+                )
+            ),
+            SplitRefused refusal => SplitConflict(refusal),
+            SplitIdempotencyMismatch mismatch => Problem(
+                detail: "This Idempotency-Key was already used with a different request.",
+                statusCode: mismatch.StatusCode,
+                extensions: new Dictionary<string, object?>
+                {
+                    ["reason"] = mismatch.Reason,
+                    ["key"] = mismatch.Key,
+                }
+            ),
+            SplitOutcomeUnknown unknown => Problem(
+                detail: "The operation outcome could not be established. Retry explicitly with the same key and unchanged request.",
+                statusCode: unknown.StatusCode,
+                extensions: new Dictionary<string, object?> { ["reason"] = unknown.Reason }
+            ),
+            _ => throw new InvalidOperationException($"Unknown split result: {result}"),
+        };
+    }
+
+    private ObjectResult SplitConflict(SplitRefused refusal) =>
+        Problem(
+            detail: "No Linked Contributions were created.",
+            statusCode: refusal.StatusCode,
+            extensions: new Dictionary<string, object?>
+            {
+                ["reason"] = refusal.Reason,
+                ["created"] = refusal.Created,
+                ["failures"] = refusal
+                    .Failures.Select(LinkedContributionSplitFailureResource.FromFailure)
+                    .ToArray(),
+            }
+        );
 
     [HttpPut("{id}")]
     public async Task<IActionResult> Update(int id, UpdateTransactionRequest request)

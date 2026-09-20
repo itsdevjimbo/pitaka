@@ -406,7 +406,7 @@ public sealed class LinkedContributionSplitService(DbContextOptions<PitakaDbCont
                     new Dictionary<string, object?>
                     {
                         ["transactionId"] = capacity.Transaction.Id,
-                        ["direction"] = capacity.Transaction.Type.ToString(),
+                        ["direction"] = capacity.Transaction.Type,
                         ["accountId"] = account.Account.Id,
                         ["accountName"] = account.Account.Name,
                     }
@@ -459,7 +459,7 @@ public sealed class LinkedContributionSplitService(DbContextOptions<PitakaDbCont
                         new Dictionary<string, object?>
                         {
                             ["goalName"] = goal.Goal.Name,
-                            ["currentState"] = goal.Goal.Status.ToString(),
+                            ["currentState"] = goal.Goal.Status,
                         },
                         index,
                         row.GoalId

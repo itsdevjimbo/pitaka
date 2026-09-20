@@ -51,6 +51,9 @@ _Avoid_: Total cash, total balance, total, net value, assets
 An Account or a Category the person has stopped using. It keeps everything it recorded — an Account its balance, a Category the Transactions filed under it — and can be brought back. Retiring is how one of them leaves everyday use without being deleted, which stays refused once there is something to lose: an Account with history, a Category in use. The two part only in what happens next. A retired Account stays in the account list among the active ones; a retired Category drops out of the pickers but is still returned by `GET /api/categories`, because old Transactions resolve their category name from that collection. That is what each list is for, not a difference in the state.
 _Avoid_: Closed, archived, deleted, inactive, disabled
 
+The stable machine reason `account_inactive` is the compatibility exception fixed by the Linked
+Contribution split contract. Human-facing copy and every other domain reference still say Retired.
+
 **UserName**:
 Always a mirror of Email. Pitaka has no separate login handle — a person is identified by Email and nothing else.
 _Avoid_: Handle, login name, a username distinct from the email
