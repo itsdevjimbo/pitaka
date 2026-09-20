@@ -7,6 +7,7 @@ namespace PitakaApp.Api.Requests;
 public record TransactionQueryRequest(
     int? AccountId = null,
     int? CategoryId = null,
+    int? RecurringTransactionId = null,
     TransactionType? Type = null,
     // A case-insensitive substring match on a Transaction's `Description` and nothing else —
     // never a Category or Account name. Empty or whitespace-only is absent, not a filter
@@ -58,6 +59,7 @@ public record TransactionQueryRequest(
         new(
             AccountId: AccountId,
             CategoryId: CategoryId,
+            RecurringTransactionId: RecurringTransactionId,
             Type: Type,
             Description: string.IsNullOrWhiteSpace(Description) ? null : Description,
             From: From,
