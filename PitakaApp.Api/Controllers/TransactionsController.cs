@@ -252,7 +252,22 @@ public class TransactionsController(
             return Forbid();
         }
 
-        await _transactionService.DeleteAsync(transaction);
-        return NoContent();
+        var result = await _transactionService.DeleteAsync(transaction);
+
+        return result switch
+        {
+            TransactionDeleted => NoContent(),
+            TransactionHasLinkedContributions conflict => Problem(
+                detail: "Remove every Linked Contribution before deleting this Transaction.",
+                statusCode: StatusCodes.Status409Conflict,
+                extensions: new Dictionary<string, object?>
+                {
+                    ["reason"] = "transaction_has_linked_contributions",
+                    ["transactionId"] = conflict.TransactionId,
+                    ["linkedContributions"] = conflict.LinkedContributions,
+                }
+            ),
+            _ => throw new InvalidOperationException($"Unknown deletion result: {result}"),
+        };
     }
 }

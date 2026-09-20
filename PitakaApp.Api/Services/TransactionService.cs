@@ -175,18 +175,24 @@ public class TransactionService(PitakaDbContext context, UpdateAccountBalance up
         return transaction;
     }
 
-    public async Task DeleteAsync(Transaction transaction)
+    public async Task<TransactionDeleteResult> DeleteAsync(Transaction transaction)
     {
-        await _updateAccountBalance.ReverseTransaction(transaction);
-
         var contributions = await _context
             .GoalContributions.Where(gc => gc.TransactionId == transaction.Id)
+            .OrderBy(gc => gc.Id)
+            .Select(gc => new TransactionLinkedContribution(gc.Id, gc.GoalId, gc.Goal.Name))
             .ToListAsync();
 
-        _context.GoalContributions.RemoveRange(contributions);
+        if (contributions.Count > 0)
+        {
+            return new TransactionHasLinkedContributions(transaction.Id, contributions);
+        }
+
+        await _updateAccountBalance.ReverseTransaction(transaction);
         _context.Transactions.Remove(transaction);
 
         await _context.SaveChangesAsync();
+        return new TransactionDeleted();
     }
 
     public async Task<bool> IsValidTransferTransaction(User user, int? transferToAccountId)
