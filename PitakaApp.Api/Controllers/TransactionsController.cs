@@ -245,27 +245,11 @@ public class TransactionsController(
             {
                 ["reason"] = refusal.Reason,
                 ["created"] = refusal.Created,
-                ["failures"] = refusal.Failures.Select(SplitFailureBody).ToArray(),
+                ["failures"] = refusal
+                    .Failures.Select(LinkedContributionSplitFailureResource.FromFailure)
+                    .ToArray(),
             }
         );
-
-    private static IReadOnlyDictionary<string, object?> SplitFailureBody(SplitFailure failure)
-    {
-        var body = new Dictionary<string, object?> { ["reason"] = failure.Reason };
-        if (failure.RowIndex is int rowIndex)
-        {
-            body["rowIndex"] = rowIndex;
-        }
-        if (failure.GoalId is int goalId)
-        {
-            body["goalId"] = goalId;
-        }
-        foreach (var fact in failure.Facts)
-        {
-            body[fact.Key] = fact.Value;
-        }
-        return body;
-    }
 
     [HttpPut("{id}")]
     public async Task<IActionResult> Update(int id, UpdateTransactionRequest request)
