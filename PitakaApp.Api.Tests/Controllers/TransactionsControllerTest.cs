@@ -458,6 +458,210 @@ public class TransactionsControllerTest : IDisposable
     }
 
     [Fact]
+    public async Task Get_FilterByRecurringTransactionId_ReturnsOnlyItsSurvivingGeneratedTransactions()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var wantedRecurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id
+        );
+        var otherRecurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            name: "Other recurring transaction"
+        );
+
+        var surviving = await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            recurringTransactionId: wantedRecurringTransaction.Id
+        );
+        var removed = await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            recurringTransactionId: wantedRecurringTransaction.Id
+        );
+        await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            recurringTransactionId: otherRecurringTransaction.Id
+        );
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id);
+
+        _context.Transactions.Remove(removed);
+        await _context.SaveChangesAsync();
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync(
+            "/api/transactions?recurringTransactionId=" + wantedRecurringTransaction.Id
+        );
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(
+            TestJsonOptions.Default
+        );
+
+        Assert.Equal([surviving.Id], body!.Data.Select(t => t.Id));
+        Assert.Equal(1, body!.TotalCount);
+    }
+
+    [Fact]
+    public async Task Get_FilterByRecurringTransactionId_CombinesWithExistingFilters()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id
+        );
+
+        var wanted = await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            type: TransactionType.Expense,
+            description: "September rent",
+            transactionDate: new DateTime(2026, 9, 1),
+            recurringTransactionId: recurringTransaction.Id
+        );
+        await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            type: TransactionType.Expense,
+            description: "August rent",
+            transactionDate: new DateTime(2026, 8, 1),
+            recurringTransactionId: recurringTransaction.Id
+        );
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync(
+            "/api/transactions?recurringTransactionId="
+                + recurringTransaction.Id
+                + "&type=Expense&description=rent&from=2026-09-01T00:00:00Z"
+        );
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(
+            TestJsonOptions.Default
+        );
+
+        Assert.Equal([wanted.Id], body!.Data.Select(t => t.Id));
+        Assert.Equal(1, body!.TotalCount);
+    }
+
+    [Fact]
+    public async Task Get_FilterByRecurringTransactionId_PaginatesAndCountsOnlyMatchingHistory()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id
+        );
+        var otherRecurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            name: "Other recurring transaction"
+        );
+
+        for (var i = 0; i < 3; i++)
+        {
+            await TransactionFactory.CreateAsync(
+                _context,
+                user.Id,
+                account.Id,
+                recurringTransactionId: recurringTransaction.Id
+            );
+        }
+        await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            recurringTransactionId: otherRecurringTransaction.Id
+        );
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync(
+            "/api/transactions?recurringTransactionId="
+                + recurringTransaction.Id
+                + "&page=2&pageSize=2"
+        );
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(
+            TestJsonOptions.Default
+        );
+
+        Assert.Single(body!.Data);
+        Assert.Equal(3, body.TotalCount);
+        Assert.Equal(2, body.Page);
+        Assert.Equal(2, body.PageSize);
+    }
+
+    [Fact]
+    public async Task Get_FilterByUnknownRecurringTransactionId_ReturnsEmptyPage_NotError()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync(
+            "/api/transactions?recurringTransactionId=2147483647"
+        );
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(
+            TestJsonOptions.Default
+        );
+        Assert.Empty(body!.Data);
+        Assert.Equal(0, body.TotalCount);
+    }
+
+    [Fact]
+    public async Task Get_FilterByAnotherUsersRecurringTransactionId_ReturnsEmptyPage_NotError()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        await TransactionFactory.CreateAsync(_context, user.Id, account.Id);
+
+        var stranger = await UserFactory.CreateAsync(_context);
+        var strangerAccount = await AccountFactory.CreateAsync(_context, stranger.Id);
+        var strangerRecurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            _context,
+            stranger.Id,
+            strangerAccount.Id
+        );
+        await TransactionFactory.CreateAsync(
+            _context,
+            stranger.Id,
+            strangerAccount.Id,
+            recurringTransactionId: strangerRecurringTransaction.Id
+        );
+
+        _client.ActAsUser(user);
+
+        var response = await _client.GetAsync(
+            "/api/transactions?recurringTransactionId=" + strangerRecurringTransaction.Id
+        );
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<TransactionPageResource>(
+            TestJsonOptions.Default
+        );
+        Assert.Empty(body!.Data);
+        Assert.Equal(0, body.TotalCount);
+    }
+
+    [Fact]
     public async Task Get_FilterByType_ReturnsOnlyThatDirection()
     {
         var user = await UserFactory.CreateAsync(_context);

@@ -32,6 +32,11 @@ public class TransactionService(PitakaDbContext context, UpdateAccountBalance up
             filtered = filtered.Where(t => t.CategoryId == categoryId);
         }
 
+        if (query.RecurringTransactionId is int recurringTransactionId)
+        {
+            filtered = filtered.Where(t => t.RecurringTransactionId == recurringTransactionId);
+        }
+
         if (query.Type is TransactionType type)
         {
             filtered = filtered.Where(t => t.Type == type);
