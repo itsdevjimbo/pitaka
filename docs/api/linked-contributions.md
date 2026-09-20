@@ -23,6 +23,25 @@ Accounts and Completed or Abandoned Goals. It releases Account headroom and, for
 Contribution, Transaction capacity. It does not change Account balance, the source Transaction,
 sibling Contributions or Goal lifecycle.
 
+`DELETE /api/transactions/{id}` refuses to remove a Transaction while any Linked Contributions
+refer to it. The response is `409 ProblemDetails` with this additional shape:
+
+```json
+{
+  "reason": "transaction_has_linked_contributions",
+  "transactionId": 42,
+  "linkedContributions": [
+    { "contributionId": 7, "goalId": 3, "goalName": "Emergency fund" }
+  ]
+}
+```
+
+The complete list is returned for an owned Transaction, including historical links to retired
+Accounts or Completed/Abandoned Goals. The refusal changes no Contribution, Transaction, Account
+balance or Goal state. Ownership is checked before these facts are disclosed, so existing
+not-found/authorization behavior is unchanged. After every Linked Contribution has been removed,
+Transaction deletion follows its ordinary behavior and reverses the Transaction's balance effect.
+
 ## Client recovery expectations
 
 Keep a Contribution visible until deletion is confirmed. An initial `404` means the displayed data
