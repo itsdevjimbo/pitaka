@@ -64,7 +64,8 @@ public class RecurringTransactionService(PitakaDbContext context, GetNextRunDate
 
     public async Task<RecurringTransaction> CreateAsync(
         Account account,
-        CreateRecurringTransactionInput input
+        CreateRecurringTransactionInput input,
+        CancellationToken cancellationToken = default
     )
     {
         var recurringTransaction = new RecurringTransaction
@@ -84,7 +85,7 @@ public class RecurringTransactionService(PitakaDbContext context, GetNextRunDate
 
         _context.RecurringTransactions.Add(recurringTransaction);
 
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(cancellationToken);
         return recurringTransaction;
     }
 

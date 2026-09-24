@@ -847,7 +847,7 @@ public class LinkedContributionSplitServiceTest(PitakaWebApplicationFactory fact
         var source = (
             await scope
                 .ServiceProvider.GetRequiredService<TransactionService>()
-                .GetAllForAccount(account)
+                .GetAllForAccountAsync(account)
         ).Single();
         Assert.NotNull(source.RecurringTransactionId);
         var result = Assert.IsType<SplitSucceeded>(

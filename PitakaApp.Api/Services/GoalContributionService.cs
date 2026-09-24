@@ -42,7 +42,8 @@ public class GoalContributionService(PitakaDbContext context, ContributionGuards
     public async Task<GoalContribution> CreateAsync(
         Goal goal,
         Account account,
-        CreateGoalContributionInput input
+        CreateGoalContributionInput input,
+        CancellationToken cancellationToken = default
     )
     {
         var goalContribution = new GoalContribution
@@ -58,15 +59,19 @@ public class GoalContributionService(PitakaDbContext context, ContributionGuards
         _contributionGuards.MarkConcurrencyGuardsModified(account, [goal]);
         _context.GoalContributions.Add(goalContribution);
 
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(cancellationToken);
         return goalContribution;
     }
 
-    public async Task<bool> CanEarmarkAmount(Account account, decimal amount)
+    public async Task<bool> CanEarmarkAmountAsync(
+        Account account,
+        decimal amount,
+        CancellationToken cancellationToken = default
+    )
     {
         var totalContribution = await _context
             .GoalContributions.Where(gc => gc.AccountId == account.Id)
-            .SumAsync(gc => gc.Amount);
+            .SumAsync(gc => gc.Amount, cancellationToken);
 
         return totalContribution + amount <= account.CurrentBalance;
     }

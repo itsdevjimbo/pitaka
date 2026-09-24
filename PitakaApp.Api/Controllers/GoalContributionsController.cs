@@ -36,7 +36,10 @@ public class GoalContributionsController(
     }
 
     [HttpPost]
-    public async Task<IActionResult> Create(CreateGoalContributionRequest request)
+    public async Task<IActionResult> Create(
+        CreateGoalContributionRequest request,
+        CancellationToken cancellationToken
+    )
     {
         var user = _currentUserAccessor.User!;
 
@@ -48,8 +51,12 @@ public class GoalContributionsController(
             );
         }
 
-        var account = await _accountService.GetByIdForUserAsync(user, request.AccountId);
-        var goal = await _goalService.GetByIdForUser(user, request.GoalId);
+        var account = await _accountService.GetByIdForUserAsync(
+            user,
+            request.AccountId,
+            cancellationToken
+        );
+        var goal = await _goalService.GetByIdForUserAsync(user, request.GoalId, cancellationToken);
 
         if (account == null)
         {
@@ -83,7 +90,13 @@ public class GoalContributionsController(
             );
         }
 
-        if (!await _goalContributionService.CanEarmarkAmount(account, request.Amount))
+        if (
+            !await _goalContributionService.CanEarmarkAmountAsync(
+                account,
+                request.Amount,
+                cancellationToken
+            )
+        )
         {
             return Problem(
                 detail: "Contributions cannot exceed the account's balance",
@@ -94,7 +107,8 @@ public class GoalContributionsController(
         var goalContribution = await _goalContributionService.CreateAsync(
             goal,
             account,
-            request.ToInput()
+            request.ToInput(),
+            cancellationToken
         );
         return StatusCode(
             StatusCodes.Status201Created,

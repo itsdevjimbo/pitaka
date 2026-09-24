@@ -73,10 +73,17 @@ public class RecurringTransactionsController(
     }
 
     [HttpPost]
-    public async Task<IActionResult> Create(CreateRecurringTransactionRequest request)
+    public async Task<IActionResult> Create(
+        CreateRecurringTransactionRequest request,
+        CancellationToken cancellationToken
+    )
     {
         var user = _currentUserAccessor.User!;
-        var account = await _accountService.GetByIdForUserAsync(user, request.AccountId);
+        var account = await _accountService.GetByIdForUserAsync(
+            user,
+            request.AccountId,
+            cancellationToken
+        );
 
         if (account == null)
         {
@@ -100,7 +107,8 @@ public class RecurringTransactionsController(
                 await _verifyTransactionCategory.VerifyNewAssignmentAsync(
                     user,
                     categoryId,
-                    ExpectedCategoryType(request.Type)
+                    ExpectedCategoryType(request.Type),
+                    cancellationToken
                 )
             )
                 is { } rejection
@@ -109,7 +117,13 @@ public class RecurringTransactionsController(
             return rejection;
         }
 
-        if (await _recurringTransactionService.NameExistsForUserAsync(user.Id, request.Name))
+        if (
+            await _recurringTransactionService.NameExistsForUserAsync(
+                user.Id,
+                request.Name,
+                cancellationToken: cancellationToken
+            )
+        )
         {
             return Problem(
                 detail: "A recurring transaction with this name already exists.",
@@ -119,7 +133,8 @@ public class RecurringTransactionsController(
 
         var recurringTransaction = await _recurringTransactionService.CreateAsync(
             account,
-            request.ToInput()
+            request.ToInput(),
+            cancellationToken
         );
 
         return StatusCode(

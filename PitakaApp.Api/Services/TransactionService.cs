@@ -100,19 +100,23 @@ public class TransactionService(PitakaDbContext context, UpdateAccountBalance up
         return (items, totalCount);
     }
 
-    public async Task<List<Transaction>> GetAllForAccount(Account account) =>
+    public async Task<List<Transaction>> GetAllForAccountAsync(
+        Account account,
+        CancellationToken cancellationToken = default
+    ) =>
         await _context
             .Transactions.AsNoTracking()
             .Include(t => t.Tags)
             .Where(t => t.AccountId == account.Id || t.TransferToAccountId == account.Id)
             .OrderByDescending(t => t.TransactionDate)
             .ThenByDescending(t => t.Id)
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
 
     public async Task<Transaction> CreateAsync(
         Account account,
         CreateTransactionInput input,
-        List<Tag>? tags = null
+        List<Tag>? tags = null,
+        CancellationToken cancellationToken = default
     )
     {
         var transaction = new Transaction
@@ -135,9 +139,9 @@ public class TransactionService(PitakaDbContext context, UpdateAccountBalance up
             AttachTag(transaction, tags);
         }
 
-        await _updateAccountBalance.ApplyTransaction(transaction);
+        await _updateAccountBalance.ApplyTransactionAsync(transaction, cancellationToken);
 
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(cancellationToken);
 
         return transaction;
     }
@@ -209,10 +213,15 @@ public class TransactionService(PitakaDbContext context, UpdateAccountBalance up
         return new TransactionDeleted();
     }
 
-    public async Task<bool> IsValidTransferTransaction(User user, int? transferToAccountId)
+    public async Task<bool> IsValidTransferTransactionAsync(
+        User user,
+        int? transferToAccountId,
+        CancellationToken cancellationToken = default
+    )
     {
-        return await _context.Accounts.AnyAsync(a =>
-            a.Id == transferToAccountId && a.UserId == user.Id && a.IsActive
+        return await _context.Accounts.AnyAsync(
+            a => a.Id == transferToAccountId && a.UserId == user.Id && a.IsActive,
+            cancellationToken
         );
     }
 

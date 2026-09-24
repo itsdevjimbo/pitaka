@@ -58,7 +58,7 @@ public class GoalsController(
     public async Task<IActionResult> Show(int id)
     {
         var user = _currentUserAccessor.User!;
-        var goal = await _goalService.GetByIdForUser(user, id);
+        var goal = await _goalService.GetByIdForUserAsync(user, id);
 
         if (goal == null)
         {
@@ -143,7 +143,7 @@ public class GoalsController(
     public async Task<IActionResult> GetContributions(int id)
     {
         var user = _currentUserAccessor.User!;
-        var goal = await _goalService.GetByIdForUser(user, id);
+        var goal = await _goalService.GetByIdForUserAsync(user, id);
 
         if (goal == null)
         {

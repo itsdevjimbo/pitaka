@@ -67,7 +67,7 @@ public class GenerateDueRecurringTransactions(
                     transactionDate
                 );
 
-                await _updateAccountBalance.ApplyTransaction(transaction);
+                await _updateAccountBalance.ApplyTransactionAsync(transaction);
                 _context.Transactions.Add(transaction);
                 freshRecurringTransaction.HasGeneratedTransactions = true;
 
