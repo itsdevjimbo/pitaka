@@ -765,7 +765,7 @@ public class GoalContributionsControllerTest
     }
 
     [Fact]
-    public async Task Update_GoalContributionBelongsToOtherUser_ReturnsUnauthorized()
+    public async Task Update_GoalContributionBelongsToOtherUser_ReturnsNotFoundWithoutChangingIt()
     {
         var userA = await UserFactory.CreateAsync(_context);
         var userB = await UserFactory.CreateAsync(_context);
@@ -781,11 +781,20 @@ public class GoalContributionsControllerTest
             Note = "Test note",
         };
 
+        var missingResponse = await _client.PutAsJsonAsync(
+            "/api/goal-contributions/99999",
+            request
+        );
         var response = await _client.PutAsJsonAsync(
             "/api/goal-contributions/" + contribution.Id,
             request
         );
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        await response.AssertNotFoundEquivalentToAsync(missingResponse);
+
+        var stored = await _context
+            .GoalContributions.AsNoTracking()
+            .SingleAsync(item => item.Id == contribution.Id);
+        Assert.Equal(contribution.Note, stored.Note);
     }
 
     [Theory]

@@ -27,11 +27,15 @@ public class AccountService(PitakaDbContext context)
         return await query.OrderBy(a => a.Name).ToListAsync();
     }
 
-    public async Task<Account?> GetByIdForUser(User user, int id) =>
+    public async Task<Account?> GetByIdForUserAsync(
+        User user,
+        int id,
+        CancellationToken cancellationToken = default
+    ) =>
         await _context
             .Accounts.AsNoTracking()
             .Where(a => a.Id == id && a.UserId == user.Id)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(cancellationToken);
 
     public async Task<Account?> GetTrackedByIdForUserAsync(User user, int id) =>
         await _context.Accounts.Where(a => a.Id == id && a.UserId == user.Id).FirstOrDefaultAsync();

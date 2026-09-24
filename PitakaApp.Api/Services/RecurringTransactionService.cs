@@ -35,18 +35,31 @@ public class RecurringTransactionService(PitakaDbContext context, GetNextRunDate
             )
             .FirstOrDefaultAsync();
 
-    public async Task<RecurringTransaction?> GetTrackedByIdAsync(int id) =>
-        await _context.RecurringTransactions.Where(a => a.Id == id).FirstOrDefaultAsync();
+    public async Task<RecurringTransaction?> GetTrackedByIdForUserAsync(
+        int userId,
+        int id,
+        CancellationToken cancellationToken
+    ) =>
+        await _context
+            .RecurringTransactions.Where(transaction =>
+                transaction.Id == id && transaction.UserId == userId
+            )
+            .FirstOrDefaultAsync(cancellationToken);
 
     public async Task<bool> NameExistsForUserAsync(
         int userId,
         string name,
-        int? excludeId = null
+        int? excludeId = null,
+        CancellationToken cancellationToken = default
     ) =>
         await _context
             .RecurringTransactions.AsNoTracking()
-            .AnyAsync(a =>
-                a.UserId == userId && a.Name == name && (excludeId == null || a.Id != excludeId)
+            .AnyAsync(
+                a =>
+                    a.UserId == userId
+                    && a.Name == name
+                    && (excludeId == null || a.Id != excludeId),
+                cancellationToken
             );
 
     public async Task<RecurringTransaction> CreateAsync(
@@ -77,7 +90,8 @@ public class RecurringTransactionService(PitakaDbContext context, GetNextRunDate
 
     public async Task<RecurringTransaction> UpdateAsync(
         RecurringTransaction recurringTransaction,
-        UpdateRecurringTransactionInput input
+        UpdateRecurringTransactionInput input,
+        CancellationToken cancellationToken = default
     )
     {
         recurringTransaction.Name = input.Name;
@@ -91,20 +105,21 @@ public class RecurringTransactionService(PitakaDbContext context, GetNextRunDate
             recurringTransaction.CompleteIfOccurrenceIsBeyondEnd(recurringTransaction.NextRunDate);
         }
 
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(cancellationToken);
 
         return recurringTransaction;
     }
 
     public async Task<RecurringTransaction> PatchStatusAsync(
         RecurringTransaction recurringTransaction,
-        RecurringTransactionStatus status
+        RecurringTransactionStatus status,
+        CancellationToken cancellationToken = default
     )
     {
         if (status != RecurringTransactionStatus.Active)
         {
             recurringTransaction.Status = status;
-            await _context.SaveChangesAsync();
+            await _context.SaveChangesAsync(cancellationToken);
             return recurringTransaction;
         }
 
@@ -119,13 +134,14 @@ public class RecurringTransactionService(PitakaDbContext context, GetNextRunDate
             recurringTransaction.Status = status;
         }
 
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(cancellationToken);
         return recurringTransaction;
     }
 
     public async Task<ExtendRecurringTransactionVerdict> ExtendAsync(
         RecurringTransaction recurringTransaction,
-        DateOnly? endDate
+        DateOnly? endDate,
+        CancellationToken cancellationToken = default
     )
     {
         var nextRunDate = _getNextRunDate.InclusiveOfToday(
@@ -139,19 +155,28 @@ public class RecurringTransactionService(PitakaDbContext context, GetNextRunDate
             return verdict;
         }
 
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(cancellationToken);
         return ExtendRecurringTransactionVerdict.Success;
     }
 
-    public async Task<bool> TryDeleteUnusedAsync(int recurringTransactionId) =>
+    public async Task<bool> TryDeleteUnusedAsync(
+        int userId,
+        int recurringTransactionId,
+        CancellationToken cancellationToken
+    ) =>
         await _context
             .RecurringTransactions.Where(rt =>
-                rt.Id == recurringTransactionId && !rt.HasGeneratedTransactions
+                rt.Id == recurringTransactionId
+                && rt.UserId == userId
+                && !rt.HasGeneratedTransactions
             )
-            .ExecuteDeleteAsync() == 1;
+            .ExecuteDeleteAsync(cancellationToken) == 1;
 
-    public async Task<int> GetGeneratedTransactionCountAsync(int recurringTransactionId) =>
+    public async Task<int> GetGeneratedTransactionCountAsync(
+        int recurringTransactionId,
+        CancellationToken cancellationToken = default
+    ) =>
         await _context
             .Transactions.AsNoTracking()
-            .CountAsync(t => t.RecurringTransactionId == recurringTransactionId);
+            .CountAsync(t => t.RecurringTransactionId == recurringTransactionId, cancellationToken);
 }

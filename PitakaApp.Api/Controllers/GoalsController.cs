@@ -70,22 +70,28 @@ public class GoalsController(
     }
 
     [HttpPut("{id}")]
-    public async Task<IActionResult> Update(int id, GoalRequest request)
+    public async Task<IActionResult> Update(
+        int id,
+        GoalRequest request,
+        CancellationToken cancellationToken
+    )
     {
         var user = _currentUserAccessor.User!;
-        var goal = await _goalService.GetTrackedByIdAsync(id);
+        var goal = await _goalService.GetTrackedByIdForUserAsync(user.Id, id, cancellationToken);
 
         if (goal == null)
         {
             return NotFound();
         }
 
-        if (goal.UserId != user.Id)
-        {
-            return Forbid();
-        }
-
-        if (await _goalService.NameExistsForUserAsync(user.Id, request.Name, excludeId: id))
+        if (
+            await _goalService.NameExistsForUserAsync(
+                user.Id,
+                request.Name,
+                excludeId: id,
+                cancellationToken: cancellationToken
+            )
+        )
         {
             return Problem(
                 detail: "A goal with this name already exists.",
@@ -93,49 +99,43 @@ public class GoalsController(
             );
         }
 
-        await _goalService.UpdateAsync(goal, request.ToInput());
-        var currentAmount = await _getGoalCurrentAmount.GetAsync(goal);
+        await _goalService.UpdateAsync(goal, request.ToInput(), cancellationToken);
+        var currentAmount = await _getGoalCurrentAmount.GetAsync(goal, cancellationToken);
         return Ok(GoalWithCurrentAmountResource.FromModel(goal, currentAmount));
     }
 
     [HttpPatch("{id}/status")]
-    public async Task<IActionResult> Patch(int id, GoalStatusPatchRequest request)
+    public async Task<IActionResult> Patch(
+        int id,
+        GoalStatusPatchRequest request,
+        CancellationToken cancellationToken
+    )
     {
         var user = _currentUserAccessor.User!;
-        var goal = await _goalService.GetTrackedByIdAsync(id);
+        var goal = await _goalService.GetTrackedByIdForUserAsync(user.Id, id, cancellationToken);
 
         if (goal == null)
         {
             return NotFound();
         }
 
-        if (goal.UserId != user.Id)
-        {
-            return Forbid();
-        }
-
-        await _goalService.PatchStatusAsync(goal, request.Status);
-        var currentAmount = await _getGoalCurrentAmount.GetAsync(goal);
+        await _goalService.PatchStatusAsync(goal, request.Status, cancellationToken);
+        var currentAmount = await _getGoalCurrentAmount.GetAsync(goal, cancellationToken);
         return Ok(GoalWithCurrentAmountResource.FromModel(goal, currentAmount));
     }
 
     [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete(int id)
+    public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
         var user = _currentUserAccessor.User!;
-        var goal = await _goalService.GetTrackedByIdAsync(id);
+        var goal = await _goalService.GetTrackedByIdForUserAsync(user.Id, id, cancellationToken);
 
         if (goal == null)
         {
             return NotFound();
         }
 
-        if (goal.UserId != user.Id)
-        {
-            return Forbid();
-        }
-
-        await _goalService.DeleteAsync(goal);
+        await _goalService.DeleteAsync(goal, cancellationToken);
         return NoContent();
     }
 

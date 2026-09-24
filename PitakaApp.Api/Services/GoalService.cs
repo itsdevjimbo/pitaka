@@ -31,18 +31,32 @@ public class GoalService(PitakaDbContext context)
             .Where(a => a.Id == id && a.UserId == user.Id)
             .FirstOrDefaultAsync();
 
+    public async Task<Goal?> GetTrackedByIdForUserAsync(
+        int userId,
+        int id,
+        CancellationToken cancellationToken
+    ) =>
+        await _context
+            .Goals.Where(goal => goal.Id == id && goal.UserId == userId)
+            .FirstOrDefaultAsync(cancellationToken);
+
     public async Task<Goal?> GetTrackedByIdAsync(int id) =>
-        await _context.Goals.Where(a => a.Id == id).FirstOrDefaultAsync();
+        await _context.Goals.Where(goal => goal.Id == id).FirstOrDefaultAsync();
 
     public async Task<bool> NameExistsForUserAsync(
         int userId,
         string name,
-        int? excludeId = null
+        int? excludeId = null,
+        CancellationToken cancellationToken = default
     ) =>
         await _context
             .Goals.AsNoTracking()
-            .AnyAsync(a =>
-                a.UserId == userId && a.Name == name && (excludeId == null || a.Id != excludeId)
+            .AnyAsync(
+                a =>
+                    a.UserId == userId
+                    && a.Name == name
+                    && (excludeId == null || a.Id != excludeId),
+                cancellationToken
             );
 
     public async Task<Goal> CreateAsync(User user, GoalInput input)
@@ -60,25 +74,33 @@ public class GoalService(PitakaDbContext context)
         return goal;
     }
 
-    public async Task<Goal> UpdateAsync(Goal goal, GoalInput input)
+    public async Task<Goal> UpdateAsync(
+        Goal goal,
+        GoalInput input,
+        CancellationToken cancellationToken = default
+    )
     {
         goal.Name = input.Name;
         goal.TargetAmount = input.TargetAmount;
         goal.TargetDate = input.TargetDate;
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(cancellationToken);
         return goal;
     }
 
-    public async Task<Goal> PatchStatusAsync(Goal goal, GoalStatus status)
+    public async Task<Goal> PatchStatusAsync(
+        Goal goal,
+        GoalStatus status,
+        CancellationToken cancellationToken = default
+    )
     {
         goal.Status = status;
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(cancellationToken);
         return goal;
     }
 
-    public async Task DeleteAsync(Goal goal)
+    public async Task DeleteAsync(Goal goal, CancellationToken cancellationToken = default)
     {
         _context.Goals.Remove(goal);
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(cancellationToken);
     }
 }

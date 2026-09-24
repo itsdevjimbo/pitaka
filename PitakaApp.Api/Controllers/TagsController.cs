@@ -59,22 +59,28 @@ public class TagsController(TagService tagService, CurrentUserAccessor currentUs
     }
 
     [HttpPut("{id}")]
-    public async Task<IActionResult> Update(int id, TagRequest request)
+    public async Task<IActionResult> Update(
+        int id,
+        TagRequest request,
+        CancellationToken cancellationToken
+    )
     {
         var user = _currentUserAccessor.User!;
-        var tag = await _tagService.GetTrackedByIdAsync(id);
+        var tag = await _tagService.GetTrackedByIdForUserAsync(user.Id, id, cancellationToken);
 
         if (tag == null)
         {
             return NotFound();
         }
 
-        if (tag.UserId != user.Id)
-        {
-            return Forbid();
-        }
-
-        if (await _tagService.NameExistsForUserAsync(user.Id, request.Name, excludeId: id))
+        if (
+            await _tagService.NameExistsForUserAsync(
+                user.Id,
+                request.Name,
+                excludeId: id,
+                cancellationToken: cancellationToken
+            )
+        )
         {
             return Problem(
                 detail: "A tag with this name already exists.",
@@ -82,28 +88,23 @@ public class TagsController(TagService tagService, CurrentUserAccessor currentUs
             );
         }
 
-        await _tagService.UpdateAsync(tag, request.ToInput());
+        await _tagService.UpdateAsync(tag, request.ToInput(), cancellationToken);
 
         return Ok(TagResource.FromModel(tag));
     }
 
     [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete(int id)
+    public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
         var user = _currentUserAccessor.User!;
-        var tag = await _tagService.GetTrackedByIdAsync(id);
+        var tag = await _tagService.GetTrackedByIdForUserAsync(user.Id, id, cancellationToken);
 
         if (tag == null)
         {
             return NotFound();
         }
 
-        if (tag.UserId != user.Id)
-        {
-            return Forbid();
-        }
-
-        await _tagService.DeleteAsync(tag);
+        await _tagService.DeleteAsync(tag, cancellationToken);
         return NoContent();
     }
 }

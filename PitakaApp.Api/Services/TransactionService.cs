@@ -149,16 +149,27 @@ public class TransactionService(PitakaDbContext context, UpdateAccountBalance up
             .Where(t => t.Id == id && t.UserId == user.Id)
             .FirstOrDefaultAsync();
 
-    public async Task<Transaction?> GetTrackedByIdAsync(int id) =>
+    public async Task<Transaction?> GetTrackedByIdForUserAsync(
+        int userId,
+        int id,
+        CancellationToken cancellationToken
+    ) =>
         await _context
             .Transactions.Include(t => t.Tags)
-            .Where(c => c.Id == id)
+            .Where(transaction => transaction.Id == id && transaction.UserId == userId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+    public async Task<Transaction?> GetTrackedByIdAsync(int id) =>
+        await _context
+            .Transactions.Include(transaction => transaction.Tags)
+            .Where(transaction => transaction.Id == id)
             .FirstOrDefaultAsync();
 
     public async Task<Transaction> UpdateAsync(
         Transaction transaction,
         UpdateTransactionInput input,
-        List<Tag>? tags = null
+        List<Tag>? tags = null,
+        CancellationToken cancellationToken = default
     )
     {
         transaction.CategoryId = input.CategoryId;
@@ -171,27 +182,30 @@ public class TransactionService(PitakaDbContext context, UpdateAccountBalance up
             SyncTags(transaction, tags);
         }
 
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(cancellationToken);
         return transaction;
     }
 
-    public async Task<TransactionDeleteResult> DeleteAsync(Transaction transaction)
+    public async Task<TransactionDeleteResult> DeleteAsync(
+        Transaction transaction,
+        CancellationToken cancellationToken = default
+    )
     {
         var contributions = await _context
             .GoalContributions.Where(gc => gc.TransactionId == transaction.Id)
             .OrderBy(gc => gc.Id)
             .Select(gc => new TransactionLinkedContribution(gc.Id, gc.GoalId, gc.Goal.Name))
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
 
         if (contributions.Count > 0)
         {
             return new TransactionHasLinkedContributions(transaction.Id, contributions);
         }
 
-        await _updateAccountBalance.ReverseTransaction(transaction);
+        await _updateAccountBalance.ReverseTransactionAsync(transaction, cancellationToken);
         _context.Transactions.Remove(transaction);
 
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(cancellationToken);
         return new TransactionDeleted();
     }
 

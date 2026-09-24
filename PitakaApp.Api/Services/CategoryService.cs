@@ -24,20 +24,37 @@ public class CategoryService(PitakaDbContext context)
             .Where(c => c.Id == id && (c.UserId == user.Id || c.IsDefault))
             .FirstOrDefaultAsync();
 
-    public async Task<Category?> GetTrackedByIdAsync(int id) =>
-        await _context.Categories.Where(c => c.Id == id).FirstOrDefaultAsync();
+    public async Task<Category?> GetTrackedByIdForUserAsync(
+        int userId,
+        int id,
+        CancellationToken cancellationToken
+    ) =>
+        await _context
+            .Categories.Where(category => category.Id == id && category.UserId == userId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+    public async Task<bool> IsDefaultAsync(int id, CancellationToken cancellationToken) =>
+        await _context.Categories.AnyAsync(
+            category => category.Id == id && category.IsDefault,
+            cancellationToken
+        );
 
     // excludeId lets Update check "does any OTHER category of mine already have this
     // name" without the category being renamed conflicting with itself.
     public async Task<bool> NameExistsForUserAsync(
         int userId,
         string name,
-        int? excludeId = null
+        int? excludeId = null,
+        CancellationToken cancellationToken = default
     ) =>
         await _context
             .Categories.AsNoTracking()
-            .AnyAsync(c =>
-                c.UserId == userId && c.Name == name && (excludeId == null || c.Id != excludeId)
+            .AnyAsync(
+                c =>
+                    c.UserId == userId
+                    && c.Name == name
+                    && (excludeId == null || c.Id != excludeId),
+                cancellationToken
             );
 
     public async Task<Category> CreateUserOwnedAsync(User user, CreateCategoryInput input)
@@ -58,19 +75,27 @@ public class CategoryService(PitakaDbContext context)
         return category;
     }
 
-    public async Task<Category> UpdateAsync(Category category, UpdateCategoryInput input)
+    public async Task<Category> UpdateAsync(
+        Category category,
+        UpdateCategoryInput input,
+        CancellationToken cancellationToken = default
+    )
     {
         category.Name = input.Name;
         category.Description = input.Description;
         category.Icon = input.Icon;
         category.Color = input.Color;
 
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(cancellationToken);
 
         return category;
     }
 
-    public async Task<Category> PatchActiveStatus(Category category, PatchCategoryActiveInput input)
+    public async Task<Category> PatchActiveStatusAsync(
+        Category category,
+        PatchCategoryActiveInput input,
+        CancellationToken cancellationToken = default
+    )
     {
         if (input.IsActive)
         {
@@ -81,14 +106,14 @@ public class CategoryService(PitakaDbContext context)
             category.Deactivate();
         }
 
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(cancellationToken);
         return category;
     }
 
-    public async Task DeleteAsync(Category category)
+    public async Task DeleteAsync(Category category, CancellationToken cancellationToken = default)
     {
         _context.Categories.Remove(category);
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(cancellationToken);
     }
 
     // No user scoping is intentional. VerifyTransactionCategory and
@@ -96,10 +121,17 @@ public class CategoryService(PitakaDbContext context)
     // and system defaults are unreachable behind the Forbid at CategoriesController.
     // A WHERE UserId here would be redundant and would read as if cross-user
     // references were possible.
-    public async Task<bool> IsInUseAsync(int categoryId) =>
-        await _context.Transactions.AsNoTracking().AnyAsync(t => t.CategoryId == categoryId)
-        || await _context.Budgets.AsNoTracking().AnyAsync(b => b.CategoryId == categoryId)
+    public async Task<bool> IsInUseAsync(
+        int categoryId,
+        CancellationToken cancellationToken = default
+    ) =>
+        await _context
+            .Transactions.AsNoTracking()
+            .AnyAsync(t => t.CategoryId == categoryId, cancellationToken)
+        || await _context
+            .Budgets.AsNoTracking()
+            .AnyAsync(b => b.CategoryId == categoryId, cancellationToken)
         || await _context
             .RecurringTransactions.AsNoTracking()
-            .AnyAsync(rt => rt.CategoryId == categoryId);
+            .AnyAsync(rt => rt.CategoryId == categoryId, cancellationToken);
 }

@@ -80,7 +80,7 @@ public class TransactionsController(
     public async Task<IActionResult> Post(CreateTransactionRequest request)
     {
         var user = _currentUserAccessor.User!;
-        var account = await _accountService.GetByIdForUser(user, request.AccountId);
+        var account = await _accountService.GetByIdForUserAsync(user, request.AccountId);
 
         List<Tag>? tags = null;
         var distinctTagIds = request.TagIds?.Distinct().ToArray();
@@ -132,7 +132,7 @@ public class TransactionsController(
 
         if (distinctTagIds != null)
         {
-            tags = await _tagService.GetByTagsIdsForUser(user, distinctTagIds);
+            tags = await _tagService.GetByTagsIdsForUserAsync(user, distinctTagIds);
         }
 
         if (tags?.Count != distinctTagIds?.Length)
@@ -252,10 +252,18 @@ public class TransactionsController(
         );
 
     [HttpPut("{id}")]
-    public async Task<IActionResult> Update(int id, UpdateTransactionRequest request)
+    public async Task<IActionResult> Update(
+        int id,
+        UpdateTransactionRequest request,
+        CancellationToken cancellationToken
+    )
     {
         var user = _currentUserAccessor.User!;
-        var transaction = await _transactionService.GetTrackedByIdAsync(id);
+        var transaction = await _transactionService.GetTrackedByIdForUserAsync(
+            user.Id,
+            id,
+            cancellationToken
+        );
 
         List<Tag>? tags = null;
         var distinctTagIds = request.TagIds?.Distinct().ToArray();
@@ -263,11 +271,6 @@ public class TransactionsController(
         if (transaction == null)
         {
             return NotFound();
-        }
-
-        if (transaction!.UserId != user.Id)
-        {
-            return Forbid();
         }
 
         if (transaction.Type == Enums.TransactionType.Transfer && request.CategoryId != null)
@@ -290,7 +293,8 @@ public class TransactionsController(
                 await _verifyTransactionCategory.VerifyAsync(
                     user,
                     categoryId,
-                    ExpectedCategoryType(transaction.Type)
+                    ExpectedCategoryType(transaction.Type),
+                    cancellationToken
                 )
             )
                 is { } rejection
@@ -301,7 +305,11 @@ public class TransactionsController(
 
         if (distinctTagIds != null)
         {
-            tags = await _tagService.GetByTagsIdsForUser(user, distinctTagIds);
+            tags = await _tagService.GetByTagsIdsForUserAsync(
+                user,
+                distinctTagIds,
+                cancellationToken
+            );
         }
 
         if (tags?.Count != distinctTagIds?.Length)
@@ -312,27 +320,31 @@ public class TransactionsController(
             );
         }
 
-        await _transactionService.UpdateAsync(transaction, request.ToInput(), tags);
+        await _transactionService.UpdateAsync(
+            transaction,
+            request.ToInput(),
+            tags,
+            cancellationToken
+        );
         return Ok(TransactionResource.FromModel(transaction));
     }
 
     [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete(int id)
+    public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
         var user = _currentUserAccessor.User!;
-        var transaction = await _transactionService.GetTrackedByIdAsync(id);
+        var transaction = await _transactionService.GetTrackedByIdForUserAsync(
+            user.Id,
+            id,
+            cancellationToken
+        );
 
         if (transaction == null)
         {
             return NotFound();
         }
 
-        if (transaction!.UserId != user.Id)
-        {
-            return Forbid();
-        }
-
-        var result = await _transactionService.DeleteAsync(transaction);
+        var result = await _transactionService.DeleteAsync(transaction, cancellationToken);
 
         return result switch
         {

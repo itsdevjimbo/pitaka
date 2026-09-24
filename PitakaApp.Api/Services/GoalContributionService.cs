@@ -29,11 +29,15 @@ public class GoalContributionService(PitakaDbContext context, ContributionGuards
             .Where(a => a.Id == id && a.Goal.UserId == user.Id)
             .FirstOrDefaultAsync();
 
-    public async Task<GoalContribution?> GetTrackedByIdAsync(int id) =>
+    public async Task<GoalContribution?> GetTrackedByIdForUserAsync(
+        int userId,
+        int id,
+        CancellationToken cancellationToken
+    ) =>
         await _context
             .GoalContributions.Include(gc => gc.Goal)
-            .Where(gc => gc.Id == id)
-            .FirstOrDefaultAsync();
+            .Where(gc => gc.Id == id && gc.Goal.UserId == userId)
+            .FirstOrDefaultAsync(cancellationToken);
 
     public async Task<GoalContribution> CreateAsync(
         Goal goal,
@@ -69,21 +73,26 @@ public class GoalContributionService(PitakaDbContext context, ContributionGuards
 
     public async Task<GoalContribution> UpdateAsync(
         GoalContribution goalContribution,
-        UpdateGoalContributionInput input
+        UpdateGoalContributionInput input,
+        CancellationToken cancellationToken = default
     )
     {
         goalContribution.Note = input.Note;
 
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(cancellationToken);
         return goalContribution;
     }
 
     // A single database statement makes a concurrent deletion indistinguishable from an
     // already-absent row, while the ownership predicate avoids disclosing another User's row.
-    public async Task<bool> DeleteForUserAsync(int userId, int id) =>
+    public async Task<bool> DeleteForUserAsync(
+        int userId,
+        int id,
+        CancellationToken cancellationToken
+    ) =>
         await _context
             .GoalContributions.Where(gc => gc.Id == id && gc.Goal.UserId == userId)
-            .ExecuteDeleteAsync() == 1;
+            .ExecuteDeleteAsync(cancellationToken) == 1;
 
     public async Task DeleteAsync(GoalContribution goalContribution)
     {

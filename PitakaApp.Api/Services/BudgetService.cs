@@ -18,18 +18,29 @@ public class BudgetService(PitakaDbContext context)
             .Where(a => a.Id == id && a.UserId == user.Id)
             .FirstOrDefaultAsync();
 
-    public async Task<Budget?> GetTrackedByIdAsync(int id) =>
-        await _context.Budgets.Where(a => a.Id == id).FirstOrDefaultAsync();
+    public async Task<Budget?> GetTrackedByIdForUserAsync(
+        int userId,
+        int id,
+        CancellationToken cancellationToken
+    ) =>
+        await _context
+            .Budgets.Where(budget => budget.Id == id && budget.UserId == userId)
+            .FirstOrDefaultAsync(cancellationToken);
 
     public async Task<bool> NameExistsForUserAsync(
         int userId,
         string name,
-        int? excludeId = null
+        int? excludeId = null,
+        CancellationToken cancellationToken = default
     ) =>
         await _context
             .Budgets.AsNoTracking()
-            .AnyAsync(a =>
-                a.UserId == userId && a.Name == name && (excludeId == null || a.Id != excludeId)
+            .AnyAsync(
+                a =>
+                    a.UserId == userId
+                    && a.Name == name
+                    && (excludeId == null || a.Id != excludeId),
+                cancellationToken
             );
 
     public async Task<Budget> CreateAsync(User user, BudgetInput input)
@@ -52,7 +63,11 @@ public class BudgetService(PitakaDbContext context)
         return budget;
     }
 
-    public async Task<Budget> UpdateAsync(Budget budget, BudgetInput input)
+    public async Task<Budget> UpdateAsync(
+        Budget budget,
+        BudgetInput input,
+        CancellationToken cancellationToken = default
+    )
     {
         budget.Name = input.Name;
         budget.CategoryId = input.CategoryId;
@@ -62,14 +77,14 @@ public class BudgetService(PitakaDbContext context)
         budget.EndDate = input.EndDate;
         budget.Description = input.Description;
 
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(cancellationToken);
 
         return budget;
     }
 
-    public async Task DeleteAsync(Budget budget)
+    public async Task DeleteAsync(Budget budget, CancellationToken cancellationToken = default)
     {
         _context.Budgets.Remove(budget);
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(cancellationToken);
     }
 }

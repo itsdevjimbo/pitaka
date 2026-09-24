@@ -23,11 +23,18 @@ public class VerifyBudgetCategory(PitakaDbContext context)
 {
     private readonly PitakaDbContext _context = context;
 
-    public async Task<BudgetCategoryVerdict> VerifyAsync(User user, int categoryId)
+    public async Task<BudgetCategoryVerdict> VerifyAsync(
+        User user,
+        int categoryId,
+        CancellationToken cancellationToken = default
+    )
     {
         var category = await _context
             .Categories.AsNoTracking()
-            .FirstOrDefaultAsync(c => c.Id == categoryId && (c.UserId == user.Id || c.IsDefault));
+            .FirstOrDefaultAsync(
+                c => c.Id == categoryId && (c.UserId == user.Id || c.IsDefault),
+                cancellationToken
+            );
 
         if (category == null)
         {

@@ -2,7 +2,7 @@
 
 The skills speak in terms of five canonical triage roles. This file maps those roles to the actual label strings used in this repo's issue tracker.
 
-This repo tracks issues as local markdown (see `issue-tracker.md`), so a "label" is the value of the `Status:` line near the top of an issue file.
+This repo tracks issues in GitHub (see `issue-tracker.md`), so each role maps to a GitHub issue label.
 
 | Label in mattpocock/skills | Label in our tracker | Meaning                                  |
 | -------------------------- | -------------------- | ---------------------------------------- |

@@ -102,22 +102,32 @@ public class BudgetsController(
     }
 
     [HttpPut("{id}")]
-    public async Task<IActionResult> Update(int id, BudgetRequest request)
+    public async Task<IActionResult> Update(
+        int id,
+        BudgetRequest request,
+        CancellationToken cancellationToken
+    )
     {
         var user = _currentUserAccessor.User!;
-        var budget = await _budgetService.GetTrackedByIdAsync(id);
+        var budget = await _budgetService.GetTrackedByIdForUserAsync(
+            user.Id,
+            id,
+            cancellationToken
+        );
 
         if (budget == null)
         {
             return NotFound();
         }
 
-        if (budget.UserId != user.Id)
-        {
-            return Forbid();
-        }
-
-        if (await _budgetService.NameExistsForUserAsync(user.Id, request.Name, excludeId: id))
+        if (
+            await _budgetService.NameExistsForUserAsync(
+                user.Id,
+                request.Name,
+                excludeId: id,
+                cancellationToken: cancellationToken
+            )
+        )
         {
             return Problem(
                 detail: "A budget with this name already exists.",
@@ -127,35 +137,36 @@ public class BudgetsController(
 
         if (
             request.CategoryId is int categoryId
-            && RejectBudgetCategory(await _verifyBudgetCategory.VerifyAsync(user, categoryId))
+            && RejectBudgetCategory(
+                await _verifyBudgetCategory.VerifyAsync(user, categoryId, cancellationToken)
+            )
                 is { } rejection
         )
         {
             return rejection;
         }
 
-        await _budgetService.UpdateAsync(budget, request.ToInput());
+        await _budgetService.UpdateAsync(budget, request.ToInput(), cancellationToken);
 
         return Ok(BudgetResource.FromModel(budget));
     }
 
     [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete(int id)
+    public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
         var user = _currentUserAccessor.User!;
-        var budget = await _budgetService.GetTrackedByIdAsync(id);
+        var budget = await _budgetService.GetTrackedByIdForUserAsync(
+            user.Id,
+            id,
+            cancellationToken
+        );
 
         if (budget == null)
         {
             return NotFound();
         }
 
-        if (budget.UserId != user.Id)
-        {
-            return Forbid();
-        }
-
-        await _budgetService.DeleteAsync(budget);
+        await _budgetService.DeleteAsync(budget, cancellationToken);
         return NoContent();
     }
 }

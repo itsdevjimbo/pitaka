@@ -48,7 +48,7 @@ public class GoalContributionsController(
             );
         }
 
-        var account = await _accountService.GetByIdForUser(user, request.AccountId);
+        var account = await _accountService.GetByIdForUserAsync(user, request.AccountId);
         var goal = await _goalService.GetByIdForUser(user, request.GoalId);
 
         if (account == null)
@@ -117,31 +117,38 @@ public class GoalContributionsController(
     }
 
     [HttpPut("{id}")]
-    public async Task<IActionResult> Update(int id, UpdateGoalContributionRequest request)
+    public async Task<IActionResult> Update(
+        int id,
+        UpdateGoalContributionRequest request,
+        CancellationToken cancellationToken
+    )
     {
         var user = _currentUserAccessor.User!;
-        var goalContribution = await _goalContributionService.GetTrackedByIdAsync(id);
+        var goalContribution = await _goalContributionService.GetTrackedByIdForUserAsync(
+            user.Id,
+            id,
+            cancellationToken
+        );
 
         if (goalContribution == null)
         {
             return NotFound();
         }
 
-        if (goalContribution.Goal.UserId != user.Id)
-        {
-            return Forbid();
-        }
-
-        await _goalContributionService.UpdateAsync(goalContribution, request.ToInput());
+        await _goalContributionService.UpdateAsync(
+            goalContribution,
+            request.ToInput(),
+            cancellationToken
+        );
 
         return Ok(GoalContributionResource.FromModel(goalContribution));
     }
 
     [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete(int id)
+    public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
         var user = _currentUserAccessor.User!;
-        return await _goalContributionService.DeleteForUserAsync(user.Id, id)
+        return await _goalContributionService.DeleteForUserAsync(user.Id, id, cancellationToken)
             ? NoContent()
             : NotFound();
     }

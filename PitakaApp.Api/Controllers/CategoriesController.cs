@@ -73,22 +73,32 @@ public class CategoriesController(
 
     [TypeFilter(typeof(ResolveCurrentUserFilter))]
     [HttpPut("{id}")]
-    public async Task<IActionResult> Update(int id, UpdateCategoryRequest request)
+    public async Task<IActionResult> Update(
+        int id,
+        UpdateCategoryRequest request,
+        CancellationToken cancellationToken
+    )
     {
         var user = _currentUserAccessor.User!;
-        var category = await _categoryService.GetTrackedByIdAsync(id);
+        var category = await _categoryService.GetTrackedByIdForUserAsync(
+            user.Id,
+            id,
+            cancellationToken
+        );
 
         if (category == null)
         {
-            return NotFound();
+            return await NotFoundUnlessSystemDefaultAsync(id, cancellationToken);
         }
 
-        if (category.UserId != user.Id)
-        {
-            return Forbid();
-        }
-
-        if (await _categoryService.NameExistsForUserAsync(user.Id, request.Name, excludeId: id))
+        if (
+            await _categoryService.NameExistsForUserAsync(
+                user.Id,
+                request.Name,
+                excludeId: id,
+                cancellationToken: cancellationToken
+            )
+        )
         {
             return Problem(
                 detail: "A category with this name already exists.",
@@ -96,49 +106,59 @@ public class CategoriesController(
             );
         }
 
-        category = await _categoryService.UpdateAsync(category, request.ToInput());
+        category = await _categoryService.UpdateAsync(
+            category,
+            request.ToInput(),
+            cancellationToken
+        );
         return Ok(CategoryResource.FromModel(category));
     }
 
     [TypeFilter(typeof(ResolveCurrentUserFilter))]
     [HttpPatch("{id}/status")]
-    public async Task<IActionResult> PatchStatus(int id, PatchCategoryActiveStatusRequest request)
+    public async Task<IActionResult> PatchStatus(
+        int id,
+        PatchCategoryActiveStatusRequest request,
+        CancellationToken cancellationToken
+    )
     {
         var user = _currentUserAccessor.User!;
-        var category = await _categoryService.GetTrackedByIdAsync(id);
+        var category = await _categoryService.GetTrackedByIdForUserAsync(
+            user.Id,
+            id,
+            cancellationToken
+        );
 
         if (category == null)
         {
-            return NotFound();
+            return await NotFoundUnlessSystemDefaultAsync(id, cancellationToken);
         }
 
-        if (category.UserId != user.Id)
-        {
-            return Forbid();
-        }
-
-        category = await _categoryService.PatchActiveStatus(category, request.ToInput());
+        category = await _categoryService.PatchActiveStatusAsync(
+            category,
+            request.ToInput(),
+            cancellationToken
+        );
         return Ok(CategoryResource.FromModel(category));
     }
 
     [TypeFilter(typeof(ResolveCurrentUserFilter))]
     [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete(int id)
+    public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
         var user = _currentUserAccessor.User!;
-        var category = await _categoryService.GetTrackedByIdAsync(id);
+        var category = await _categoryService.GetTrackedByIdForUserAsync(
+            user.Id,
+            id,
+            cancellationToken
+        );
 
         if (category == null)
         {
-            return NotFound();
+            return await NotFoundUnlessSystemDefaultAsync(id, cancellationToken);
         }
 
-        if (category.UserId != user.Id)
-        {
-            return Forbid();
-        }
-
-        if (await _categoryService.IsInUseAsync(id))
+        if (await _categoryService.IsInUseAsync(id, cancellationToken))
         {
             return Problem(
                 detail: "This category is in use and cannot be deleted.",
@@ -146,8 +166,21 @@ public class CategoriesController(
             );
         }
 
-        await _categoryService.DeleteAsync(category);
+        await _categoryService.DeleteAsync(category, cancellationToken);
 
         return NoContent();
+    }
+
+    private async Task<IActionResult> NotFoundUnlessSystemDefaultAsync(
+        int id,
+        CancellationToken cancellationToken
+    )
+    {
+        if (await _categoryService.IsDefaultAsync(id, cancellationToken))
+        {
+            return Forbid();
+        }
+
+        return NotFound();
     }
 }
