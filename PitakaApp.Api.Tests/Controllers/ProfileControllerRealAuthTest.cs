@@ -198,6 +198,39 @@ public class ProfileControllerRealAuthTest : IDisposable
 
         var laterLogin = await LogIn(firstEmail, UserFactory.DefaultPassword);
         Assert.True((await laterLogin.Content.ReadFromJsonAsync<LoginResponse>())!.User.HasPicture);
+
+        var removePicture = await Send(
+            HttpMethod.Delete,
+            "/api/profile/picture",
+            firstLoginBody.Token,
+            body: null
+        );
+        Assert.Equal(HttpStatusCode.NoContent, removePicture.StatusCode);
+
+        var profileAfterRemoval = await Send(
+            HttpMethod.Get,
+            "/api/profile",
+            firstLoginBody.Token,
+            body: null
+        );
+        Assert.False(
+            (await profileAfterRemoval.Content.ReadFromJsonAsync<ProfileResponse>())!.HasPicture
+        );
+
+        var updateAfterRemoval = await Send(
+            HttpMethod.Put,
+            "/api/profile",
+            firstLoginBody.Token,
+            new { name = _faker.Person.FullName }
+        );
+        Assert.False(
+            (await updateAfterRemoval.Content.ReadFromJsonAsync<ProfileResponse>())!.HasPicture
+        );
+
+        var loginAfterRemoval = await LogIn(firstEmail, UserFactory.DefaultPassword);
+        Assert.False(
+            (await loginAfterRemoval.Content.ReadFromJsonAsync<LoginResponse>())!.User.HasPicture
+        );
     }
 
     [Fact]
