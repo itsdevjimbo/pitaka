@@ -145,10 +145,10 @@ public class GoalContributionsController(
     }
 
     [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete(int id)
+    public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
         var user = _currentUserAccessor.User!;
-        return await _goalContributionService.DeleteForUserAsync(user.Id, id)
+        return await _goalContributionService.DeleteForUserAsync(user.Id, id, cancellationToken)
             ? NoContent()
             : NotFound();
     }
