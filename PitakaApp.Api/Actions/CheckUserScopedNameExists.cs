@@ -45,7 +45,10 @@ public class CheckUserScopedNameExists
         where TEntity : class
     {
         var userIdPredicate = Expression.Lambda<Func<TEntity, bool>>(
-            Expression.Equal(userIdSelector.Body, Expression.Constant((int?)userId)),
+            Expression.Equal(
+                userIdSelector.Body,
+                Expression.Convert(Expression.Constant(userId), typeof(int?))
+            ),
             userIdSelector.Parameters
         );
         return ExecuteAsyncCore(
