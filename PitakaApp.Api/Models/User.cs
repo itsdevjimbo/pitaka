@@ -27,6 +27,12 @@ public class User : IdentityUser<int>, ITimestamped
     // the stored state and the confirmation token die together.
     public DateTime? PendingEmailExpiresAt { get; set; }
 
+    public int? PhotoId { get; set; }
+
+    public StoredFile? Photo { get; set; }
+
+    public bool HasPicture => PhotoId is not null;
+
     // The pending address as it stands at utcNow, or null (ADR 0014). Past its expiry —
     // or never set — it is absent: not shown on the Profile, not blocking a fresh
     // request, not redeemable. The one place that "treated as absent" rule is spelled

@@ -34,6 +34,7 @@ public class RealAuthWebApplicationFactory : WebApplicationFactory<Program>, IAs
     // factory otherwise leaves the real SmtpEmailSender wired — nothing in S1 was
     // authenticated, so nothing here ever needed to read a sent message before.
     public readonly RecordingEmailSender EmailSender = new();
+    public readonly InMemoryFileStorage FileStorage = new();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -52,6 +53,12 @@ public class RealAuthWebApplicationFactory : WebApplicationFactory<Program>, IAs
         {
             services.RemoveAll<IEmailSender>();
             services.AddSingleton<IEmailSender>(EmailSender);
+
+            services.RemoveAll<IFileStorage>();
+            services.AddSingleton(FileStorage);
+            services.AddSingleton<IFileStorage>(provider =>
+                provider.GetRequiredService<InMemoryFileStorage>()
+            );
         });
     }
 

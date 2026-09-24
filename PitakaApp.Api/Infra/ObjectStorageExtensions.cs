@@ -2,6 +2,7 @@ using Amazon.Runtime;
 using Amazon.S3;
 using Microsoft.Extensions.Options;
 using PitakaApp.Api.Options;
+using PitakaApp.Api.Services;
 
 namespace PitakaApp.Api.Infra;
 
@@ -37,6 +38,8 @@ public static class ObjectStorageExtensions
 
             return new AmazonS3Client(credentials, config);
         });
+
+        builder.Services.AddSingleton<IFileStorage, S3FileStorage>();
 
         return builder;
     }

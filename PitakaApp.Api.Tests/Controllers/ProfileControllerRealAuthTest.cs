@@ -34,6 +34,7 @@ public class ProfileControllerRealAuthTest : IDisposable
     private readonly PitakaDbContext _context;
     private readonly HttpClient _client;
     private readonly RecordingEmailSender _emailSender;
+    private readonly InMemoryFileStorage _fileStorage;
 
     public ProfileControllerRealAuthTest(RealAuthWebApplicationFactory factory)
     {
@@ -41,6 +42,7 @@ public class ProfileControllerRealAuthTest : IDisposable
         _context = _scope.ServiceProvider.GetRequiredService<PitakaDbContext>();
         _client = factory.CreateClient();
         _emailSender = factory.EmailSender;
+        _fileStorage = factory.FileStorage;
     }
 
     // ─── Profile self-service ticket 07: the read, moved from GET api/auth/me ───────
@@ -92,6 +94,7 @@ public class ProfileControllerRealAuthTest : IDisposable
 
         var registerBody = await registerResponse.Content.ReadFromJsonAsync<ProfileResponse>();
         Assert.NotNull(registerBody);
+        Assert.False(registerBody.HasPicture);
 
         var confirmMessage = Assert.Single(_emailSender.To(email));
         var match = Regex.Match(
@@ -121,6 +124,7 @@ public class ProfileControllerRealAuthTest : IDisposable
 
         var loginBody = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>();
         Assert.NotNull(loginBody);
+        Assert.False(loginBody.User.HasPicture);
 
         var request = new HttpRequestMessage(HttpMethod.Get, "/api/profile");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", loginBody!.Token);
@@ -131,6 +135,89 @@ public class ProfileControllerRealAuthTest : IDisposable
 
         var body = await response.Content.ReadFromJsonAsync<ProfileResponse>();
         Assert.Equal(email, body!.Email);
+    }
+
+    [Fact]
+    public async Task PictureRoutes_WithRealTokens_OnlyReadTheSignedInProfilesPicture()
+    {
+        var firstEmail = _faker.Internet.Email();
+        var secondEmail = _faker.Internet.Email();
+        await UserFactory.CreateAsync(_context, firstEmail);
+        await UserFactory.CreateAsync(_context, secondEmail);
+
+        var firstLogin = await LogIn(firstEmail, UserFactory.DefaultPassword);
+        var secondLogin = await LogIn(secondEmail, UserFactory.DefaultPassword);
+        var firstLoginBody = (await firstLogin.Content.ReadFromJsonAsync<LoginResponse>())!;
+        var secondLoginBody = (await secondLogin.Content.ReadFromJsonAsync<LoginResponse>())!;
+        Assert.False(firstLoginBody.User.HasPicture);
+
+        var upload = await PutPictureAsync(
+            firstLoginBody.Token,
+            ProfilePictureTestImages.CreatePng()
+        );
+        Assert.Equal(HttpStatusCode.NoContent, upload.StatusCode);
+        var currentKey = await _context
+            .Users.AsNoTracking()
+            .Where(user => user.Email == firstEmail)
+            .Select(user => user.Photo!.ObjectKey)
+            .SingleAsync();
+        Assert.True(_fileStorage.Contains(currentKey!));
+
+        var firstPicture = await Send(
+            HttpMethod.Get,
+            "/api/profile/picture",
+            firstLoginBody.Token,
+            body: null
+        );
+        Assert.Equal(HttpStatusCode.OK, firstPicture.StatusCode);
+        Assert.Equal("image/png", firstPicture.Content.Headers.ContentType!.MediaType);
+
+        var secondPicture = await Send(
+            HttpMethod.Get,
+            "/api/profile/picture",
+            secondLoginBody.Token,
+            body: null
+        );
+        Assert.Equal(HttpStatusCode.NotFound, secondPicture.StatusCode);
+
+        var profileRead = await Send(
+            HttpMethod.Get,
+            "/api/profile",
+            firstLoginBody.Token,
+            body: null
+        );
+        Assert.True((await profileRead.Content.ReadFromJsonAsync<ProfileResponse>())!.HasPicture);
+
+        var profileUpdate = await Send(
+            HttpMethod.Put,
+            "/api/profile",
+            firstLoginBody.Token,
+            new { name = _faker.Person.FullName }
+        );
+        Assert.True((await profileUpdate.Content.ReadFromJsonAsync<ProfileResponse>())!.HasPicture);
+
+        var laterLogin = await LogIn(firstEmail, UserFactory.DefaultPassword);
+        Assert.True((await laterLogin.Content.ReadFromJsonAsync<LoginResponse>())!.User.HasPicture);
+    }
+
+    [Fact]
+    public async Task PictureRoutes_WithoutARealBearerToken_ReturnUnauthorized()
+    {
+        Assert.Equal(
+            HttpStatusCode.Unauthorized,
+            (await _client.GetAsync("/api/profile/picture")).StatusCode
+        );
+
+        using var request = new HttpRequestMessage(HttpMethod.Put, "/api/profile/picture");
+        using var form = new MultipartFormDataContent();
+        form.Add(new ByteArrayContent(ProfilePictureTestImages.CreatePng()), "File", "source.png");
+        request.Content = form;
+        Assert.Equal(HttpStatusCode.Unauthorized, (await _client.SendAsync(request)).StatusCode);
+
+        Assert.Equal(
+            HttpStatusCode.Unauthorized,
+            (await _client.DeleteAsync("/api/profile/picture")).StatusCode
+        );
     }
 
     [Fact]
@@ -964,6 +1051,16 @@ public class ProfileControllerRealAuthTest : IDisposable
         }
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
         return _client.SendAsync(request);
+    }
+
+    private async Task<HttpResponseMessage> PutPictureAsync(string bearerToken, byte[] imageBytes)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Put, "/api/profile/picture");
+        using var form = new MultipartFormDataContent();
+        form.Add(new ByteArrayContent(imageBytes), "File", "source.png");
+        request.Content = form;
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
+        return await _client.SendAsync(request);
     }
 
     public void Dispose() => _scope.Dispose();

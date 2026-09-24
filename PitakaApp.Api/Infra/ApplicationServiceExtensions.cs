@@ -25,6 +25,10 @@ public static class ApplicationServiceExtensions
         services.AddScoped<CancelEmailChange>();
         services.AddScoped<ChangeProfileName>();
         services.AddScoped<ChangePassword>();
+        services.AddScoped<ProfilePictureService>();
+        services.AddScoped<CleanupFiles>();
+        services.AddSingleton<ProfilePictureImageProcessor>();
+        services.AddHostedService<FileCleanupWorker>();
 
         // Category
         services.AddScoped<CategoryService>();

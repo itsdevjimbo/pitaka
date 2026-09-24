@@ -56,8 +56,16 @@ public class PitakaWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
 
             services.RemoveAll<IEmailSender>();
             services.AddSingleton<IEmailSender>(EmailSender);
+
+            services.RemoveAll<IFileStorage>();
+            services.AddSingleton(FileStorage);
+            services.AddSingleton<IFileStorage>(provider =>
+                provider.GetRequiredService<InMemoryFileStorage>()
+            );
         });
     }
+
+    public readonly InMemoryFileStorage FileStorage = new();
 
     async Task IAsyncLifetime.InitializeAsync()
     {
