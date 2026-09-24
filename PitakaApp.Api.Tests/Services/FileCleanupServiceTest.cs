@@ -47,7 +47,8 @@ public class FileCleanupServiceTest : IDisposable
             _context,
             currentKey,
             "image/png",
-            StoredFileState.Available,
+            StoredFileState.PendingDeletion,
+            now,
             now
         );
         user.PhotoId = currentFile.Id;
@@ -92,6 +93,11 @@ public class FileCleanupServiceTest : IDisposable
         );
         Assert.True(_storage.Contains(currentKey));
         Assert.DoesNotContain(currentKey, _storage.DeletedKeys);
+        Assert.True(
+            await _context.Files.AnyAsync(picture =>
+                picture.ObjectKey == currentKey && picture.State == StoredFileState.PendingDeletion
+            )
+        );
 
         _storage.DeleteFailure = null;
         var retryAt = now.AddMinutes(-1);
@@ -111,7 +117,7 @@ public class FileCleanupServiceTest : IDisposable
         _context.ChangeTracker.Clear();
         Assert.True(
             await _context.Files.AnyAsync(picture =>
-                picture.ObjectKey == currentKey && picture.State == StoredFileState.Available
+                picture.ObjectKey == currentKey && picture.State == StoredFileState.PendingDeletion
             )
         );
     }

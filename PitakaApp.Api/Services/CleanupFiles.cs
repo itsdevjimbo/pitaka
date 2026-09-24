@@ -76,6 +76,10 @@ public class CleanupFiles(
         var claimed = await _context
             .Files.Where(file =>
                 file.Id == fileId
+                // The lifecycle state is changed atomically with Profile references by the
+                // write paths. Keep a live reference as the final guard before removing its
+                // object, even if a stale or inconsistent cleanup record reaches this queue.
+                && !_context.Users.Any(user => user.PhotoId == fileId)
                 && (
                     (
                         file.State == StoredFileState.PendingDeletion

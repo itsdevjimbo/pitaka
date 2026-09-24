@@ -6,6 +6,8 @@ using Bogus;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Time.Testing;
 using PitakaApp.Api.Controllers;
 using PitakaApp.Api.Data;
 using PitakaApp.Api.Models;
@@ -287,6 +289,14 @@ public class ProfilePictureControllerTest : IDisposable
         var removed = await _client.DeleteAsync("/api/profile/picture");
         Assert.Equal(HttpStatusCode.NoContent, removed.StatusCode);
         Assert.False((await ReadProfileAsync()).HasPicture);
+        var updatedProfile = await _client.PutAsJsonAsync(
+            "/api/profile",
+            new { name = "Profile after picture removal" }
+        );
+        Assert.Equal(HttpStatusCode.OK, updatedProfile.StatusCode);
+        Assert.False(
+            (await updatedProfile.Content.ReadFromJsonAsync<ProfileResponse>())!.HasPicture
+        );
         Assert.Equal(
             HttpStatusCode.NotFound,
             (await _client.GetAsync("/api/profile/picture")).StatusCode
@@ -295,6 +305,93 @@ public class ProfilePictureControllerTest : IDisposable
             HttpStatusCode.NoContent,
             (await _client.DeleteAsync("/api/profile/picture")).StatusCode
         );
+    }
+
+    [Fact]
+    public async Task RemovePicture_WhenStorageDeletionFails_ClearsTheProfileAndRetriesDurably()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(user);
+        Assert.Equal(
+            HttpStatusCode.NoContent,
+            (
+                await PutPictureAsync(
+                    ProfilePictureTestImages.Create(SKEncodedImageFormat.Png, SKColors.Goldenrod),
+                    "a.png",
+                    "image/png"
+                )
+            ).StatusCode
+        );
+
+        var storedPicture = await _context
+            .Users.AsNoTracking()
+            .Where(candidate => candidate.Id == user.Id)
+            .Select(candidate => new { Id = candidate.PhotoId!.Value, candidate.Photo!.ObjectKey })
+            .SingleAsync();
+        var fileId = storedPicture.Id;
+        var objectKey = storedPicture.ObjectKey;
+        Assert.True(_storage.Contains(objectKey));
+
+        var removed = await _client.DeleteAsync("/api/profile/picture");
+        Assert.Equal(HttpStatusCode.NoContent, removed.StatusCode);
+        Assert.False((await ReadProfileAsync()).HasPicture);
+        Assert.Equal(
+            HttpStatusCode.NotFound,
+            (await _client.GetAsync("/api/profile/picture")).StatusCode
+        );
+
+        var retryClockStart = new DateTimeOffset(2026, 9, 25, 12, 0, 0, TimeSpan.Zero);
+        var clock = new FakeTimeProvider(retryClockStart);
+        await _context
+            .Files.Where(file => file.Id == fileId)
+            .ExecuteUpdateAsync(setters =>
+                setters.SetProperty(
+                    file => file.NextAttemptAt,
+                    retryClockStart.AddMinutes(-1).UtcDateTime
+                )
+            );
+        var cleanup = new CleanupFiles(
+            _context,
+            _storage,
+            clock,
+            _scope.ServiceProvider.GetRequiredService<ILogger<CleanupFiles>>()
+        );
+        _storage.DeleteFailure = new IOException("temporary object-store failure");
+
+        try
+        {
+            await cleanup.RunAsync(CancellationToken.None);
+
+            _context.ChangeTracker.Clear();
+            var queuedFile = await _context
+                .Files.AsNoTracking()
+                .SingleAsync(file => file.Id == fileId);
+            Assert.Equal(StoredFileState.PendingDeletion, queuedFile.State);
+            Assert.Equal(1, queuedFile.DeletionAttempts);
+            Assert.True(queuedFile.NextAttemptAt > clock.GetUtcNow().UtcDateTime);
+            Assert.True(_storage.Contains(objectKey));
+            Assert.False(
+                await _context.Users.AnyAsync(candidate =>
+                    candidate.Id == user.Id && candidate.PhotoId != null
+                )
+            );
+
+            _storage.DeleteFailure = null;
+            clock.Advance(TimeSpan.FromMinutes(1));
+            await cleanup.RunAsync(CancellationToken.None);
+
+            Assert.False(_storage.Contains(objectKey));
+            Assert.False(await _context.Files.AnyAsync(file => file.Id == fileId));
+            Assert.False((await ReadProfileAsync()).HasPicture);
+            Assert.Equal(
+                HttpStatusCode.NotFound,
+                (await _client.GetAsync("/api/profile/picture")).StatusCode
+            );
+        }
+        finally
+        {
+            _storage.DeleteFailure = null;
+        }
     }
 
     private async Task<ProfileResponse> ReadProfileAsync()
