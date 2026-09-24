@@ -5,10 +5,8 @@ using PitakaApp.Api.Options;
 
 namespace PitakaApp.Api.Services;
 
-public class S3ProfilePictureStorage(
-    IAmazonS3 s3Client,
-    IOptions<ObjectStorageOption> objectStorageOption
-) : IProfilePictureStorage
+public class S3FileStorage(IAmazonS3 s3Client, IOptions<ObjectStorageOption> objectStorageOption)
+    : IFileStorage
 {
     private readonly IAmazonS3 _s3Client = s3Client;
     private readonly string _bucketName = objectStorageOption.Value.BucketName;

@@ -1,6 +1,6 @@
 namespace PitakaApp.Api.Services;
 
-public interface IProfilePictureStorage
+public interface IFileStorage
 {
     Task PutAsync(
         string objectKey,

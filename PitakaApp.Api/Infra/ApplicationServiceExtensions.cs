@@ -26,9 +26,9 @@ public static class ApplicationServiceExtensions
         services.AddScoped<ChangeProfileName>();
         services.AddScoped<ChangePassword>();
         services.AddScoped<ProfilePictureService>();
-        services.AddScoped<CleanupProfilePictureObjects>();
+        services.AddScoped<CleanupFiles>();
         services.AddSingleton<ProfilePictureImageProcessor>();
-        services.AddHostedService<ProfilePictureCleanupWorker>();
+        services.AddHostedService<FileCleanupWorker>();
 
         // Category
         services.AddScoped<CategoryService>();

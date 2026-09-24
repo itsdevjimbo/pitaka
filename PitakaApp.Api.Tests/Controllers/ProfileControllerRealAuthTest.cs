@@ -34,7 +34,7 @@ public class ProfileControllerRealAuthTest : IDisposable
     private readonly PitakaDbContext _context;
     private readonly HttpClient _client;
     private readonly RecordingEmailSender _emailSender;
-    private readonly InMemoryProfilePictureStorage _pictureStorage;
+    private readonly InMemoryFileStorage _fileStorage;
 
     public ProfileControllerRealAuthTest(RealAuthWebApplicationFactory factory)
     {
@@ -42,7 +42,7 @@ public class ProfileControllerRealAuthTest : IDisposable
         _context = _scope.ServiceProvider.GetRequiredService<PitakaDbContext>();
         _client = factory.CreateClient();
         _emailSender = factory.EmailSender;
-        _pictureStorage = factory.PictureStorage;
+        _fileStorage = factory.FileStorage;
     }
 
     // ─── Profile self-service ticket 07: the read, moved from GET api/auth/me ───────
@@ -159,9 +159,9 @@ public class ProfileControllerRealAuthTest : IDisposable
         var currentKey = await _context
             .Users.AsNoTracking()
             .Where(user => user.Email == firstEmail)
-            .Select(user => user.ProfilePictureObjectKey)
+            .Select(user => user.Photo!.ObjectKey)
             .SingleAsync();
-        Assert.True(_pictureStorage.Contains(currentKey!));
+        Assert.True(_fileStorage.Contains(currentKey!));
 
         var firstPicture = await Send(
             HttpMethod.Get,

@@ -2,23 +2,28 @@ using System.ComponentModel.DataAnnotations;
 
 namespace PitakaApp.Api.Models;
 
-public enum ProfilePictureObjectState
+public enum StoredFileState
 {
     Uploading,
-    Current,
+    Available,
     PendingDeletion,
     Deleting,
 }
 
-// Durable lifecycle record for one immutable object key. The Profile's reference and
-// this state change in one database transaction, so cleanup cannot race a current
-// picture or make a losing upload current after cleanup has claimed it.
-public class ProfilePictureObject
+// Metadata and durable cleanup state for one immutable private object-storage key.
+// Keep State available while any domain row references this file; transition it to
+// PendingDeletion in the same transaction that removes the last reference.
+public class StoredFile
 {
+    public int Id { get; set; }
+
     [MaxLength(128)]
     public required string ObjectKey { get; set; }
 
-    public ProfilePictureObjectState State { get; set; }
+    [MaxLength(32)]
+    public required string MediaType { get; set; }
+
+    public StoredFileState State { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

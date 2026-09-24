@@ -8,7 +8,7 @@ public sealed record ProfilePictureContent(byte[] Content, string MediaType);
 
 public class ProfilePictureService(
     PitakaDbContext context,
-    IProfilePictureStorage storage,
+    IFileStorage storage,
     ProfilePictureImageProcessor imageProcessor,
     TimeProvider timeProvider,
     ILogger<ProfilePictureService> logger
@@ -18,7 +18,7 @@ public class ProfilePictureService(
     private static readonly TimeSpan AbandonedUploadGracePeriod = TimeSpan.FromMinutes(2);
 
     private readonly PitakaDbContext _context = context;
-    private readonly IProfilePictureStorage _storage = storage;
+    private readonly IFileStorage _storage = storage;
     private readonly ProfilePictureImageProcessor _imageProcessor = imageProcessor;
     private readonly TimeProvider _timeProvider = timeProvider;
     private readonly ILogger<ProfilePictureService> _logger = logger;
@@ -53,31 +53,30 @@ public class ProfilePictureService(
         }
 
         var picture = processed.Picture!;
-        var objectKey = $"profile-pictures/{Guid.NewGuid():N}";
-        _context.ProfilePictureObjects.Add(
-            new ProfilePictureObject
-            {
-                ObjectKey = objectKey,
-                State = ProfilePictureObjectState.Uploading,
-                CreatedAt = _timeProvider.GetUtcNow().UtcDateTime,
-            }
-        );
+        var file = new StoredFile
+        {
+            ObjectKey = $"files/{Guid.NewGuid():N}",
+            MediaType = picture.MediaType,
+            State = StoredFileState.Uploading,
+            CreatedAt = _timeProvider.GetUtcNow().UtcDateTime,
+        };
+        _context.Files.Add(file);
         await _context.SaveChangesAsync(cancellationToken);
 
         try
         {
             await _storage.PutAsync(
-                objectKey,
+                file.ObjectKey,
                 picture.Content,
                 picture.MediaType,
                 cancellationToken
             );
-            await MakeCurrentAsync(userId, objectKey, picture.MediaType, cancellationToken);
+            await MakeCurrentAsync(userId, file.Id, cancellationToken);
             return null;
         }
         catch
         {
-            await MarkForCleanupAsync(objectKey);
+            await MarkForCleanupAsync(file.Id);
             throw;
         }
     }
@@ -87,24 +86,19 @@ public class ProfilePictureService(
         CancellationToken cancellationToken
     )
     {
-        var reference = await _context
+        var file = await _context
             .Users.AsNoTracking()
             .Where(user => user.Id == userId)
-            .Select(user => new { user.ProfilePictureObjectKey, user.ProfilePictureMediaType })
+            .Select(user => user.Photo)
             .SingleOrDefaultAsync(cancellationToken);
 
-        if (reference?.ProfilePictureObjectKey is not { } objectKey)
+        if (file is null)
         {
             return null;
         }
 
-        if (reference.ProfilePictureMediaType is not { } mediaType)
-        {
-            throw new InvalidOperationException("The Profile picture media type is missing.");
-        }
-
-        var content = await _storage.GetAsync(objectKey, cancellationToken);
-        return new ProfilePictureContent(content, mediaType);
+        var content = await _storage.GetAsync(file.ObjectKey, cancellationToken);
+        return new ProfilePictureContent(content, file.MediaType);
     }
 
     public async Task RemoveAsync(int userId, CancellationToken cancellationToken)
@@ -122,27 +116,26 @@ public class ProfilePictureService(
                     cancellationToken
                 );
 
-                if (user is null || user.ProfilePictureObjectKey is not { } objectKey)
+                if (user is null || user.PhotoId is not { } fileId)
                 {
                     return;
                 }
 
-                var picture = await _context.ProfilePictureObjects.SingleOrDefaultAsync(
-                    candidate => candidate.ObjectKey == objectKey,
+                var file = await _context.Files.SingleOrDefaultAsync(
+                    candidate => candidate.Id == fileId,
                     cancellationToken
                 );
-                if (picture is null || picture.State != ProfilePictureObjectState.Current)
+                if (file is null || file.State != StoredFileState.Available)
                 {
                     throw new InvalidOperationException(
-                        $"Current Profile picture object {objectKey} has no current lifecycle record."
+                        $"Current Profile picture file {fileId} has no current lifecycle record."
                     );
                 }
 
-                user.ProfilePictureObjectKey = null;
-                user.ProfilePictureMediaType = null;
+                user.PhotoId = null;
                 user.ConcurrencyStamp = Guid.NewGuid().ToString();
-                picture.State = ProfilePictureObjectState.PendingDeletion;
-                picture.NextAttemptAt = _timeProvider.GetUtcNow().UtcDateTime;
+                file.State = StoredFileState.PendingDeletion;
+                file.NextAttemptAt = _timeProvider.GetUtcNow().UtcDateTime;
 
                 await _context.SaveChangesAsync(cancellationToken);
                 await transaction.CommitAsync(cancellationToken);
@@ -156,12 +149,7 @@ public class ProfilePictureService(
         }
     }
 
-    private async Task MakeCurrentAsync(
-        int userId,
-        string objectKey,
-        string mediaType,
-        CancellationToken cancellationToken
-    )
+    private async Task MakeCurrentAsync(int userId, int fileId, CancellationToken cancellationToken)
     {
         for (var attempt = 0; attempt < MaxCommitAttempts; attempt++)
         {
@@ -176,39 +164,38 @@ public class ProfilePictureService(
                         candidate => candidate.Id == userId,
                         cancellationToken
                     ) ?? throw new InvalidOperationException($"Profile {userId} no longer exists.");
-                var newPicture = await _context.ProfilePictureObjects.SingleAsync(
-                    candidate => candidate.ObjectKey == objectKey,
+                var newFile = await _context.Files.SingleAsync(
+                    candidate => candidate.Id == fileId,
                     cancellationToken
                 );
-                if (newPicture.State != ProfilePictureObjectState.Uploading)
+                if (newFile.State != StoredFileState.Uploading)
                 {
                     throw new InvalidOperationException(
-                        $"Profile picture object {objectKey} was claimed for cleanup before commit."
+                        $"Profile picture file {fileId} was claimed for cleanup before commit."
                     );
                 }
 
-                if (user.ProfilePictureObjectKey is { } oldObjectKey)
+                if (user.PhotoId is { } oldFileId)
                 {
-                    var oldPicture = await _context.ProfilePictureObjects.SingleOrDefaultAsync(
-                        candidate => candidate.ObjectKey == oldObjectKey,
+                    var oldFile = await _context.Files.SingleOrDefaultAsync(
+                        candidate => candidate.Id == oldFileId,
                         cancellationToken
                     );
-                    if (oldPicture is null || oldPicture.State != ProfilePictureObjectState.Current)
+                    if (oldFile is null || oldFile.State != StoredFileState.Available)
                     {
                         throw new InvalidOperationException(
-                            $"Current Profile picture object {oldObjectKey} has no current lifecycle record."
+                            $"Current Profile picture file {oldFileId} has no current lifecycle record."
                         );
                     }
 
-                    oldPicture.State = ProfilePictureObjectState.PendingDeletion;
-                    oldPicture.NextAttemptAt = _timeProvider.GetUtcNow().UtcDateTime;
+                    oldFile.State = StoredFileState.PendingDeletion;
+                    oldFile.NextAttemptAt = _timeProvider.GetUtcNow().UtcDateTime;
                 }
 
-                user.ProfilePictureObjectKey = objectKey;
-                user.ProfilePictureMediaType = mediaType;
+                user.PhotoId = newFile.Id;
                 user.ConcurrencyStamp = Guid.NewGuid().ToString();
-                newPicture.State = ProfilePictureObjectState.Current;
-                newPicture.NextAttemptAt = null;
+                newFile.State = StoredFileState.Available;
+                newFile.NextAttemptAt = null;
 
                 await _context.SaveChangesAsync(cancellationToken);
                 await transaction.CommitAsync(cancellationToken);
@@ -222,25 +209,25 @@ public class ProfilePictureService(
         }
     }
 
-    private async Task MarkForCleanupAsync(string objectKey)
+    private async Task MarkForCleanupAsync(int fileId)
     {
         try
         {
             _context.ChangeTracker.Clear();
-            var picture = await _context.ProfilePictureObjects.SingleOrDefaultAsync(candidate =>
-                candidate.ObjectKey == objectKey
+            var file = await _context.Files.SingleOrDefaultAsync(candidate =>
+                candidate.Id == fileId
             );
 
             // A commit outcome can be uncertain if the connection fails while committing.
             // Only an upload intent can be queued here; a picture that actually committed
             // current remains protected from cleanup.
-            if (picture?.State != ProfilePictureObjectState.Uploading)
+            if (file?.State != StoredFileState.Uploading)
             {
                 return;
             }
 
-            picture.State = ProfilePictureObjectState.PendingDeletion;
-            picture.NextAttemptAt = _timeProvider
+            file.State = StoredFileState.PendingDeletion;
+            file.NextAttemptAt = _timeProvider
                 .GetUtcNow()
                 .UtcDateTime.Add(AbandonedUploadGracePeriod);
             await _context.SaveChangesAsync(CancellationToken.None);
@@ -249,8 +236,8 @@ public class ProfilePictureService(
         {
             _logger.LogWarning(
                 exception,
-                "Could not queue Profile picture object {ObjectKey} for cleanup; its upload intent remains durable.",
-                objectKey
+                "Could not queue Profile picture file {FileId} for cleanup; its upload intent remains durable.",
+                fileId
             );
         }
     }

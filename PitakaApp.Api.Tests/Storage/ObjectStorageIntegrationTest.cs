@@ -9,13 +9,13 @@ public class ObjectStorageIntegrationTest
 {
     [Fact]
     [Trait("Category", "StorageIntegration")]
-    public async Task RegisteredProfilePictureStorage_CanWriteReadAndDeleteAnObject()
+    public async Task RegisteredProfileFileStorage_CanWriteReadAndDeleteAnObject()
     {
         var builder = WebApplication.CreateBuilder();
         builder.AddObjectStorage();
 
         await using var app = builder.Build();
-        var storage = app.Services.GetRequiredService<IProfilePictureStorage>();
+        var storage = app.Services.GetRequiredService<IFileStorage>();
         var objectKey = $"integration-test/{Guid.NewGuid():N}.txt";
         var expectedContent = "Pitaka object storage integration test"u8.ToArray();
         var objectWasCreated = false;

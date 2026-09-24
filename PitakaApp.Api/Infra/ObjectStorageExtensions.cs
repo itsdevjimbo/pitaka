@@ -39,7 +39,7 @@ public static class ObjectStorageExtensions
             return new AmazonS3Client(credentials, config);
         });
 
-        builder.Services.AddSingleton<IProfilePictureStorage, S3ProfilePictureStorage>();
+        builder.Services.AddSingleton<IFileStorage, S3FileStorage>();
 
         return builder;
     }

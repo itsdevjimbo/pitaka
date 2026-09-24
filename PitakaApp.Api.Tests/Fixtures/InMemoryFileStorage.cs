@@ -3,7 +3,7 @@ using PitakaApp.Api.Services;
 
 namespace PitakaApp.Api.Tests.Fixtures;
 
-public class InMemoryProfilePictureStorage : IProfilePictureStorage
+public class InMemoryFileStorage : IFileStorage
 {
     private readonly ConcurrentDictionary<string, byte[]> _objects = new();
     private int _putCount;

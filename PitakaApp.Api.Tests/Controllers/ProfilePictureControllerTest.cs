@@ -23,14 +23,14 @@ public class ProfilePictureControllerTest : IDisposable
     private readonly IServiceScope _scope;
     private readonly PitakaDbContext _context;
     private readonly HttpClient _client;
-    private readonly InMemoryProfilePictureStorage _storage;
+    private readonly InMemoryFileStorage _storage;
 
     public ProfilePictureControllerTest(PitakaWebApplicationFactory factory)
     {
         _scope = factory.Services.CreateScope();
         _context = _scope.ServiceProvider.GetRequiredService<PitakaDbContext>();
         _client = factory.CreateClient();
-        _storage = factory.PictureStorage;
+        _storage = factory.FileStorage;
         _storage.PutFailure = null;
         _storage.GetFailure = null;
         _storage.DeleteFailure = null;
@@ -145,9 +145,14 @@ public class ProfilePictureControllerTest : IDisposable
         var previous = await _context
             .Users.AsNoTracking()
             .Where(candidate => candidate.Id == user.Id)
-            .Select(candidate => candidate.ProfilePictureObjectKey)
+            .Select(candidate => candidate.PhotoId)
             .SingleAsync();
         Assert.NotNull(previous);
+        var previousObjectKey = await _context
+            .Files.AsNoTracking()
+            .Where(file => file.Id == previous)
+            .Select(file => file.ObjectKey)
+            .SingleAsync();
 
         _storage.PutFailure = new IOException("storage unavailable");
         try
@@ -162,12 +167,15 @@ public class ProfilePictureControllerTest : IDisposable
             var afterFailure = await _context
                 .Users.AsNoTracking()
                 .SingleAsync(candidate => candidate.Id == user.Id);
-            Assert.Equal(previous, afterFailure.ProfilePictureObjectKey);
+            Assert.Equal(previous, afterFailure.PhotoId);
             Assert.True(afterFailure.HasPicture);
 
             var read = await _client.GetAsync("/api/profile/picture");
             Assert.Equal(HttpStatusCode.OK, read.StatusCode);
-            Assert.Equal(_storage.Read(previous!), await read.Content.ReadAsByteArrayAsync());
+            Assert.Equal(
+                _storage.Read(previousObjectKey),
+                await read.Content.ReadAsByteArrayAsync()
+            );
         }
         finally
         {
@@ -247,7 +255,7 @@ public class ProfilePictureControllerTest : IDisposable
             var current = await _context
                 .Users.AsNoTracking()
                 .Where(candidate => candidate.Id == user.Id)
-                .Select(candidate => candidate.ProfilePictureObjectKey)
+                .Select(candidate => candidate.Photo!.ObjectKey)
                 .SingleAsync();
             Assert.NotNull(current);
             using var decoded = SKBitmap.Decode(_storage.Read(current!));
