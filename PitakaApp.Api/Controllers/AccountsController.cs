@@ -101,42 +101,29 @@ public class AccountsController(
     }
 
     [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete(int id)
+    public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
         var user = _currentUserAccessor.User!;
-        var account = await _accountService.GetTrackedByIdForUserAsync(user, id);
+        var result = await _accountService.DeleteAsync(user.Id, id, cancellationToken);
 
-        if (account == null)
+        return result switch
         {
-            return NotFound();
-        }
-
-        if (await _accountService.HasTransactionHistoryAsync(id))
-        {
-            return Problem(
+            AccountDeletionResult.Deleted => NoContent(),
+            AccountDeletionResult.NotFound => NotFound(),
+            AccountDeletionResult.HasTransactionHistory => Problem(
                 detail: "This account has transaction history and cannot be deleted.",
                 statusCode: StatusCodes.Status409Conflict
-            );
-        }
-
-        if (await _accountService.HasGoalContributionsAsync(id))
-        {
-            return Problem(
+            ),
+            AccountDeletionResult.HasGoalContributions => Problem(
                 detail: "This account contains funds allocated toward a specific goal.",
                 statusCode: StatusCodes.Status409Conflict
-            );
-        }
-
-        if (await _accountService.HasGeneratedRecurringTransactionsAsync(id))
-        {
-            return Problem(
+            ),
+            AccountDeletionResult.HasGeneratedRecurringTransactions => Problem(
                 detail: "This account has recurring transactions with generated history and cannot be deleted.",
                 statusCode: StatusCodes.Status409Conflict
-            );
-        }
-
-        await _accountService.DeleteAsync(account);
-        return NoContent();
+            ),
+            _ => throw new ArgumentOutOfRangeException(nameof(result), result, null),
+        };
     }
 
     [HttpGet("{id}/transactions")]

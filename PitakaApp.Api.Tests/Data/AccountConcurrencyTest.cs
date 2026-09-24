@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using PitakaApp.Api.Data;
 using PitakaApp.Api.Enums;
@@ -48,42 +49,135 @@ public class AccountConcurrencyTest : IDisposable
     }
 
     [Fact]
-    public async Task AccountDeletionCannotCascadeAContributionCommittedAfterEligibilityChecks()
+    public async Task Delete_ConcurrentContributionCommit_ThrowsConcurrencyConflict()
     {
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 500);
         var goal = await GoalFactory.CreateAsync(_context, user.Id);
 
-        using var deleteScope = _factory.Services.CreateScope();
-        using var createScope = _factory.Services.CreateScope();
-        var deleteContext = deleteScope.ServiceProvider.GetRequiredService<PitakaDbContext>();
-        var createContext = createScope.ServiceProvider.GetRequiredService<PitakaDbContext>();
-        var accountToDelete = await deleteContext.Accounts.SingleAsync(a => a.Id == account.Id);
-        Assert.False(
-            await deleteContext.GoalContributions.AnyAsync(gc => gc.AccountId == account.Id)
+        await AssertConcurrentWritePreventsAccountDeletionAsync(
+            account,
+            async () =>
+            {
+                using var createScope = _factory.Services.CreateScope();
+                var createContext =
+                    createScope.ServiceProvider.GetRequiredService<PitakaDbContext>();
+                var service =
+                    createScope.ServiceProvider.GetRequiredService<GoalContributionService>();
+                var guardedAccount = await createContext.Accounts.SingleAsync(a =>
+                    a.Id == account.Id
+                );
+                var guardedGoal = await createContext.Goals.SingleAsync(g => g.Id == goal.Id);
+
+                await service.CreateAsync(
+                    guardedGoal,
+                    guardedAccount,
+                    new CreateGoalContributionInput(null, 100, new DateOnly(2026, 9, 24))
+                );
+            },
+            async context =>
+                await context.GoalContributions.AnyAsync(gc => gc.AccountId == account.Id)
+        );
+    }
+
+    [Fact]
+    public async Task Delete_ConcurrentTransactionCommit_ThrowsConcurrencyConflict()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id, initialBalance: 500);
+
+        await AssertConcurrentWritePreventsAccountDeletionAsync(
+            account,
+            async () =>
+            {
+                using var createScope = _factory.Services.CreateScope();
+                var createContext =
+                    createScope.ServiceProvider.GetRequiredService<PitakaDbContext>();
+                var service = createScope.ServiceProvider.GetRequiredService<TransactionService>();
+                var guardedAccount = await createContext.Accounts.SingleAsync(a =>
+                    a.Id == account.Id
+                );
+
+                await service.CreateAsync(
+                    guardedAccount,
+                    new CreateTransactionInput(TransactionType.Income, 100)
+                );
+            },
+            async context => await context.Transactions.AnyAsync(t => t.AccountId == account.Id)
+        );
+    }
+
+    private async Task AssertConcurrentWritePreventsAccountDeletionAsync(
+        PitakaApp.Api.Models.Account account,
+        Func<Task> commitWrite,
+        Func<PitakaDbContext, Task<bool>> writeExists
+    )
+    {
+        var interceptor = new PauseBeforeAccountDelete();
+        var options = new DbContextOptionsBuilder<PitakaDbContext>(
+            _scope.ServiceProvider.GetRequiredService<DbContextOptions<PitakaDbContext>>()
+        )
+            .AddInterceptors(interceptor)
+            .Options;
+        await using var deleteContext = new PitakaDbContext(options);
+        var accountService = new AccountService(deleteContext);
+        var deleteTask = accountService.DeleteAsync(
+            account.UserId,
+            account.Id,
+            CancellationToken.None
         );
 
-        var createService =
-            createScope.ServiceProvider.GetRequiredService<GoalContributionService>();
-        var guardedAccount = await createContext.Accounts.SingleAsync(a => a.Id == account.Id);
-        var guardedGoal = await createContext.Goals.SingleAsync(g => g.Id == goal.Id);
-        await createService.CreateAsync(
-            guardedGoal,
-            guardedAccount,
-            new CreateGoalContributionInput(null, 100, DateOnly.FromDateTime(DateTime.UtcNow))
-        );
+        Exception? deleteFailure = null;
+        try
+        {
+            await interceptor.WaitUntilDeleteIsReachedAsync();
+            await commitWrite();
+        }
+        finally
+        {
+            interceptor.Release();
+            try
+            {
+                await deleteTask;
+            }
+            catch (Exception exception)
+            {
+                deleteFailure = exception;
+            }
+        }
 
-        deleteContext.Accounts.Remove(accountToDelete);
-        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() =>
-            deleteContext.SaveChangesAsync()
-        );
+        Assert.IsType<DbUpdateConcurrencyException>(deleteFailure);
 
         using var assertScope = _factory.Services.CreateScope();
         var assertContext = assertScope.ServiceProvider.GetRequiredService<PitakaDbContext>();
         Assert.True(await assertContext.Accounts.AnyAsync(a => a.Id == account.Id));
-        Assert.True(
-            await assertContext.GoalContributions.AnyAsync(gc => gc.AccountId == account.Id)
+        Assert.True(await writeExists(assertContext));
+    }
+
+    private sealed class PauseBeforeAccountDelete : SaveChangesInterceptor
+    {
+        private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(15);
+        private readonly TaskCompletionSource _deleteReached = new(
+            TaskCreationOptions.RunContinuationsAsynchronously
         );
+        private readonly TaskCompletionSource _released = new(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+
+        public Task WaitUntilDeleteIsReachedAsync() => _deleteReached.Task.WaitAsync(Timeout);
+
+        public void Release() => _released.TrySetResult();
+
+        public override async ValueTask<InterceptionResult<int>> SavingChangesAsync(
+            DbContextEventData eventData,
+            InterceptionResult<int> result,
+            CancellationToken cancellationToken = default
+        )
+        {
+            _deleteReached.TrySetResult();
+            await _released.Task.WaitAsync(Timeout, cancellationToken);
+            return result;
+        }
     }
 
     [Fact]
