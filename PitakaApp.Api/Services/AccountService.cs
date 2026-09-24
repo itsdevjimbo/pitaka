@@ -79,22 +79,69 @@ public class AccountService(PitakaDbContext context)
         return account;
     }
 
-    public async Task DeleteAsync(Account account)
+    public async Task<AccountDeletionResult> DeleteAsync(
+        int userId,
+        int accountId,
+        CancellationToken cancellationToken
+    )
     {
+        var account = await _context.Accounts.FirstOrDefaultAsync(
+            a => a.Id == accountId && a.UserId == userId,
+            cancellationToken
+        );
+
+        if (account is null)
+        {
+            return AccountDeletionResult.NotFound;
+        }
+
+        if (await HasTransactionHistoryAsync(account.Id, cancellationToken))
+        {
+            return AccountDeletionResult.HasTransactionHistory;
+        }
+
+        if (await HasGoalContributionsAsync(account.Id, cancellationToken))
+        {
+            return AccountDeletionResult.HasGoalContributions;
+        }
+
+        if (await HasGeneratedRecurringTransactionsAsync(account.Id, cancellationToken))
+        {
+            return AccountDeletionResult.HasGeneratedRecurringTransactions;
+        }
+
         _context.Accounts.Remove(account);
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(cancellationToken);
+        return AccountDeletionResult.Deleted;
     }
 
-    public async Task<bool> HasTransactionHistoryAsync(int accountId) =>
+    private async Task<bool> HasTransactionHistoryAsync(
+        int accountId,
+        CancellationToken cancellationToken
+    ) =>
         await _context
             .Transactions.AsNoTracking()
-            .AnyAsync(t => t.AccountId == accountId || t.TransferToAccountId == accountId);
+            .AnyAsync(
+                t => t.AccountId == accountId || t.TransferToAccountId == accountId,
+                cancellationToken
+            );
 
-    public async Task<bool> HasGoalContributionsAsync(int accountId) =>
-        await _context.GoalContributions.AsNoTracking().AnyAsync(t => t.AccountId == accountId);
+    private async Task<bool> HasGoalContributionsAsync(
+        int accountId,
+        CancellationToken cancellationToken
+    ) =>
+        await _context
+            .GoalContributions.AsNoTracking()
+            .AnyAsync(t => t.AccountId == accountId, cancellationToken);
 
-    public async Task<bool> HasGeneratedRecurringTransactionsAsync(int accountId) =>
+    private async Task<bool> HasGeneratedRecurringTransactionsAsync(
+        int accountId,
+        CancellationToken cancellationToken
+    ) =>
         await _context
             .RecurringTransactions.AsNoTracking()
-            .AnyAsync(rt => rt.AccountId == accountId && rt.HasGeneratedTransactions);
+            .AnyAsync(
+                rt => rt.AccountId == accountId && rt.HasGeneratedTransactions,
+                cancellationToken
+            );
 }

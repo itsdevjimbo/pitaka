@@ -79,9 +79,9 @@ same atomic unit of work. Multiple saves that must succeed together need an expl
 transaction. Follow [ADR 0017](adr/0017-linked-contributions-and-idempotency-results-commit-together.md)
 for linked splits, including concurrency guards, idempotency, and uncertain outcomes.
 
-Existing exceptions: ordinary Transaction creation and Account deletion still coordinate
-business checks in controllers. New or materially revised operations follow the boundary
-above; unrelated edits do not require moving an entire controller.
+Existing exception: ordinary Transaction creation still coordinates business checks in the
+controller. New or materially revised operations follow the boundary above; unrelated edits
+do not require moving an entire controller.
 
 ### Services and actions
 

@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text;
+using System.Text.Json;
 using Bogus;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -771,12 +772,21 @@ public class AccountsControllerTest : IDisposable
     {
         var user = await UserFactory.CreateAsync(_context);
         var account = await AccountFactory.CreateAsync(_context, user.Id);
-        await TransactionFactory.CreateAsync(_context, user.Id, account.Id);
+        var transaction = await TransactionFactory.CreateAsync(_context, user.Id, account.Id);
+        var accountBefore = await ReadAccountStateAsync(account.Id);
 
         _client.ActAsUser(user);
 
         var response = await _client.DeleteAsync("/api/accounts/" + account.Id);
-        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        await AssertConflictAsync(
+            response,
+            "This account has transaction history and cannot be deleted."
+        );
+
+        await AssertAccountUnchangedAsync(account.Id, accountBefore);
+        Assert.True(
+            await _context.Transactions.AsNoTracking().AnyAsync(t => t.Id == transaction.Id)
+        );
     }
 
     [Fact]
@@ -797,17 +807,22 @@ public class AccountsControllerTest : IDisposable
         );
         var transactionService = _scope.ServiceProvider.GetRequiredService<TransactionService>();
         await transactionService.DeleteAsync(transaction);
+        var accountBefore = await ReadAccountStateAsync(account.Id);
 
         _client.ActAsUser(user);
 
         var response = await _client.DeleteAsync("/api/accounts/" + account.Id);
 
-        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
-        Assert.True(await _context.Accounts.AsNoTracking().AnyAsync(a => a.Id == account.Id));
+        await AssertConflictAsync(
+            response,
+            "This account has recurring transactions with generated history and cannot be deleted."
+        );
+
+        await AssertAccountUnchangedAsync(account.Id, accountBefore);
         Assert.True(
             await _context
                 .RecurringTransactions.AsNoTracking()
-                .AnyAsync(rt => rt.Id == recurringTransaction.Id)
+                .AnyAsync(rt => rt.Id == recurringTransaction.Id && rt.HasGeneratedTransactions)
         );
     }
 
@@ -826,11 +841,22 @@ public class AccountsControllerTest : IDisposable
             amount: 100,
             transferToAccountId: accountA.Id
         );
+        var accountBefore = await ReadAccountStateAsync(accountA.Id);
 
         _client.ActAsUser(userA);
 
         var response = await _client.DeleteAsync("/api/accounts/" + accountA.Id);
-        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        await AssertConflictAsync(
+            response,
+            "This account has transaction history and cannot be deleted."
+        );
+
+        await AssertAccountUnchangedAsync(accountA.Id, accountBefore);
+        Assert.True(
+            await _context
+                .Transactions.AsNoTracking()
+                .AnyAsync(t => t.TransferToAccountId == accountA.Id)
+        );
     }
 
     [Fact]
@@ -840,14 +866,112 @@ public class AccountsControllerTest : IDisposable
         var account = await AccountFactory.CreateAsync(_context, user.Id);
         var goal = await GoalFactory.CreateAsync(_context, user.Id);
 
-        await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id);
-        await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id);
-        await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id);
+        var contributions = new[]
+        {
+            await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id),
+            await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id),
+            await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id),
+        };
+        var accountBefore = await ReadAccountStateAsync(account.Id);
 
         _client.ActAsUser(user);
 
         var response = await _client.DeleteAsync("api/accounts/" + account.Id);
-        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        await AssertConflictAsync(
+            response,
+            "This account contains funds allocated toward a specific goal."
+        );
+
+        await AssertAccountUnchangedAsync(account.Id, accountBefore);
+        var contributionIds = await _context
+            .GoalContributions.AsNoTracking()
+            .Where(gc => gc.AccountId == account.Id)
+            .OrderBy(gc => gc.Id)
+            .Select(gc => gc.Id)
+            .ToListAsync();
+        Assert.Equal(contributions.Select(gc => gc.Id), contributionIds);
+    }
+
+    [Fact]
+    public async Task Delete_WhenTransactionContributionAndGeneratedHistoryExist_ReturnsTransactionConflictFirst()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var goal = await GoalFactory.CreateAsync(_context, user.Id);
+        await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id);
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id
+        );
+        await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            recurringTransactionId: recurringTransaction.Id
+        );
+        var accountBefore = await ReadAccountStateAsync(account.Id);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.DeleteAsync("/api/accounts/" + account.Id);
+        await AssertConflictAsync(
+            response,
+            "This account has transaction history and cannot be deleted."
+        );
+
+        await AssertAccountUnchangedAsync(account.Id, accountBefore);
+        Assert.True(
+            await _context
+                .GoalContributions.AsNoTracking()
+                .AnyAsync(gc => gc.AccountId == account.Id)
+        );
+        Assert.True(
+            await _context
+                .RecurringTransactions.AsNoTracking()
+                .AnyAsync(rt => rt.Id == recurringTransaction.Id && rt.HasGeneratedTransactions)
+        );
+    }
+
+    [Fact]
+    public async Task Delete_WhenContributionAndGeneratedHistoryExist_ReturnsContributionConflictFirst()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var account = await AccountFactory.CreateAsync(_context, user.Id);
+        var goal = await GoalFactory.CreateAsync(_context, user.Id);
+        var recurringTransaction = await RecurringTransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id
+        );
+        var transaction = await TransactionFactory.CreateAsync(
+            _context,
+            user.Id,
+            account.Id,
+            recurringTransactionId: recurringTransaction.Id
+        );
+        var transactionService = _scope.ServiceProvider.GetRequiredService<TransactionService>();
+        await transactionService.DeleteAsync(transaction);
+        var contribution = await GoalContributionFactory.CreateAsync(_context, goal.Id, account.Id);
+        var accountBefore = await ReadAccountStateAsync(account.Id);
+
+        _client.ActAsUser(user);
+
+        var response = await _client.DeleteAsync("/api/accounts/" + account.Id);
+        await AssertConflictAsync(
+            response,
+            "This account contains funds allocated toward a specific goal."
+        );
+
+        await AssertAccountUnchangedAsync(account.Id, accountBefore);
+        Assert.True(
+            await _context.GoalContributions.AsNoTracking().AnyAsync(gc => gc.Id == contribution.Id)
+        );
+        Assert.True(
+            await _context
+                .RecurringTransactions.AsNoTracking()
+                .AnyAsync(rt => rt.Id == recurringTransaction.Id && rt.HasGeneratedTransactions)
+        );
     }
 
     [Fact]
@@ -1003,6 +1127,45 @@ public class AccountsControllerTest : IDisposable
         );
         Assert.Empty(body!);
     }
+
+    private Task<AccountState> ReadAccountStateAsync(int accountId) =>
+        _context
+            .Accounts.AsNoTracking()
+            .Where(account => account.Id == accountId)
+            .Select(account => new AccountState(
+                account.UserId,
+                account.Name,
+                account.Type,
+                account.InitialBalance,
+                account.CurrentBalance,
+                account.IsActive,
+                account.Version
+            ))
+            .SingleAsync();
+
+    private async Task AssertAccountUnchangedAsync(int accountId, AccountState expected)
+    {
+        Assert.Equal(expected, await ReadAccountStateAsync(accountId));
+    }
+
+    private static async Task AssertConflictAsync(HttpResponseMessage response, string detail)
+    {
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(
+            TestJsonOptions.Default
+        );
+        Assert.Equal(detail, problem.GetProperty("detail").GetString());
+    }
+
+    private sealed record AccountState(
+        int UserId,
+        string Name,
+        AccountType Type,
+        decimal InitialBalance,
+        decimal CurrentBalance,
+        bool IsActive,
+        uint Version
+    );
 
     public void Dispose() => _scope.Dispose();
 }
