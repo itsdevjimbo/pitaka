@@ -10,11 +10,40 @@ services:
       - Jwt__Key=${JWT_KEY}
       - Email__Host=smtp4dev
       - Email__Port=25
+      - ObjectStorage__Endpoint=http://seaweedfs:8333
+      - ObjectStorage__Region=${OBJECT_STORAGE_REGION:-us-east-1}
+      - ObjectStorage__BucketName=${OBJECT_STORAGE_BUCKET:-pitaka-private}
+      - ObjectStorage__AccessKeyId=${OBJECT_STORAGE_ACCESS_KEY_ID}
+      - ObjectStorage__SecretAccessKey=${OBJECT_STORAGE_SECRET_ACCESS_KEY}
     depends_on:
       mysql:
         condition: service_healthy
       smtp4dev:
         condition: service_started
+      seaweedfs:
+        condition: service_healthy
+
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.47
+    command: ["mini", "-dir=/data"]
+    environment:
+      - AWS_ACCESS_KEY_ID=${OBJECT_STORAGE_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${OBJECT_STORAGE_SECRET_ACCESS_KEY}
+      - S3_BUCKET=${OBJECT_STORAGE_BUCKET:-pitaka-private}
+    ports:
+      - "8333:8333"
+    volumes:
+      - pitaka_object_storage_data:/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -S --spider -O /dev/null http://localhost:8333/ 2>&1 | grep -q 'HTTP/1.1 403 Forbidden'",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
 
   mysql:
     image: mysql:8
@@ -48,8 +77,15 @@ services:
     environment:
       - TEST_DB_CONNECTION=Server=mysql;Port=3306;Database=pitaka_test;User=root;Password=${MYSQL_ROOT_PASSWORD}
       - REALAUTH_TEST_DB_CONNECTION=Server=mysql;Port=3306;Database=pitaka_test_realauth;User=root;Password=${MYSQL_ROOT_PASSWORD}
+      - ObjectStorage__Endpoint=http://seaweedfs:8333
+      - ObjectStorage__Region=${OBJECT_STORAGE_REGION:-us-east-1}
+      - ObjectStorage__BucketName=${OBJECT_STORAGE_BUCKET:-pitaka-private}
+      - ObjectStorage__AccessKeyId=${OBJECT_STORAGE_ACCESS_KEY_ID}
+      - ObjectStorage__SecretAccessKey=${OBJECT_STORAGE_SECRET_ACCESS_KEY}
     depends_on:
       mysql:
+        condition: service_healthy
+      seaweedfs:
         condition: service_healthy
 
   migrator:
@@ -81,9 +117,17 @@ services:
       - /src/bin
     environment:
       - ConnectionStrings__DefaultConnection=Server=mysql;Port=3306;Database=pitaka;User=root;Password=${MYSQL_ROOT_PASSWORD}
+      - ObjectStorage__Endpoint=http://seaweedfs:8333
+      - ObjectStorage__Region=${OBJECT_STORAGE_REGION:-us-east-1}
+      - ObjectStorage__BucketName=${OBJECT_STORAGE_BUCKET:-pitaka-private}
+      - ObjectStorage__AccessKeyId=${OBJECT_STORAGE_ACCESS_KEY_ID}
+      - ObjectStorage__SecretAccessKey=${OBJECT_STORAGE_SECRET_ACCESS_KEY}
     depends_on:
       mysql:
+        condition: service_healthy
+      seaweedfs:
         condition: service_healthy
 
 volumes:
   pitaka_mysql_data:
+  pitaka_object_storage_data:
