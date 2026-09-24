@@ -73,19 +73,22 @@ public class CategoriesController(
 
     [TypeFilter(typeof(ResolveCurrentUserFilter))]
     [HttpPut("{id}")]
-    public async Task<IActionResult> Update(int id, UpdateCategoryRequest request)
+    public async Task<IActionResult> Update(
+        int id,
+        UpdateCategoryRequest request,
+        CancellationToken cancellationToken
+    )
     {
         var user = _currentUserAccessor.User!;
-        var category = await _categoryService.GetTrackedByIdAsync(id);
+        var category = await _categoryService.GetTrackedByIdForUserAsync(
+            user.Id,
+            id,
+            cancellationToken
+        );
 
         if (category == null)
         {
-            return NotFound();
-        }
-
-        if (category.UserId != user.Id)
-        {
-            return Forbid();
+            return await NotFoundUnlessSystemDefaultAsync(id, cancellationToken);
         }
 
         if (await _categoryService.NameExistsForUserAsync(user.Id, request.Name, excludeId: id))
@@ -102,19 +105,22 @@ public class CategoriesController(
 
     [TypeFilter(typeof(ResolveCurrentUserFilter))]
     [HttpPatch("{id}/status")]
-    public async Task<IActionResult> PatchStatus(int id, PatchCategoryActiveStatusRequest request)
+    public async Task<IActionResult> PatchStatus(
+        int id,
+        PatchCategoryActiveStatusRequest request,
+        CancellationToken cancellationToken
+    )
     {
         var user = _currentUserAccessor.User!;
-        var category = await _categoryService.GetTrackedByIdAsync(id);
+        var category = await _categoryService.GetTrackedByIdForUserAsync(
+            user.Id,
+            id,
+            cancellationToken
+        );
 
         if (category == null)
         {
-            return NotFound();
-        }
-
-        if (category.UserId != user.Id)
-        {
-            return Forbid();
+            return await NotFoundUnlessSystemDefaultAsync(id, cancellationToken);
         }
 
         category = await _categoryService.PatchActiveStatus(category, request.ToInput());
@@ -123,19 +129,18 @@ public class CategoriesController(
 
     [TypeFilter(typeof(ResolveCurrentUserFilter))]
     [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete(int id)
+    public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
         var user = _currentUserAccessor.User!;
-        var category = await _categoryService.GetTrackedByIdAsync(id);
+        var category = await _categoryService.GetTrackedByIdForUserAsync(
+            user.Id,
+            id,
+            cancellationToken
+        );
 
         if (category == null)
         {
-            return NotFound();
-        }
-
-        if (category.UserId != user.Id)
-        {
-            return Forbid();
+            return await NotFoundUnlessSystemDefaultAsync(id, cancellationToken);
         }
 
         if (await _categoryService.IsInUseAsync(id))
@@ -149,5 +154,18 @@ public class CategoriesController(
         await _categoryService.DeleteAsync(category);
 
         return NoContent();
+    }
+
+    private async Task<IActionResult> NotFoundUnlessSystemDefaultAsync(
+        int id,
+        CancellationToken cancellationToken
+    )
+    {
+        if (await _categoryService.IsDefaultAsync(id, cancellationToken))
+        {
+            return Forbid();
+        }
+
+        return NotFound();
     }
 }

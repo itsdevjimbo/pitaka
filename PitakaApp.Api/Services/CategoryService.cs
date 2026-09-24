@@ -24,8 +24,20 @@ public class CategoryService(PitakaDbContext context)
             .Where(c => c.Id == id && (c.UserId == user.Id || c.IsDefault))
             .FirstOrDefaultAsync();
 
-    public async Task<Category?> GetTrackedByIdAsync(int id) =>
-        await _context.Categories.Where(c => c.Id == id).FirstOrDefaultAsync();
+    public async Task<Category?> GetTrackedByIdForUserAsync(
+        int userId,
+        int id,
+        CancellationToken cancellationToken
+    ) =>
+        await _context
+            .Categories.Where(category => category.Id == id && category.UserId == userId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+    public async Task<bool> IsDefaultAsync(int id, CancellationToken cancellationToken) =>
+        await _context.Categories.AnyAsync(
+            category => category.Id == id && category.IsDefault,
+            cancellationToken
+        );
 
     // excludeId lets Update check "does any OTHER category of mine already have this
     // name" without the category being renamed conflicting with itself.

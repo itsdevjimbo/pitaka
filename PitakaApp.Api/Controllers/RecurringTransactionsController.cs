@@ -148,19 +148,22 @@ public class RecurringTransactionsController(
     }
 
     [HttpPut("{id}")]
-    public async Task<IActionResult> Update(int id, UpdateRecurringTransactionRequest request)
+    public async Task<IActionResult> Update(
+        int id,
+        UpdateRecurringTransactionRequest request,
+        CancellationToken cancellationToken
+    )
     {
         var user = _currentUserAccessor.User!;
-        var recurringTransaction = await _recurringTransactionService.GetTrackedByIdAsync(id);
+        var recurringTransaction = await _recurringTransactionService.GetTrackedByIdForUserAsync(
+            user.Id,
+            id,
+            cancellationToken
+        );
 
         if (recurringTransaction == null)
         {
             return NotFound();
-        }
-
-        if (recurringTransaction.UserId != user.Id)
-        {
-            return Forbid();
         }
 
         // Type is read from the stored row: UpdateRecurringTransactionRequest carries no
@@ -220,19 +223,22 @@ public class RecurringTransactionsController(
     }
 
     [HttpPatch("{id}/status")]
-    public async Task<IActionResult> Patch(int id, RecurringTransactionPatchRequest request)
+    public async Task<IActionResult> Patch(
+        int id,
+        RecurringTransactionPatchRequest request,
+        CancellationToken cancellationToken
+    )
     {
         var user = _currentUserAccessor.User!;
-        var recurringTransaction = await _recurringTransactionService.GetTrackedByIdAsync(id);
+        var recurringTransaction = await _recurringTransactionService.GetTrackedByIdForUserAsync(
+            user.Id,
+            id,
+            cancellationToken
+        );
 
         if (recurringTransaction == null)
         {
             return NotFound();
-        }
-
-        if (recurringTransaction.UserId != user.Id)
-        {
-            return Forbid();
         }
 
         if (request.Status == RecurringTransactionStatus.Active)
@@ -260,19 +266,22 @@ public class RecurringTransactionsController(
     }
 
     [HttpPost("{id}/extend")]
-    public async Task<IActionResult> Extend(int id, ExtendRecurringTransactionRequest request)
+    public async Task<IActionResult> Extend(
+        int id,
+        ExtendRecurringTransactionRequest request,
+        CancellationToken cancellationToken
+    )
     {
         var user = _currentUserAccessor.User!;
-        var recurringTransaction = await _recurringTransactionService.GetTrackedByIdAsync(id);
+        var recurringTransaction = await _recurringTransactionService.GetTrackedByIdForUserAsync(
+            user.Id,
+            id,
+            cancellationToken
+        );
 
         if (recurringTransaction == null)
         {
             return NotFound();
-        }
-
-        if (recurringTransaction.UserId != user.Id)
-        {
-            return Forbid();
         }
 
         if (recurringTransaction.Status != RecurringTransactionStatus.Completed)
@@ -321,19 +330,18 @@ public class RecurringTransactionsController(
     }
 
     [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete(int id)
+    public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
         var user = _currentUserAccessor.User!;
-        var recurringTransaction = await _recurringTransactionService.GetTrackedByIdAsync(id);
+        var recurringTransaction = await _recurringTransactionService.GetTrackedByIdForUserAsync(
+            user.Id,
+            id,
+            cancellationToken
+        );
 
         if (recurringTransaction == null)
         {
             return NotFound();
-        }
-
-        if (recurringTransaction.UserId != user.Id)
-        {
-            return Forbid();
         }
 
         if (!await _recurringTransactionService.TryDeleteUnusedAsync(id))

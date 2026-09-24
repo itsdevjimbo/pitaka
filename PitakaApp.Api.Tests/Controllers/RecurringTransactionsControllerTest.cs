@@ -796,7 +796,7 @@ public class RecurringTransactionsControllerTest : IDisposable
     }
 
     [Fact]
-    public async Task Update_WithRecurringTransactionBelongsToOtherUser_ReturnsForbidden()
+    public async Task Update_WithRecurringTransactionBelongsToOtherUser_ReturnsNotFoundWithoutChangingIt()
     {
         var userA = await UserFactory.CreateAsync(_context);
         var userB = await UserFactory.CreateAsync(_context);
@@ -811,11 +811,21 @@ public class RecurringTransactionsControllerTest : IDisposable
 
         var request = new { Name = "Test 1", Amount = 501 };
 
+        var missingResponse = await _client.PutAsJsonAsync(
+            "/api/recurring-transactions/999999",
+            request
+        );
         var response = await _client.PutAsJsonAsync(
             "/api/recurring-transactions/" + recurringTransaction.Id,
             request
         );
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        await response.AssertNotFoundEquivalentToAsync(missingResponse);
+
+        var stored = await _context
+            .RecurringTransactions.AsNoTracking()
+            .SingleAsync(item => item.Id == recurringTransaction.Id);
+        Assert.Equal(recurringTransaction.Name, stored.Name);
+        Assert.Equal(recurringTransaction.Amount, stored.Amount);
     }
 
     [Fact]
@@ -1282,7 +1292,7 @@ public class RecurringTransactionsControllerTest : IDisposable
     [Theory]
     [InlineData("Paused")]
     [InlineData("Active")]
-    public async Task Patch_WithRecurringTransactionBelongsToOtherUser_ReturnsForbidden(
+    public async Task Patch_WithRecurringTransactionBelongsToOtherUser_ReturnsNotFoundWithoutChangingIt(
         string status
     )
     {
@@ -1297,11 +1307,16 @@ public class RecurringTransactionsControllerTest : IDisposable
 
         _client.ActAsUser(user);
 
+        var request = new { Status = status };
+        var missingResponse = await _client.PatchAsJsonAsync(
+            "/api/recurring-transactions/99999/status",
+            request
+        );
         var response = await _client.PatchAsJsonAsync(
             "/api/recurring-transactions/" + recurringTransaction.Id + "/status",
-            new { Status = status }
+            request
         );
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        await response.AssertNotFoundEquivalentToAsync(missingResponse);
 
         _client.ActAsUser(userB);
         var stored = await _client.GetFromJsonAsync<RecurringTransactionResource>(
@@ -1897,7 +1912,7 @@ public class RecurringTransactionsControllerTest : IDisposable
     }
 
     [Fact]
-    public async Task Extend_WhenRecurringTransactionBelongsToAnotherUser_ReturnsForbiddenWithoutChangingIt()
+    public async Task Extend_WhenRecurringTransactionBelongsToAnotherUser_ReturnsNotFoundWithoutChangingIt()
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var owner = await UserFactory.CreateAsync(_context);
@@ -1918,12 +1933,16 @@ public class RecurringTransactionsControllerTest : IDisposable
         var before = await _client.GetStringAsync(url);
         _client.ActAsUser(otherUser);
 
+        var missingResponse = await _client.PostAsJsonAsync(
+            "/api/recurring-transactions/99999/extend",
+            new { EndDate = today.AddDays(1) }
+        );
         var response = await _client.PostAsJsonAsync(
             url + "/extend",
             new { EndDate = today.AddDays(1) }
         );
 
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        await response.AssertNotFoundEquivalentToAsync(missingResponse);
         _client.ActAsUser(owner);
         Assert.Equal(before, await _client.GetStringAsync(url));
     }
@@ -1960,7 +1979,7 @@ public class RecurringTransactionsControllerTest : IDisposable
     }
 
     [Fact]
-    public async Task Delete_BelongsToOtherUser_ReturnsForbidden()
+    public async Task Delete_BelongsToOtherUser_ReturnsNotFoundWithoutDeletingIt()
     {
         var user = await UserFactory.CreateAsync(_context);
         var userB = await UserFactory.CreateAsync(_context);
@@ -1971,12 +1990,17 @@ public class RecurringTransactionsControllerTest : IDisposable
             account.Id
         );
 
+        var url = "/api/recurring-transactions/" + recurringTransaction.Id;
+        _client.ActAsUser(userB);
+        var before = await _client.GetStringAsync(url);
         _client.ActAsUser(user);
 
-        var response = await _client.DeleteAsync(
-            "api/recurring-transactions/" + recurringTransaction.Id
-        );
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        var missingResponse = await _client.DeleteAsync("api/recurring-transactions/99999");
+        var response = await _client.DeleteAsync(url);
+        await response.AssertNotFoundEquivalentToAsync(missingResponse);
+
+        _client.ActAsUser(userB);
+        Assert.Equal(before, await _client.GetStringAsync(url));
     }
 
     [Fact]

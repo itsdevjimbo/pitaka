@@ -1893,7 +1893,7 @@ public class TransactionsControllerTest : IDisposable
     }
 
     [Fact]
-    public async Task Update_AnotherUserTransaction_ReturnsForbidden()
+    public async Task Update_AnotherUserTransaction_ReturnsNotFoundWithoutChangingIt()
     {
         var userA = await UserFactory.CreateAsync(_context);
         var userB = await UserFactory.CreateAsync(_context);
@@ -1904,8 +1904,15 @@ public class TransactionsControllerTest : IDisposable
 
         var request = new { CategoryId = 1 };
 
+        var missingResponse = await _client.PutAsJsonAsync("/api/transactions/9999", request);
         var response = await _client.PutAsJsonAsync("/api/transactions/" + transaction.Id, request);
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        await response.AssertNotFoundEquivalentToAsync(missingResponse);
+
+        var stored = await _context
+            .Transactions.AsNoTracking()
+            .SingleAsync(item => item.Id == transaction.Id);
+        Assert.Equal(transaction.CategoryId, stored.CategoryId);
+        Assert.Equal(transaction.Amount, stored.Amount);
     }
 
     [Fact]
@@ -1998,7 +2005,7 @@ public class TransactionsControllerTest : IDisposable
     }
 
     [Fact]
-    public async Task Delete_OtherUserTransactionWithLinkedContribution_ReturnsForbiddenWithoutFacts()
+    public async Task Delete_OtherUserTransactionWithLinkedContribution_ReturnsNotFoundWithoutFactsOrChanges()
     {
         var userA = await UserFactory.CreateAsync(_context);
         var userB = await UserFactory.CreateAsync(_context);
@@ -2011,20 +2018,36 @@ public class TransactionsControllerTest : IDisposable
             account.Id,
             transaction.Id
         );
+        var accountBalance = await _context
+            .Accounts.AsNoTracking()
+            .Where(item => item.Id == account.Id)
+            .Select(item => item.CurrentBalance)
+            .SingleAsync();
 
         _client.ActAsUser(userA);
 
+        var missingResponse = await _client.DeleteAsync("/api/transactions/9999");
         var response = await _client.DeleteAsync("/api/transactions/" + transaction.Id);
 
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        await response.AssertNotFoundEquivalentToAsync(missingResponse);
         var body = await response.Content.ReadAsStringAsync();
         Assert.DoesNotContain(goal.Name, body);
-        Assert.DoesNotContain(contribution.Id.ToString(), body);
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.DoesNotContain("transactionId", problem!.Extensions.Keys);
+        Assert.DoesNotContain("linkedContributions", problem.Extensions.Keys);
         Assert.True(
             await _context.Transactions.AsNoTracking().AnyAsync(t => t.Id == transaction.Id)
         );
         Assert.True(
             await _context.GoalContributions.AsNoTracking().AnyAsync(gc => gc.Id == contribution.Id)
+        );
+        Assert.Equal(
+            accountBalance,
+            await _context
+                .Accounts.AsNoTracking()
+                .Where(item => item.Id == account.Id)
+                .Select(item => item.CurrentBalance)
+                .SingleAsync()
         );
     }
 

@@ -31,8 +31,17 @@ public class GoalService(PitakaDbContext context)
             .Where(a => a.Id == id && a.UserId == user.Id)
             .FirstOrDefaultAsync();
 
+    public async Task<Goal?> GetTrackedByIdForUserAsync(
+        int userId,
+        int id,
+        CancellationToken cancellationToken
+    ) =>
+        await _context
+            .Goals.Where(goal => goal.Id == id && goal.UserId == userId)
+            .FirstOrDefaultAsync(cancellationToken);
+
     public async Task<Goal?> GetTrackedByIdAsync(int id) =>
-        await _context.Goals.Where(a => a.Id == id).FirstOrDefaultAsync();
+        await _context.Goals.Where(goal => goal.Id == id).FirstOrDefaultAsync();
 
     public async Task<bool> NameExistsForUserAsync(
         int userId,

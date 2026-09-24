@@ -21,8 +21,14 @@ public class TagService(PitakaDbContext context)
             .Where(a => a.Id == id && a.UserId == user.Id)
             .FirstOrDefaultAsync();
 
-    public async Task<Tag?> GetTrackedByIdAsync(int id) =>
-        await _context.Tags.Where(a => a.Id == id).FirstOrDefaultAsync();
+    public async Task<Tag?> GetTrackedByIdForUserAsync(
+        int userId,
+        int id,
+        CancellationToken cancellationToken
+    ) =>
+        await _context
+            .Tags.Where(tag => tag.Id == id && tag.UserId == userId)
+            .FirstOrDefaultAsync(cancellationToken);
 
     public async Task<bool> NameExistsForUserAsync(
         int userId,

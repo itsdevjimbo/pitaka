@@ -149,10 +149,20 @@ public class TransactionService(PitakaDbContext context, UpdateAccountBalance up
             .Where(t => t.Id == id && t.UserId == user.Id)
             .FirstOrDefaultAsync();
 
-    public async Task<Transaction?> GetTrackedByIdAsync(int id) =>
+    public async Task<Transaction?> GetTrackedByIdForUserAsync(
+        int userId,
+        int id,
+        CancellationToken cancellationToken
+    ) =>
         await _context
             .Transactions.Include(t => t.Tags)
-            .Where(c => c.Id == id)
+            .Where(transaction => transaction.Id == id && transaction.UserId == userId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+    public async Task<Transaction?> GetTrackedByIdAsync(int id) =>
+        await _context
+            .Transactions.Include(transaction => transaction.Tags)
+            .Where(transaction => transaction.Id == id)
             .FirstOrDefaultAsync();
 
     public async Task<Transaction> UpdateAsync(

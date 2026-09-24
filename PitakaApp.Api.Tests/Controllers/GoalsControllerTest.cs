@@ -226,7 +226,7 @@ public class GoalsControllerTest : IDisposable
     }
 
     [Fact]
-    public async Task Update_OtherUsersBudget_ReturnsForbidden()
+    public async Task Update_OtherUsersGoal_ReturnsNotFoundWithoutChangingIt()
     {
         var userA = await UserFactory.CreateAsync(_context);
         var userB = await UserFactory.CreateAsync(_context);
@@ -241,8 +241,14 @@ public class GoalsControllerTest : IDisposable
             TargetDate = DateOnly.FromDateTime(DateTime.Now.AddDays(7)),
         };
 
+        var missingResponse = await _client.PutAsJsonAsync("/api/goals/99999", request);
         var response = await _client.PutAsJsonAsync("/api/goals/" + goal.Id, request);
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        await response.AssertNotFoundEquivalentToAsync(missingResponse);
+
+        var stored = await _context.Goals.AsNoTracking().SingleAsync(item => item.Id == goal.Id);
+        Assert.Equal(goal.Name, stored.Name);
+        Assert.Equal(goal.TargetAmount, stored.TargetAmount);
+        Assert.Equal(goal.TargetDate, stored.TargetDate);
     }
 
     [Fact]
@@ -336,7 +342,7 @@ public class GoalsControllerTest : IDisposable
     }
 
     [Fact]
-    public async Task Patch_OtherUserGoalStatus_ReturnsForbid()
+    public async Task Patch_OtherUserGoalStatus_ReturnsNotFoundWithoutChangingIt()
     {
         var userA = await UserFactory.CreateAsync(_context);
         var userB = await UserFactory.CreateAsync(_context);
@@ -346,8 +352,12 @@ public class GoalsControllerTest : IDisposable
 
         var request = new { Status = GoalStatus.Completed };
 
+        var missingResponse = await _client.PatchAsJsonAsync("/api/goals/999999/status", request);
         var response = await _client.PatchAsJsonAsync("/api/goals/" + goal.Id + "/status", request);
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        await response.AssertNotFoundEquivalentToAsync(missingResponse);
+
+        var stored = await _context.Goals.AsNoTracking().SingleAsync(item => item.Id == goal.Id);
+        Assert.Equal(goal.Status, stored.Status);
     }
 
     [Fact]
@@ -425,7 +435,7 @@ public class GoalsControllerTest : IDisposable
     }
 
     [Fact]
-    public async Task Delete_OtherUsersBudget_ReturnsForbidden()
+    public async Task Delete_OtherUsersGoal_ReturnsNotFoundWithoutDeletingIt()
     {
         var userA = await UserFactory.CreateAsync(_context);
         var userB = await UserFactory.CreateAsync(_context);
@@ -433,8 +443,10 @@ public class GoalsControllerTest : IDisposable
 
         _client.ActAsUser(userA);
 
+        var missingResponse = await _client.DeleteAsync("api/goals/99999");
         var response = await _client.DeleteAsync("api/goals/" + goal.Id);
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        await response.AssertNotFoundEquivalentToAsync(missingResponse);
+        Assert.True(await _context.Goals.AsNoTracking().AnyAsync(item => item.Id == goal.Id));
     }
 
     [Fact]

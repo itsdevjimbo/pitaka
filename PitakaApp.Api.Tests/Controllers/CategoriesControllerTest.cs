@@ -220,7 +220,7 @@ public class CategoriesControllerTest : IDisposable
     }
 
     [Fact]
-    public async Task Update_OtherUsersCategory_ReturnsForbidden()
+    public async Task Update_OtherUsersCategory_ReturnsNotFoundWithoutChangingIt()
     {
         var userA = await UserFactory.CreateAsync(_context);
         var userB = await UserFactory.CreateAsync(_context);
@@ -230,26 +230,36 @@ public class CategoriesControllerTest : IDisposable
 
         var request = new { Name = "Test category 3" };
 
+        var missingResponse = await _client.PutAsJsonAsync("/api/categories/99999", request);
         var response = await _client.PutAsJsonAsync(
             "/api/categories/" + seededCategory.Id,
             request
         );
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        await response.AssertNotFoundEquivalentToAsync(missingResponse);
+
+        var stored = await _context
+            .Categories.AsNoTracking()
+            .SingleAsync(item => item.Id == seededCategory.Id);
+        Assert.Equal(seededCategory.Name, stored.Name);
     }
 
     [Fact]
     public async Task Update_SystemDefaultCategory_ReturnsForbidden()
     {
         var user = await UserFactory.CreateAsync(_context);
-        var userB = await UserFactory.CreateAsync(_context);
         _client.ActAsUser(user);
 
         var category = await _context.Categories.Where(c => c.IsDefault).FirstAsync();
+        var originalName = category.Name;
 
         var request = new { Name = "Test category 3" };
 
         var response = await _client.PutAsJsonAsync("/api/categories/" + category.Id, request);
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        var stored = await _context
+            .Categories.AsNoTracking()
+            .SingleAsync(item => item.Id == category.Id);
+        Assert.Equal(originalName, stored.Name);
     }
 
     [Fact]
@@ -386,7 +396,7 @@ public class CategoriesControllerTest : IDisposable
     }
 
     [Fact]
-    public async Task Delete_OtherUsersCategory_ReturnsForbidden()
+    public async Task Delete_OtherUsersCategory_ReturnsNotFoundWithoutDeletingIt()
     {
         var userA = await UserFactory.CreateAsync(_context);
         var userB = await UserFactory.CreateAsync(_context);
@@ -394,8 +404,12 @@ public class CategoriesControllerTest : IDisposable
 
         var seededCategory = await CategoryFactory.CreateAsync(_context, userB.Id);
 
+        var missingResponse = await _client.DeleteAsync("api/categories/99999");
         var response = await _client.DeleteAsync("api/categories/" + seededCategory.Id);
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        await response.AssertNotFoundEquivalentToAsync(missingResponse);
+        Assert.True(
+            await _context.Categories.AsNoTracking().AnyAsync(item => item.Id == seededCategory.Id)
+        );
     }
 
     [Fact]
@@ -488,7 +502,7 @@ public class CategoriesControllerTest : IDisposable
     }
 
     [Fact]
-    public async Task Patch_OtherUsersCategoryStatus_ReturnsForbidden()
+    public async Task Patch_OtherUsersCategoryStatus_ReturnsNotFoundWithoutChangingIt()
     {
         var userA = await UserFactory.CreateAsync(_context);
         var userB = await UserFactory.CreateAsync(_context);
@@ -496,18 +510,23 @@ public class CategoriesControllerTest : IDisposable
 
         _client.ActAsUser(userA);
 
+        var request = new { IsActive = false };
+        var missingResponse = await _client.PatchAsJsonAsync(
+            "/api/categories/99999/status",
+            request
+        );
         var response = await _client.PatchAsJsonAsync(
             "/api/categories/" + category.Id + "/status",
-            new { IsActive = false }
+            request
         );
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        await response.AssertNotFoundEquivalentToAsync(missingResponse);
 
         var stored = await _context.Categories.AsNoTracking().SingleAsync(c => c.Id == category.Id);
         Assert.True(stored.IsActive);
     }
 
     [Fact]
-    public async Task Patch_SystemDefaultCategoryStatus_ReturnsForbidden()
+    public async Task Patch_SystemDefaultCategoryStatus_ReturnsForbiddenWithoutChangingIt()
     {
         var user = await UserFactory.CreateAsync(_context);
         var category = await CategoryFactory.CreateAsync(_context);
@@ -519,6 +538,25 @@ public class CategoriesControllerTest : IDisposable
             new { IsActive = false }
         );
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        var stored = await _context
+            .Categories.AsNoTracking()
+            .SingleAsync(item => item.Id == category.Id);
+        Assert.Equal(category.IsActive, stored.IsActive);
+    }
+
+    [Fact]
+    public async Task Delete_SystemDefaultCategory_ReturnsForbiddenWithoutDeletingIt()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        var category = await _context.Categories.AsNoTracking().FirstAsync(item => item.IsDefault);
+        _client.ActAsUser(user);
+
+        var response = await _client.DeleteAsync("api/categories/" + category.Id);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.True(
+            await _context.Categories.AsNoTracking().AnyAsync(item => item.Id == category.Id)
+        );
     }
 
     [Fact]
