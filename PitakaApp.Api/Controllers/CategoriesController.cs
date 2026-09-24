@@ -91,7 +91,14 @@ public class CategoriesController(
             return await NotFoundUnlessSystemDefaultAsync(id, cancellationToken);
         }
 
-        if (await _categoryService.NameExistsForUserAsync(user.Id, request.Name, excludeId: id))
+        if (
+            await _categoryService.NameExistsForUserAsync(
+                user.Id,
+                request.Name,
+                excludeId: id,
+                cancellationToken: cancellationToken
+            )
+        )
         {
             return Problem(
                 detail: "A category with this name already exists.",
@@ -99,7 +106,11 @@ public class CategoriesController(
             );
         }
 
-        category = await _categoryService.UpdateAsync(category, request.ToInput());
+        category = await _categoryService.UpdateAsync(
+            category,
+            request.ToInput(),
+            cancellationToken
+        );
         return Ok(CategoryResource.FromModel(category));
     }
 
@@ -123,7 +134,11 @@ public class CategoriesController(
             return await NotFoundUnlessSystemDefaultAsync(id, cancellationToken);
         }
 
-        category = await _categoryService.PatchActiveStatus(category, request.ToInput());
+        category = await _categoryService.PatchActiveStatusAsync(
+            category,
+            request.ToInput(),
+            cancellationToken
+        );
         return Ok(CategoryResource.FromModel(category));
     }
 
@@ -143,7 +158,7 @@ public class CategoriesController(
             return await NotFoundUnlessSystemDefaultAsync(id, cancellationToken);
         }
 
-        if (await _categoryService.IsInUseAsync(id))
+        if (await _categoryService.IsInUseAsync(id, cancellationToken))
         {
             return Problem(
                 detail: "This category is in use and cannot be deleted.",
@@ -151,7 +166,7 @@ public class CategoriesController(
             );
         }
 
-        await _categoryService.DeleteAsync(category);
+        await _categoryService.DeleteAsync(category, cancellationToken);
 
         return NoContent();
     }

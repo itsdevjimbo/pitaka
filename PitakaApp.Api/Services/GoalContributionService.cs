@@ -73,12 +73,13 @@ public class GoalContributionService(PitakaDbContext context, ContributionGuards
 
     public async Task<GoalContribution> UpdateAsync(
         GoalContribution goalContribution,
-        UpdateGoalContributionInput input
+        UpdateGoalContributionInput input,
+        CancellationToken cancellationToken = default
     )
     {
         goalContribution.Note = input.Note;
 
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(cancellationToken);
         return goalContribution;
     }
 

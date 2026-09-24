@@ -135,7 +135,11 @@ public class GoalContributionsController(
             return NotFound();
         }
 
-        await _goalContributionService.UpdateAsync(goalContribution, request.ToInput());
+        await _goalContributionService.UpdateAsync(
+            goalContribution,
+            request.ToInput(),
+            cancellationToken
+        );
 
         return Ok(GoalContributionResource.FromModel(goalContribution));
     }

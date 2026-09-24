@@ -29,25 +29,31 @@ public class VerifyTransactionCategory(PitakaDbContext context)
     public Task<TransactionCategoryVerdict> VerifyAsync(
         User user,
         int categoryId,
-        CategoryType expectedType
-    ) => VerifyAsync(user, categoryId, expectedType, requireActive: false);
+        CategoryType expectedType,
+        CancellationToken cancellationToken = default
+    ) => VerifyAsync(user, categoryId, expectedType, requireActive: false, cancellationToken);
 
     public Task<TransactionCategoryVerdict> VerifyNewAssignmentAsync(
         User user,
         int categoryId,
-        CategoryType expectedType
-    ) => VerifyAsync(user, categoryId, expectedType, requireActive: true);
+        CategoryType expectedType,
+        CancellationToken cancellationToken = default
+    ) => VerifyAsync(user, categoryId, expectedType, requireActive: true, cancellationToken);
 
     private async Task<TransactionCategoryVerdict> VerifyAsync(
         User user,
         int categoryId,
         CategoryType expectedType,
-        bool requireActive
+        bool requireActive,
+        CancellationToken cancellationToken
     )
     {
         var category = await _context
             .Categories.AsNoTracking()
-            .FirstOrDefaultAsync(c => c.Id == categoryId && (c.UserId == user.Id || c.IsDefault));
+            .FirstOrDefaultAsync(
+                c => c.Id == categoryId && (c.UserId == user.Id || c.IsDefault),
+                cancellationToken
+            );
 
         if (category == null)
         {

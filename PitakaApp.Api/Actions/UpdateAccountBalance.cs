@@ -36,11 +36,15 @@ public class UpdateAccountBalance(PitakaDbContext context)
         return account;
     }
 
-    public async Task<Account> ReverseTransaction(Transaction transaction)
+    public async Task<Account> ReverseTransaction(
+        Transaction transaction,
+        CancellationToken cancellationToken = default
+    )
     {
         var accounts = await GetTrackedAccountsOrThrowAsync(
             transaction.AccountId,
-            transaction.TransferToAccountId
+            transaction.TransferToAccountId,
+            cancellationToken
         );
         var account = accounts[transaction.AccountId];
 
@@ -68,7 +72,8 @@ public class UpdateAccountBalance(PitakaDbContext context)
 
     private async Task<Dictionary<int, Account>> GetTrackedAccountsOrThrowAsync(
         int sourceAccountId,
-        int? destinationAccountId
+        int? destinationAccountId,
+        CancellationToken cancellationToken = default
     )
     {
         var accountIds = new[] { sourceAccountId, destinationAccountId }
@@ -79,7 +84,7 @@ public class UpdateAccountBalance(PitakaDbContext context)
         var accounts = await _context
             .Accounts.Where(account => accountIds.Contains(account.Id))
             .OrderBy(account => account.Id)
-            .ToDictionaryAsync(account => account.Id);
+            .ToDictionaryAsync(account => account.Id, cancellationToken);
 
         foreach (var accountId in accountIds)
         {

@@ -293,7 +293,8 @@ public class TransactionsController(
                 await _verifyTransactionCategory.VerifyAsync(
                     user,
                     categoryId,
-                    ExpectedCategoryType(transaction.Type)
+                    ExpectedCategoryType(transaction.Type),
+                    cancellationToken
                 )
             )
                 is { } rejection
@@ -304,7 +305,7 @@ public class TransactionsController(
 
         if (distinctTagIds != null)
         {
-            tags = await _tagService.GetByTagsIdsForUser(user, distinctTagIds);
+            tags = await _tagService.GetByTagsIdsForUser(user, distinctTagIds, cancellationToken);
         }
 
         if (tags?.Count != distinctTagIds?.Length)
@@ -315,7 +316,12 @@ public class TransactionsController(
             );
         }
 
-        await _transactionService.UpdateAsync(transaction, request.ToInput(), tags);
+        await _transactionService.UpdateAsync(
+            transaction,
+            request.ToInput(),
+            tags,
+            cancellationToken
+        );
         return Ok(TransactionResource.FromModel(transaction));
     }
 
@@ -334,7 +340,7 @@ public class TransactionsController(
             return NotFound();
         }
 
-        var result = await _transactionService.DeleteAsync(transaction);
+        var result = await _transactionService.DeleteAsync(transaction, cancellationToken);
 
         return result switch
         {

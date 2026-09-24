@@ -84,7 +84,14 @@ public class GoalsController(
             return NotFound();
         }
 
-        if (await _goalService.NameExistsForUserAsync(user.Id, request.Name, excludeId: id))
+        if (
+            await _goalService.NameExistsForUserAsync(
+                user.Id,
+                request.Name,
+                excludeId: id,
+                cancellationToken: cancellationToken
+            )
+        )
         {
             return Problem(
                 detail: "A goal with this name already exists.",
@@ -92,8 +99,8 @@ public class GoalsController(
             );
         }
 
-        await _goalService.UpdateAsync(goal, request.ToInput());
-        var currentAmount = await _getGoalCurrentAmount.GetAsync(goal);
+        await _goalService.UpdateAsync(goal, request.ToInput(), cancellationToken);
+        var currentAmount = await _getGoalCurrentAmount.GetAsync(goal, cancellationToken);
         return Ok(GoalWithCurrentAmountResource.FromModel(goal, currentAmount));
     }
 
@@ -112,8 +119,8 @@ public class GoalsController(
             return NotFound();
         }
 
-        await _goalService.PatchStatusAsync(goal, request.Status);
-        var currentAmount = await _getGoalCurrentAmount.GetAsync(goal);
+        await _goalService.PatchStatusAsync(goal, request.Status, cancellationToken);
+        var currentAmount = await _getGoalCurrentAmount.GetAsync(goal, cancellationToken);
         return Ok(GoalWithCurrentAmountResource.FromModel(goal, currentAmount));
     }
 
@@ -128,7 +135,7 @@ public class GoalsController(
             return NotFound();
         }
 
-        await _goalService.DeleteAsync(goal);
+        await _goalService.DeleteAsync(goal, cancellationToken);
         return NoContent();
     }
 

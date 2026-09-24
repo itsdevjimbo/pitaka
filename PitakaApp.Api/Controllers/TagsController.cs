@@ -73,7 +73,14 @@ public class TagsController(TagService tagService, CurrentUserAccessor currentUs
             return NotFound();
         }
 
-        if (await _tagService.NameExistsForUserAsync(user.Id, request.Name, excludeId: id))
+        if (
+            await _tagService.NameExistsForUserAsync(
+                user.Id,
+                request.Name,
+                excludeId: id,
+                cancellationToken: cancellationToken
+            )
+        )
         {
             return Problem(
                 detail: "A tag with this name already exists.",
@@ -81,7 +88,7 @@ public class TagsController(TagService tagService, CurrentUserAccessor currentUs
             );
         }
 
-        await _tagService.UpdateAsync(tag, request.ToInput());
+        await _tagService.UpdateAsync(tag, request.ToInput(), cancellationToken);
 
         return Ok(TagResource.FromModel(tag));
     }
@@ -97,7 +104,7 @@ public class TagsController(TagService tagService, CurrentUserAccessor currentUs
             return NotFound();
         }
 
-        await _tagService.DeleteAsync(tag);
+        await _tagService.DeleteAsync(tag, cancellationToken);
         return NoContent();
     }
 }

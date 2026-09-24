@@ -120,7 +120,14 @@ public class BudgetsController(
             return NotFound();
         }
 
-        if (await _budgetService.NameExistsForUserAsync(user.Id, request.Name, excludeId: id))
+        if (
+            await _budgetService.NameExistsForUserAsync(
+                user.Id,
+                request.Name,
+                excludeId: id,
+                cancellationToken: cancellationToken
+            )
+        )
         {
             return Problem(
                 detail: "A budget with this name already exists.",
@@ -130,14 +137,16 @@ public class BudgetsController(
 
         if (
             request.CategoryId is int categoryId
-            && RejectBudgetCategory(await _verifyBudgetCategory.VerifyAsync(user, categoryId))
+            && RejectBudgetCategory(
+                await _verifyBudgetCategory.VerifyAsync(user, categoryId, cancellationToken)
+            )
                 is { } rejection
         )
         {
             return rejection;
         }
 
-        await _budgetService.UpdateAsync(budget, request.ToInput());
+        await _budgetService.UpdateAsync(budget, request.ToInput(), cancellationToken);
 
         return Ok(BudgetResource.FromModel(budget));
     }
@@ -157,7 +166,7 @@ public class BudgetsController(
             return NotFound();
         }
 
-        await _budgetService.DeleteAsync(budget);
+        await _budgetService.DeleteAsync(budget, cancellationToken);
         return NoContent();
     }
 }
