@@ -84,7 +84,7 @@ public class PitakaDbContext(DbContextOptions<PitakaDbContext> options)
             .HasOne(user => user.Photo)
             .WithOne()
             .HasForeignKey<User>(user => user.PhotoId)
-            .OnDelete(DeleteBehavior.Restrict);
+            .OnDelete(DeleteBehavior.SetNull);
 
         var enumProperties = modelBuilder
             .Model.GetEntityTypes()

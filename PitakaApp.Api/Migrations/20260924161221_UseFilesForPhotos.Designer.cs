@@ -1094,7 +1094,7 @@ namespace PitakaApp.Api.Migrations
                     b.HasOne("PitakaApp.Api.Models.StoredFile", "Photo")
                         .WithOne()
                         .HasForeignKey("PitakaApp.Api.Models.User", "PhotoId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.SetNull)
                         .HasConstraintName("fk_users_files_photo_id");
 
                     b.Navigation("Photo");
