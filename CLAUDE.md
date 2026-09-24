@@ -8,11 +8,11 @@ Before implementing or reviewing code, read `docs/coding-standards.md` for rules
 
 ### Issue tracker
 
-Issues live as markdown files under `.scratch/<feature>/` in this repo. See `docs/agents/issue-tracker.md`.
+Issues and specs live in this repo's GitHub Issues. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
-The five canonical triage roles, each label string equal to its name. See `docs/agents/triage-labels.md`.
+The five canonical triage roles use their own names as GitHub labels. See `docs/agents/triage-labels.md`.
 
 ### Domain docs
 
