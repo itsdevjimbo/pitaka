@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using PitakaApp.Api.Actions;
 using PitakaApp.Api.Data;
 using PitakaApp.Api.Dtos;
 using PitakaApp.Api.Enums;
@@ -7,9 +8,14 @@ using PitakaApp.Api.Models;
 
 namespace PitakaApp.Api.Services;
 
-public class GoalService(PitakaDbContext context)
+public class GoalService(
+    PitakaDbContext context,
+    CheckUserScopedNameExists checkUserScopedNameExists
+)
 {
     private readonly PitakaDbContext _context = context;
+    private readonly CheckUserScopedNameExists _checkUserScopedNameExists =
+        checkUserScopedNameExists;
 
     public async Task<List<GoalWithCurrentAmount>> GetAllForUser(User user) =>
         await _context
@@ -47,23 +53,28 @@ public class GoalService(PitakaDbContext context)
     public async Task<Goal?> GetTrackedByIdAsync(int id) =>
         await _context.Goals.Where(goal => goal.Id == id).FirstOrDefaultAsync();
 
-    public async Task<bool> NameExistsForUserAsync(
+    public Task<bool> NameExistsForUserAsync(
         int userId,
         string name,
         int? excludeId = null,
         CancellationToken cancellationToken = default
     ) =>
-        await _context
-            .Goals.AsNoTracking()
-            .AnyAsync(
-                a =>
-                    a.UserId == userId
-                    && a.Name == name
-                    && (excludeId == null || a.Id != excludeId),
-                cancellationToken
-            );
+        _checkUserScopedNameExists.ExecuteAsync(
+            _context.Goals,
+            userId,
+            name,
+            goal => goal.UserId,
+            goal => goal.Name,
+            goal => goal.Id,
+            excludeId,
+            cancellationToken
+        );
 
-    public async Task<Goal> CreateAsync(User user, GoalInput input)
+    public async Task<Goal> CreateAsync(
+        User user,
+        GoalInput input,
+        CancellationToken cancellationToken = default
+    )
     {
         var goal = new Goal
         {
@@ -74,7 +85,7 @@ public class GoalService(PitakaDbContext context)
         };
 
         _context.Goals.Add(goal);
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(cancellationToken);
         return goal;
     }
 

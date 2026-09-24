@@ -367,6 +367,34 @@ public class AccountsControllerTest : IDisposable
     }
 
     [Fact]
+    public async Task Create_SameNameDifferentUser_ReturnsCreated()
+    {
+        var userA = await UserFactory.CreateAsync(_context);
+        var userB = await UserFactory.CreateAsync(_context);
+        await AccountFactory.CreateAsync(_context, userB.Id, "Savings account");
+        _client.ActAsUser(userA);
+
+        var request = new
+        {
+            Name = "Savings account",
+            Type = AccountType.Bank,
+            InitialBalance = 5000,
+        };
+
+        var response = await _client.PostAsJsonAsync("/api/accounts", request);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<AccountResource>(
+            TestJsonOptions.Default
+        );
+        Assert.True(
+            await _context
+                .Accounts.AsNoTracking()
+                .AnyAsync(a => a.Id == body!.Id && a.UserId == userA.Id)
+        );
+    }
+
+    [Fact]
     public async Task Create_WithInitialBalance_ReturnsItInResponse()
     {
         var user = await UserFactory.CreateAsync(_context);

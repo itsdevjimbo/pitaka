@@ -7,11 +7,17 @@ using PitakaApp.Api.Models;
 
 namespace PitakaApp.Api.Services;
 
-public class RecurringTransactionService(PitakaDbContext context, GetNextRunDate getNextRunDate)
+public class RecurringTransactionService(
+    PitakaDbContext context,
+    GetNextRunDate getNextRunDate,
+    CheckUserScopedNameExists checkUserScopedNameExists
+)
 {
     private readonly PitakaDbContext _context = context;
 
     private readonly GetNextRunDate _getNextRunDate = getNextRunDate;
+    private readonly CheckUserScopedNameExists _checkUserScopedNameExists =
+        checkUserScopedNameExists;
 
     private IQueryable<RecurringTransactionRead> WithGeneratedTransactionCount(
         IQueryable<RecurringTransaction> recurringTransactions
@@ -46,21 +52,22 @@ public class RecurringTransactionService(PitakaDbContext context, GetNextRunDate
             )
             .FirstOrDefaultAsync(cancellationToken);
 
-    public async Task<bool> NameExistsForUserAsync(
+    public Task<bool> NameExistsForUserAsync(
         int userId,
         string name,
         int? excludeId = null,
         CancellationToken cancellationToken = default
     ) =>
-        await _context
-            .RecurringTransactions.AsNoTracking()
-            .AnyAsync(
-                a =>
-                    a.UserId == userId
-                    && a.Name == name
-                    && (excludeId == null || a.Id != excludeId),
-                cancellationToken
-            );
+        _checkUserScopedNameExists.ExecuteAsync(
+            _context.RecurringTransactions,
+            userId,
+            name,
+            recurringTransaction => recurringTransaction.UserId,
+            recurringTransaction => recurringTransaction.Name,
+            recurringTransaction => recurringTransaction.Id,
+            excludeId,
+            cancellationToken
+        );
 
     public async Task<RecurringTransaction> CreateAsync(
         Account account,

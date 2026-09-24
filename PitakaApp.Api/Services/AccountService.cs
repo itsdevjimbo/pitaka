@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using PitakaApp.Api.Actions;
 using PitakaApp.Api.Data;
 using PitakaApp.Api.Enums;
 using PitakaApp.Api.Inputs;
@@ -6,9 +7,14 @@ using PitakaApp.Api.Models;
 
 namespace PitakaApp.Api.Services;
 
-public class AccountService(PitakaDbContext context)
+public class AccountService(
+    PitakaDbContext context,
+    CheckUserScopedNameExists checkUserScopedNameExists
+)
 {
     private readonly PitakaDbContext _context = context;
+    private readonly CheckUserScopedNameExists _checkUserScopedNameExists =
+        checkUserScopedNameExists;
 
     public async Task<List<Account>> GetAllForUser(User user, AccountQueryInput input)
     {
@@ -37,34 +43,54 @@ public class AccountService(PitakaDbContext context)
             .Where(a => a.Id == id && a.UserId == user.Id)
             .FirstOrDefaultAsync(cancellationToken);
 
-    public async Task<Account?> GetTrackedByIdForUserAsync(User user, int id) =>
-        await _context.Accounts.Where(a => a.Id == id && a.UserId == user.Id).FirstOrDefaultAsync();
-
-    public async Task<bool> NameExistsForUserAsync(
-        int userId,
-        string name,
-        int? excludeId = null
+    public async Task<Account?> GetTrackedByIdForUserAsync(
+        User user,
+        int id,
+        CancellationToken cancellationToken = default
     ) =>
         await _context
-            .Accounts.AsNoTracking()
-            .AnyAsync(a =>
-                a.UserId == userId && a.Name == name && (excludeId == null || a.Id != excludeId)
-            );
+            .Accounts.Where(a => a.Id == id && a.UserId == user.Id)
+            .FirstOrDefaultAsync(cancellationToken);
 
-    public async Task<Account> CreateAsync(User user, CreateAccountInput input)
+    public Task<bool> NameExistsForUserAsync(
+        int userId,
+        string name,
+        int? excludeId = null,
+        CancellationToken cancellationToken = default
+    ) =>
+        _checkUserScopedNameExists.ExecuteAsync(
+            _context.Accounts,
+            userId,
+            name,
+            account => account.UserId,
+            account => account.Name,
+            account => account.Id,
+            excludeId,
+            cancellationToken
+        );
+
+    public async Task<Account> CreateAsync(
+        User user,
+        CreateAccountInput input,
+        CancellationToken cancellationToken = default
+    )
     {
         var account = Account.Open(user.Id, input.Name, input.Type, input.InitialBalance);
 
         _context.Accounts.Add(account);
 
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(cancellationToken);
         return account;
     }
 
-    public async Task<Account> UpdateAsync(Account account, UpdateAccountInput input)
+    public async Task<Account> UpdateAsync(
+        Account account,
+        UpdateAccountInput input,
+        CancellationToken cancellationToken = default
+    )
     {
         account.Name = input.Name;
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(cancellationToken);
         return account;
     }
 

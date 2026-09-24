@@ -34,11 +34,20 @@ public class GoalsController(
     }
 
     [HttpPost]
-    public async Task<IActionResult> Create(GoalRequest request)
+    public async Task<IActionResult> Create(
+        GoalRequest request,
+        CancellationToken cancellationToken
+    )
     {
         var user = _currentUserAccessor.User!;
 
-        if (await _goalService.NameExistsForUserAsync(user.Id, request.Name))
+        if (
+            await _goalService.NameExistsForUserAsync(
+                user.Id,
+                request.Name,
+                cancellationToken: cancellationToken
+            )
+        )
         {
             return Problem(
                 detail: "An goal with this name already exists.",
@@ -46,8 +55,8 @@ public class GoalsController(
             );
         }
 
-        var goal = await _goalService.CreateAsync(user, request.ToInput());
-        var currentAmount = await _getGoalCurrentAmount.GetAsync(goal);
+        var goal = await _goalService.CreateAsync(user, request.ToInput(), cancellationToken);
+        var currentAmount = await _getGoalCurrentAmount.GetAsync(goal, cancellationToken);
         return StatusCode(
             StatusCodes.Status201Created,
             GoalWithCurrentAmountResource.FromModel(goal, currentAmount)

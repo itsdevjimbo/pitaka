@@ -27,11 +27,17 @@ public class TagsController(TagService tagService, CurrentUserAccessor currentUs
     }
 
     [HttpPost]
-    public async Task<IActionResult> Create(TagRequest request)
+    public async Task<IActionResult> Create(TagRequest request, CancellationToken cancellationToken)
     {
         var user = _currentUserAccessor.User!;
 
-        if (await _tagService.NameExistsForUserAsync(user.Id, request.Name))
+        if (
+            await _tagService.NameExistsForUserAsync(
+                user.Id,
+                request.Name,
+                cancellationToken: cancellationToken
+            )
+        )
         {
             return Problem(
                 detail: "A tag with this name already exists.",
@@ -39,7 +45,7 @@ public class TagsController(TagService tagService, CurrentUserAccessor currentUs
             );
         }
 
-        var tag = await _tagService.CreateAsync(user, request.ToInput());
+        var tag = await _tagService.CreateAsync(user, request.ToInput(), cancellationToken);
 
         return StatusCode(StatusCodes.Status201Created, TagResource.FromModel(tag));
     }

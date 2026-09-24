@@ -29,6 +29,7 @@ public static class ApplicationServiceExtensions
         services.AddScoped<CleanupFiles>();
         services.AddSingleton<ProfilePictureImageProcessor>();
         services.AddHostedService<FileCleanupWorker>();
+        services.AddScoped<CheckUserScopedNameExists>();
 
         // Category
         services.AddScoped<CategoryService>();

@@ -1,13 +1,19 @@
 using Microsoft.EntityFrameworkCore;
+using PitakaApp.Api.Actions;
 using PitakaApp.Api.Data;
 using PitakaApp.Api.Inputs;
 using PitakaApp.Api.Models;
 
 namespace PitakaApp.Api.Services;
 
-public class CategoryService(PitakaDbContext context)
+public class CategoryService(
+    PitakaDbContext context,
+    CheckUserScopedNameExists checkUserScopedNameExists
+)
 {
     private readonly PitakaDbContext _context = context;
+    private readonly CheckUserScopedNameExists _checkUserScopedNameExists =
+        checkUserScopedNameExists;
 
     public async Task<List<Category>> GetAllForUser(User user) =>
         await _context
@@ -39,25 +45,28 @@ public class CategoryService(PitakaDbContext context)
             cancellationToken
         );
 
-    // excludeId lets Update check "does any OTHER category of mine already have this
-    // name" without the category being renamed conflicting with itself.
-    public async Task<bool> NameExistsForUserAsync(
+    public Task<bool> NameExistsForUserAsync(
         int userId,
         string name,
         int? excludeId = null,
         CancellationToken cancellationToken = default
     ) =>
-        await _context
-            .Categories.AsNoTracking()
-            .AnyAsync(
-                c =>
-                    c.UserId == userId
-                    && c.Name == name
-                    && (excludeId == null || c.Id != excludeId),
-                cancellationToken
-            );
+        _checkUserScopedNameExists.ExecuteAsync(
+            _context.Categories,
+            userId,
+            name,
+            category => category.UserId,
+            category => category.Name,
+            category => category.Id,
+            excludeId,
+            cancellationToken
+        );
 
-    public async Task<Category> CreateUserOwnedAsync(User user, CreateCategoryInput input)
+    public async Task<Category> CreateUserOwnedAsync(
+        User user,
+        CreateCategoryInput input,
+        CancellationToken cancellationToken = default
+    )
     {
         var category = new Category
         {
@@ -71,7 +80,7 @@ public class CategoryService(PitakaDbContext context)
 
         _context.Categories.Add(category);
 
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(cancellationToken);
         return category;
     }
 

@@ -61,11 +61,20 @@ public class BudgetsController(
     }
 
     [HttpPost]
-    public async Task<IActionResult> Create(BudgetRequest request)
+    public async Task<IActionResult> Create(
+        BudgetRequest request,
+        CancellationToken cancellationToken
+    )
     {
         var user = _currentUserAccessor.User!;
 
-        if (await _budgetService.NameExistsForUserAsync(user.Id, request.Name))
+        if (
+            await _budgetService.NameExistsForUserAsync(
+                user.Id,
+                request.Name,
+                cancellationToken: cancellationToken
+            )
+        )
         {
             return Problem(
                 detail: "A budget with this name already exists.",
@@ -75,14 +84,16 @@ public class BudgetsController(
 
         if (
             request.CategoryId is int categoryId
-            && RejectBudgetCategory(await _verifyBudgetCategory.VerifyAsync(user, categoryId))
+            && RejectBudgetCategory(
+                await _verifyBudgetCategory.VerifyAsync(user, categoryId, cancellationToken)
+            )
                 is { } rejection
         )
         {
             return rejection;
         }
 
-        var budget = await _budgetService.CreateAsync(user, request.ToInput());
+        var budget = await _budgetService.CreateAsync(user, request.ToInput(), cancellationToken);
 
         return StatusCode(StatusCodes.Status201Created, BudgetResource.FromModel(budget));
     }

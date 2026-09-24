@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
+using PitakaApp.Api.Actions;
 using PitakaApp.Api.Data;
 using PitakaApp.Api.Enums;
 using PitakaApp.Api.Inputs;
@@ -120,7 +121,7 @@ public class AccountConcurrencyTest : IDisposable
             .AddInterceptors(interceptor)
             .Options;
         await using var deleteContext = new PitakaDbContext(options);
-        var accountService = new AccountService(deleteContext);
+        var accountService = new AccountService(deleteContext, new CheckUserScopedNameExists());
         var deleteTask = accountService.DeleteAsync(
             account.UserId,
             account.Id,

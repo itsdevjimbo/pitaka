@@ -41,11 +41,20 @@ public class CategoriesController(
 
     [TypeFilter(typeof(ResolveCurrentUserFilter))]
     [HttpPost]
-    public async Task<IActionResult> Create(CreateCategoryRequest request)
+    public async Task<IActionResult> Create(
+        CreateCategoryRequest request,
+        CancellationToken cancellationToken
+    )
     {
         var user = _currentUserAccessor.User!;
 
-        if (await _categoryService.NameExistsForUserAsync(user.Id, request.Name))
+        if (
+            await _categoryService.NameExistsForUserAsync(
+                user.Id,
+                request.Name,
+                cancellationToken: cancellationToken
+            )
+        )
         {
             return Problem(
                 detail: "A category with this name already exists.",
@@ -53,7 +62,11 @@ public class CategoriesController(
             );
         }
 
-        var category = await _categoryService.CreateUserOwnedAsync(user, request.ToInput());
+        var category = await _categoryService.CreateUserOwnedAsync(
+            user,
+            request.ToInput(),
+            cancellationToken
+        );
         return StatusCode(StatusCodes.Status201Created, CategoryResource.FromModel(category));
     }
 

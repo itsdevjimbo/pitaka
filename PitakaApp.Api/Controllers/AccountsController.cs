@@ -31,11 +31,20 @@ public class AccountsController(
     }
 
     [HttpPost]
-    public async Task<IActionResult> Create(CreateAccountRequest request)
+    public async Task<IActionResult> Create(
+        CreateAccountRequest request,
+        CancellationToken cancellationToken
+    )
     {
         var user = _currentUserAccessor.User!;
 
-        if (await _accountService.NameExistsForUserAsync(user.Id, request.Name))
+        if (
+            await _accountService.NameExistsForUserAsync(
+                user.Id,
+                request.Name,
+                cancellationToken: cancellationToken
+            )
+        )
         {
             return Problem(
                 detail: "An account with this name already exists.",
@@ -43,7 +52,7 @@ public class AccountsController(
             );
         }
 
-        var account = await _accountService.CreateAsync(user, request.ToInput());
+        var account = await _accountService.CreateAsync(user, request.ToInput(), cancellationToken);
 
         return StatusCode(StatusCodes.Status201Created, AccountResource.FromModel(account));
     }
@@ -63,17 +72,28 @@ public class AccountsController(
     }
 
     [HttpPut("{id}")]
-    public async Task<IActionResult> Update(int id, UpdateAccountRequest request)
+    public async Task<IActionResult> Update(
+        int id,
+        UpdateAccountRequest request,
+        CancellationToken cancellationToken
+    )
     {
         var user = _currentUserAccessor.User!;
-        var account = await _accountService.GetTrackedByIdForUserAsync(user, id);
+        var account = await _accountService.GetTrackedByIdForUserAsync(user, id, cancellationToken);
 
         if (account == null)
         {
             return NotFound();
         }
 
-        if (await _accountService.NameExistsForUserAsync(user.Id, request.Name, excludeId: id))
+        if (
+            await _accountService.NameExistsForUserAsync(
+                user.Id,
+                request.Name,
+                excludeId: id,
+                cancellationToken: cancellationToken
+            )
+        )
         {
             return Problem(
                 detail: "An account with this name already exists.",
@@ -81,7 +101,7 @@ public class AccountsController(
             );
         }
 
-        await _accountService.UpdateAsync(account, request.ToInput());
+        await _accountService.UpdateAsync(account, request.ToInput(), cancellationToken);
         return Ok(AccountResource.FromModel(account));
     }
 

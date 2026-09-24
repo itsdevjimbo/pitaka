@@ -1,13 +1,19 @@
 using Microsoft.EntityFrameworkCore;
+using PitakaApp.Api.Actions;
 using PitakaApp.Api.Data;
 using PitakaApp.Api.Inputs;
 using PitakaApp.Api.Models;
 
 namespace PitakaApp.Api.Services;
 
-public class BudgetService(PitakaDbContext context)
+public class BudgetService(
+    PitakaDbContext context,
+    CheckUserScopedNameExists checkUserScopedNameExists
+)
 {
     private readonly PitakaDbContext _context = context;
+    private readonly CheckUserScopedNameExists _checkUserScopedNameExists =
+        checkUserScopedNameExists;
 
     public async Task<List<Budget>> GetAllForUser(User user) =>
         await _context.Budgets.AsNoTracking().Where(a => a.UserId == user.Id).ToListAsync();
@@ -27,23 +33,28 @@ public class BudgetService(PitakaDbContext context)
             .Budgets.Where(budget => budget.Id == id && budget.UserId == userId)
             .FirstOrDefaultAsync(cancellationToken);
 
-    public async Task<bool> NameExistsForUserAsync(
+    public Task<bool> NameExistsForUserAsync(
         int userId,
         string name,
         int? excludeId = null,
         CancellationToken cancellationToken = default
     ) =>
-        await _context
-            .Budgets.AsNoTracking()
-            .AnyAsync(
-                a =>
-                    a.UserId == userId
-                    && a.Name == name
-                    && (excludeId == null || a.Id != excludeId),
-                cancellationToken
-            );
+        _checkUserScopedNameExists.ExecuteAsync(
+            _context.Budgets,
+            userId,
+            name,
+            budget => budget.UserId,
+            budget => budget.Name,
+            budget => budget.Id,
+            excludeId,
+            cancellationToken
+        );
 
-    public async Task<Budget> CreateAsync(User user, BudgetInput input)
+    public async Task<Budget> CreateAsync(
+        User user,
+        BudgetInput input,
+        CancellationToken cancellationToken = default
+    )
     {
         var budget = new Budget
         {
@@ -59,7 +70,7 @@ public class BudgetService(PitakaDbContext context)
 
         _context.Budgets.Add(budget);
 
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(cancellationToken);
         return budget;
     }
 
