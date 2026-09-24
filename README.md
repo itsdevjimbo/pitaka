@@ -6,7 +6,8 @@ See [Coding standards](docs/coding-standards.md) for implementation and review r
 and existing exceptions.
 
 API contracts: [private-resource ownership and 404 responses](docs/api/ownership.md) and
-[Linked Contributions](docs/api/linked-contributions.md).
+[Linked Contributions](docs/api/linked-contributions.md), plus
+[private Profile pictures](docs/api/profile-pictures.md).
 
 ## Two dev loops
 

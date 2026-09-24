@@ -24,6 +24,7 @@ public class PitakaDbContext(DbContextOptions<PitakaDbContext> options)
     public DbSet<Goal> Goals { get; set; }
     public DbSet<GoalContribution> GoalContributions { get; set; }
     public DbSet<LinkedContributionOperation> LinkedContributionOperations { get; set; }
+    public DbSet<ProfilePictureObject> ProfilePictureObjects { get; set; }
     public DbSet<Tag> Tags { get; set; }
     public DbSet<DataProtectionKey> DataProtectionKeys { get; set; }
 
@@ -68,6 +69,19 @@ public class PitakaDbContext(DbContextOptions<PitakaDbContext> options)
             .IsUnique();
 
         modelBuilder.Entity<Tag>().HasIndex(c => new { c.UserId, c.Name }).IsUnique();
+
+        modelBuilder.Entity<ProfilePictureObject>().HasKey(picture => picture.ObjectKey);
+        modelBuilder
+            .Entity<ProfilePictureObject>()
+            .HasIndex(picture => new { picture.State, picture.NextAttemptAt });
+        modelBuilder
+            .Entity<ProfilePictureObject>()
+            .Property(picture => picture.State)
+            .IsConcurrencyToken();
+        modelBuilder
+            .Entity<ProfilePictureObject>()
+            .Property(picture => picture.DeletionLeaseToken)
+            .HasMaxLength(36);
 
         var enumProperties = modelBuilder
             .Model.GetEntityTypes()

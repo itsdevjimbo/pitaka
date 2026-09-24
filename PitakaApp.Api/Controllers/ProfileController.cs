@@ -23,6 +23,7 @@ public class ProfileController(
     CancelEmailChange cancelEmailChange,
     ChangeProfileName changeProfileName,
     ChangePassword changePassword,
+    ProfilePictureService profilePictureService,
     CurrentUserAccessor currentUserAccessor,
     TimeProvider timeProvider
 ) : ControllerBase
@@ -32,6 +33,7 @@ public class ProfileController(
     private readonly CancelEmailChange _cancelEmailChange = cancelEmailChange;
     private readonly ChangeProfileName _changeProfileName = changeProfileName;
     private readonly ChangePassword _changePassword = changePassword;
+    private readonly ProfilePictureService _profilePictureService = profilePictureService;
     private readonly CurrentUserAccessor _currentUserAccessor = currentUserAccessor;
     private readonly TimeProvider _timeProvider = timeProvider;
 
@@ -47,7 +49,9 @@ public class ProfileController(
         var user = _currentUserAccessor.User!;
         var pendingEmail = user.PendingEmailAsOf(_timeProvider.GetUtcNow().UtcDateTime);
 
-        return Ok(new ProfileResponse(user.Id, user.Name, user.Email!, pendingEmail));
+        return Ok(
+            new ProfileResponse(user.Id, user.Name, user.Email!, pendingEmail, user.HasPicture)
+        );
     }
 
     // Authenticated. Body carries the new name and nothing else — { name } genuinely is
@@ -63,7 +67,92 @@ public class ProfileController(
         var updated = await _changeProfileName.ExecuteAsync(user, request.ToInput());
         var pendingEmail = updated.PendingEmailAsOf(_timeProvider.GetUtcNow().UtcDateTime);
 
-        return Ok(new ProfileResponse(updated.Id, updated.Name, updated.Email!, pendingEmail));
+        return Ok(
+            new ProfileResponse(
+                updated.Id,
+                updated.Name,
+                updated.Email!,
+                pendingEmail,
+                updated.HasPicture
+            )
+        );
+    }
+
+    // The object stays private in the configured store. Browser clients fetch it with
+    // their bearer token and display these bytes through a local Blob URL.
+    [TypeFilter(typeof(ResolveCurrentUserFilter))]
+    [HttpPut("picture")]
+    [RequestSizeLimit(
+        ProfilePictureImageProcessor.MaxEncodedBytes
+            + ProfilePictureImageProcessor.MaxMultipartOverheadBytes
+    )]
+    [RequestFormLimits(
+        MultipartBodyLengthLimit = ProfilePictureImageProcessor.MaxEncodedBytes
+            + ProfilePictureImageProcessor.MaxMultipartOverheadBytes
+    )]
+    public async Task<IActionResult> UploadPicture(
+        [FromForm] UploadProfilePictureRequest request,
+        CancellationToken cancellationToken
+    )
+    {
+        var input = request.ToInput();
+        using var source = input.Source;
+        var error = await _profilePictureService.UploadAsync(
+            _currentUserAccessor.User!.Id,
+            source,
+            input.DeclaredLength,
+            cancellationToken
+        );
+
+        return error is null ? NoContent() : InvalidPicture(error.Value);
+    }
+
+    [TypeFilter(typeof(ResolveCurrentUserFilter))]
+    [HttpGet("picture")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public async Task<IActionResult> GetPicture(CancellationToken cancellationToken)
+    {
+        Response.Headers.CacheControl = "no-store, no-cache, max-age=0";
+        Response.Headers.Pragma = "no-cache";
+        Response.Headers.Expires = "0";
+
+        var picture = await _profilePictureService.GetCurrentAsync(
+            _currentUserAccessor.User!.Id,
+            cancellationToken
+        );
+
+        return picture is null ? NotFound() : File(picture.Content, picture.MediaType);
+    }
+
+    [TypeFilter(typeof(ResolveCurrentUserFilter))]
+    [HttpDelete("picture")]
+    public async Task<IActionResult> RemovePicture(CancellationToken cancellationToken)
+    {
+        await _profilePictureService.RemoveAsync(_currentUserAccessor.User!.Id, cancellationToken);
+        return NoContent();
+    }
+
+    private IActionResult InvalidPicture(ProfilePictureValidationError error)
+    {
+        var detail = error switch
+        {
+            ProfilePictureValidationError.Empty => "Choose a non-empty image file.",
+            ProfilePictureValidationError.TooLarge => "Profile pictures must be 2 MB or smaller.",
+            ProfilePictureValidationError.InvalidImage =>
+                "The uploaded bytes are not a valid image.",
+            ProfilePictureValidationError.UnsupportedFormat =>
+                "Only JPEG, PNG, and WebP images are supported.",
+            ProfilePictureValidationError.Animated => "Animated images are not supported.",
+            ProfilePictureValidationError.DimensionsExceeded =>
+                "Each image dimension must be 4096 pixels or smaller.",
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(error),
+                error,
+                "Unknown picture error."
+            ),
+        };
+
+        return Problem(detail: detail, statusCode: StatusCodes.Status400BadRequest);
     }
 
     // Authenticated. Body carries the current password and its replacement. A

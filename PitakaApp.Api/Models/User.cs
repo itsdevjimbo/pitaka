@@ -27,6 +27,17 @@ public class User : IdentityUser<int>, ITimestamped
     // the stored state and the confirmation token die together.
     public DateTime? PendingEmailExpiresAt { get; set; }
 
+    // The current picture's private object reference and detected media type. The
+    // object key is only used by server-side storage calls and never appears in a
+    // Profile response.
+    [MaxLength(128)]
+    public string? ProfilePictureObjectKey { get; set; }
+
+    [MaxLength(32)]
+    public string? ProfilePictureMediaType { get; set; }
+
+    public bool HasPicture => ProfilePictureObjectKey is not null;
+
     // The pending address as it stands at utcNow, or null (ADR 0014). Past its expiry —
     // or never set — it is absent: not shown on the Profile, not blocking a fresh
     // request, not redeemable. The one place that "treated as absent" rule is spelled

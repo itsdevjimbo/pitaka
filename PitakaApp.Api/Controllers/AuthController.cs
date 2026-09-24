@@ -42,7 +42,8 @@ public class AuthController(
                 var profileResponse = new ProfileResponse(
                     result.User!.Id,
                     result.User.Name,
-                    result.User.Email!
+                    result.User.Email!,
+                    HasPicture: result.User.HasPicture
                 );
                 return Ok(new LoginResponse(token, profileResponse));
 
@@ -88,7 +89,8 @@ public class AuthController(
                 var profileResponse = new ProfileResponse(
                     result.User!.Id,
                     result.User.Name,
-                    result.User.Email!
+                    result.User.Email!,
+                    HasPicture: result.User.HasPicture
                 );
 
                 // 201 with the Profile only — no token. A new Profile cannot sign in until it
@@ -192,6 +194,12 @@ public class AuthController(
 // LoginResponse. PendingEmail is nullable and only ever populated by the Profile read —
 // login leaves it null. Client counterpart: pitaka-web shows a "pending change"
 // indicator when set.
-public record ProfileResponse(int Id, string Name, string Email, string? PendingEmail = null);
+public record ProfileResponse(
+    int Id,
+    string Name,
+    string Email,
+    string? PendingEmail = null,
+    bool HasPicture = false
+);
 
 public record LoginResponse(string Token, ProfileResponse User);

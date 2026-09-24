@@ -14,6 +14,12 @@ _Avoid_: Account, member
 The same person, named the way they are addressed. Every user-facing string the API authors — reset emails, error messages — says Profile, never User and never Account.
 _Avoid_: Account, user account, my account, user settings
 
+**Profile picture**:
+The one optional static JPEG, PNG, or WebP image attached to a Profile. It is private to that
+Profile and is read through the authenticated Profile API; its storage address is never part of
+the Profile representation.
+_Avoid_: Avatar, profile photo
+
 **Account**:
 A supported place where money is held — a bank account, cash on hand, a wallet, or an investment.
 Carries a signed balance; a negative balance means that place is overdrawn, not that Pitaka models
