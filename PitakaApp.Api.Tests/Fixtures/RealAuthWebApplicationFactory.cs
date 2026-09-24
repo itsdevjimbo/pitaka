@@ -40,13 +40,10 @@ public class RealAuthWebApplicationFactory : WebApplicationFactory<Program>, IAs
         builder.ConfigureAppConfiguration(
             (_, config) =>
             {
-                var settings = new Dictionary<string, string?>
-                {
-                    ["ConnectionStrings:DefaultConnection"] = TestConnectionString,
-                    ["Jwt:Key"] = TestJwtKey,
-                    ["RecurringTransaction:Enabled"] = "false",
-                };
-                ObjectStorageTestConfiguration.AddTo(settings);
+                var settings = TestHostConfiguration.CreateSettings(
+                    TestConnectionString,
+                    TestJwtKey
+                );
                 config.AddInMemoryCollection(settings);
             }
         );

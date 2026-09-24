@@ -190,18 +190,10 @@ public class CorsPipelineTest(PitakaWebApplicationFactory factory)
                 {
                     config.Sources.Clear();
 
-                    var settings = new Dictionary<string, string?>
-                    {
-                        ["ConnectionStrings:DefaultConnection"] =
-                            PitakaWebApplicationFactory.TestConnectionString,
-                        ["Jwt:Key"] = PitakaWebApplicationFactory.TestJwtKey,
-                        ["Jwt:Issuer"] = "PitakaApp",
-                        ["Jwt:Audience"] = "PitakaAppUsers",
-                        ["Jwt:ExpiryMinutes"] = "60",
-                        ["RecurringTransaction:Enabled"] = "false",
-                    };
-                    ObjectStorageTestConfiguration.AddTo(settings);
-
+                    var settings = TestHostConfiguration.CreateSettings(
+                        PitakaWebApplicationFactory.TestConnectionString,
+                        PitakaWebApplicationFactory.TestJwtKey
+                    );
                     for (var i = 0; i < origins.Length; i++)
                     {
                         settings[$"Cors:AllowedOrigins:{i}"] = origins[i];

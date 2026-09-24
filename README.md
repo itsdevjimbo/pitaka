@@ -48,22 +48,6 @@ Pick one. The Docker loop needs nothing but Docker; the SDK loop needs a local .
 
    Mail the API sends (currently just password-reset links) goes to the `smtp4dev` container, which delivers nothing onward and instead shows every message in a web UI at `http://localhost:5080`.
 
-### Check the API storage client in the Docker loop
-
-The `storage-sdk-check` helper uses the API's `AddObjectStorage` registration and injected AWS
-SDK client from a disposable container on the Compose network. Run this from the repository root:
-
-```bash
-docker compose --profile storage-tools run --rm storage-sdk-check write
-docker compose restart seaweedfs
-docker compose --profile storage-tools run --rm storage-sdk-check verify
-docker compose --profile storage-tools run --rm storage-sdk-check delete
-```
-
-`write` creates and reads a signed object, `verify` reads the same object after the service
-restart, and `delete` cleans it up. The check uses the API's configured client against
-`http://seaweedfs:8333`; it does not use a public object URL.
-
 ## The SDK loop
 
 This loop trades the zero-SDK guarantee for a step debugger and hot reload. It does **not** replace the Docker loop — the setup above is still the supported baseline. Use this one when you're debugging.
@@ -104,21 +88,6 @@ For production, set all five `ObjectStorage__...` values from deployment or secr
 point `ObjectStorage__Endpoint` at the existing private S3-compatible service. The SDK loop uses
 `http://localhost:8333`; a process running in Compose uses `http://seaweedfs:8333`.
 
-### Check the API storage client in the SDK loop
-
-Start the local endpoint first, then run the helper from the repository root. It reads the same
-`ObjectStorage__...` settings and uses the same client registration as the API:
-
-```bash
-dotnet run --project tools/PitakaApp.StorageSmokeTest -- write
-docker compose restart seaweedfs
-dotnet run --project tools/PitakaApp.StorageSmokeTest -- verify
-dotnet run --project tools/PitakaApp.StorageSmokeTest -- delete
-```
-
-With the SDK loop settings above, the helper uses `http://localhost:8333`. The SDK and Docker
-checks leave no object behind after the final `delete` command.
-
 `ASPNETCORE_ENVIRONMENT` is `Development` under both launch profiles. In Development the HTTPS-redirect middleware is guarded off (see `Program.cs`), so a plain-HTTP caller on `http://localhost:5044` is served directly and never bounced to the `https` port's self-signed certificate — which is why `environment.ts` can keep pointing at `http://localhost:5044`.
 
 ## Running tests
@@ -126,6 +95,11 @@ checks leave no object behind after the final `delete` command.
 ```bash
 docker compose run --rm test
 ```
+
+This runs the full suite, including the storage integration test. Compose starts MySQL and
+SeaweedFS for the test container; the storage test writes an object, reads it back, then deletes
+it. A plain `dotnet test` also includes it, so when using the SDK loop, start MySQL and SeaweedFS
+and set the test connection string and `ObjectStorage__...` settings first.
 
 `test` (like `api` and `migrator`) copies your source into the image at *build* time — it doesn't see changes automatically. If you've changed code since the image was last built, rebuild first or the suite will silently run against stale source:
 

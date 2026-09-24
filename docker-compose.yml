@@ -77,8 +77,15 @@ services:
     environment:
       - TEST_DB_CONNECTION=Server=mysql;Port=3306;Database=pitaka_test;User=root;Password=${MYSQL_ROOT_PASSWORD}
       - REALAUTH_TEST_DB_CONNECTION=Server=mysql;Port=3306;Database=pitaka_test_realauth;User=root;Password=${MYSQL_ROOT_PASSWORD}
+      - ObjectStorage__Endpoint=http://seaweedfs:8333
+      - ObjectStorage__Region=${OBJECT_STORAGE_REGION:-us-east-1}
+      - ObjectStorage__BucketName=${OBJECT_STORAGE_BUCKET:-pitaka-private}
+      - ObjectStorage__AccessKeyId=${OBJECT_STORAGE_ACCESS_KEY_ID}
+      - ObjectStorage__SecretAccessKey=${OBJECT_STORAGE_SECRET_ACCESS_KEY}
     depends_on:
       mysql:
+        condition: service_healthy
+      seaweedfs:
         condition: service_healthy
 
   migrator:
@@ -118,21 +125,6 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
-      seaweedfs:
-        condition: service_healthy
-
-  storage-sdk-check:
-    build:
-      context: .
-      dockerfile: tools/PitakaApp.StorageSmokeTest/Dockerfile
-    profiles: ["storage-tools"]
-    environment:
-      - ObjectStorage__Endpoint=http://seaweedfs:8333
-      - ObjectStorage__Region=${OBJECT_STORAGE_REGION:-us-east-1}
-      - ObjectStorage__BucketName=${OBJECT_STORAGE_BUCKET:-pitaka-private}
-      - ObjectStorage__AccessKeyId=${OBJECT_STORAGE_ACCESS_KEY_ID}
-      - ObjectStorage__SecretAccessKey=${OBJECT_STORAGE_SECRET_ACCESS_KEY}
-    depends_on:
       seaweedfs:
         condition: service_healthy
 
