@@ -48,7 +48,7 @@ public class GoalContributionsController(
             );
         }
 
-        var account = await _accountService.GetByIdForUser(user, request.AccountId);
+        var account = await _accountService.GetByIdForUserAsync(user, request.AccountId);
         var goal = await _goalService.GetByIdForUser(user, request.GoalId);
 
         if (account == null)

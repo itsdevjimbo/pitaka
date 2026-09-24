@@ -27,7 +27,7 @@ public class AccountService(PitakaDbContext context)
         return await query.OrderBy(a => a.Name).ToListAsync();
     }
 
-    public async Task<Account?> GetByIdForUser(
+    public async Task<Account?> GetByIdForUserAsync(
         User user,
         int id,
         CancellationToken cancellationToken = default

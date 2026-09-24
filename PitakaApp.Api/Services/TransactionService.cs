@@ -202,7 +202,7 @@ public class TransactionService(PitakaDbContext context, UpdateAccountBalance up
             return new TransactionHasLinkedContributions(transaction.Id, contributions);
         }
 
-        await _updateAccountBalance.ReverseTransaction(transaction, cancellationToken);
+        await _updateAccountBalance.ReverseTransactionAsync(transaction, cancellationToken);
         _context.Transactions.Remove(transaction);
 
         await _context.SaveChangesAsync(cancellationToken);

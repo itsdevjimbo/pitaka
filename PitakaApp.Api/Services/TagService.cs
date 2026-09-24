@@ -12,7 +12,7 @@ public class TagService(PitakaDbContext context)
     public async Task<List<Tag>> GetAllForUser(User user) =>
         await _context.Tags.AsNoTracking().Where(a => a.UserId == user.Id).ToListAsync();
 
-    public async Task<List<Tag>> GetByTagsIdsForUser(
+    public async Task<List<Tag>> GetByTagsIdsForUserAsync(
         User user,
         int[] tagIds,
         CancellationToken cancellationToken = default

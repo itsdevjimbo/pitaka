@@ -36,7 +36,7 @@ public class UpdateAccountBalanceTest : IDisposable
         );
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            _updateAccountBalance.ReverseTransaction(transaction)
+            _updateAccountBalance.ReverseTransactionAsync(transaction)
         );
     }
 

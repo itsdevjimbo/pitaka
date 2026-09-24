@@ -47,9 +47,12 @@ The `pitaka-web` review found that its shared error normalizer already gives 403
 not-found message, the authentication interceptor expires a session only on 401, and the Tags
 adapter already maps 403 and 404 to the same unavailable outcome. Goal list and detail screens had a
 separate 403 path that displayed “You can no longer change this Goal,” while a 404 refreshed into the
-not-found state. The client compatibility change makes those outcomes follow the same refresh path
-and removes the ownership-specific message. It is on the separate
+not-found state. The compatibility branch adds Goal list and detail specs that exercise both 403 and
+404 write failures, assert that each refreshes into the unavailable state, and assert that the
+ownership-specific message stays hidden. The client compatibility change makes those outcomes
+follow the same refresh path and removes the ownership-specific message. The branch is on the separate
 [`issue-167-goal-ownership-compat` client branch](https://github.com/itsdevjimbo/pitaka-web/tree/issue-167-goal-ownership-compat).
+Its specs were inspected for this API change; their test run is not recorded here.
 
 Merge and deploy that client change before deploying the API status migration. The sign-in handling
 of 403 remains unchanged. If the client release cannot go first, hold the API deployment until the

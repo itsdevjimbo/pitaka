@@ -80,7 +80,7 @@ public class TransactionsController(
     public async Task<IActionResult> Post(CreateTransactionRequest request)
     {
         var user = _currentUserAccessor.User!;
-        var account = await _accountService.GetByIdForUser(user, request.AccountId);
+        var account = await _accountService.GetByIdForUserAsync(user, request.AccountId);
 
         List<Tag>? tags = null;
         var distinctTagIds = request.TagIds?.Distinct().ToArray();
@@ -132,7 +132,7 @@ public class TransactionsController(
 
         if (distinctTagIds != null)
         {
-            tags = await _tagService.GetByTagsIdsForUser(user, distinctTagIds);
+            tags = await _tagService.GetByTagsIdsForUserAsync(user, distinctTagIds);
         }
 
         if (tags?.Count != distinctTagIds?.Length)
@@ -305,7 +305,11 @@ public class TransactionsController(
 
         if (distinctTagIds != null)
         {
-            tags = await _tagService.GetByTagsIdsForUser(user, distinctTagIds, cancellationToken);
+            tags = await _tagService.GetByTagsIdsForUserAsync(
+                user,
+                distinctTagIds,
+                cancellationToken
+            );
         }
 
         if (tags?.Count != distinctTagIds?.Length)

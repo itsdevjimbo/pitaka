@@ -36,7 +36,7 @@ public class UpdateAccountBalance(PitakaDbContext context)
         return account;
     }
 
-    public async Task<Account> ReverseTransaction(
+    public async Task<Account> ReverseTransactionAsync(
         Transaction transaction,
         CancellationToken cancellationToken = default
     )

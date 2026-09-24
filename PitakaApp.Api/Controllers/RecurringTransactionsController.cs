@@ -76,7 +76,7 @@ public class RecurringTransactionsController(
     public async Task<IActionResult> Create(CreateRecurringTransactionRequest request)
     {
         var user = _currentUserAccessor.User!;
-        var account = await _accountService.GetByIdForUser(user, request.AccountId);
+        var account = await _accountService.GetByIdForUserAsync(user, request.AccountId);
 
         if (account == null)
         {
@@ -253,7 +253,7 @@ public class RecurringTransactionsController(
 
         if (request.Status == RecurringTransactionStatus.Active)
         {
-            var account = await _accountService.GetByIdForUser(
+            var account = await _accountService.GetByIdForUserAsync(
                 user,
                 recurringTransaction.AccountId,
                 cancellationToken
@@ -310,7 +310,7 @@ public class RecurringTransactionsController(
             );
         }
 
-        var account = await _accountService.GetByIdForUser(
+        var account = await _accountService.GetByIdForUserAsync(
             user,
             recurringTransaction.AccountId,
             cancellationToken

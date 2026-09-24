@@ -52,7 +52,7 @@ public class AccountsController(
     public async Task<IActionResult> Show(int id)
     {
         var user = _currentUserAccessor.User!;
-        var account = await _accountService.GetByIdForUser(user, id);
+        var account = await _accountService.GetByIdForUserAsync(user, id);
 
         if (account == null)
         {
@@ -130,7 +130,7 @@ public class AccountsController(
     public async Task<IActionResult> GetTransactions(int id)
     {
         var user = _currentUserAccessor.User!;
-        var account = await _accountService.GetByIdForUser(user, id);
+        var account = await _accountService.GetByIdForUserAsync(user, id);
 
         if (account == null)
         {
