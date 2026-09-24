@@ -171,7 +171,7 @@ public class TagsControllerTest : IDisposable
     }
 
     [Fact]
-    public async Task Update_BelongsToOtherUsersTag_ReturnsForbidden()
+    public async Task Update_BelongsToOtherUsersTag_ReturnsNotFoundWithoutChangingIt()
     {
         var user = await UserFactory.CreateAsync(_context);
         var userB = await UserFactory.CreateAsync(_context);
@@ -179,11 +179,13 @@ public class TagsControllerTest : IDisposable
 
         _client.ActAsUser(user);
 
-        var response = await _client.PutAsJsonAsync(
-            "/api/tags/" + tag.Id,
-            new { Name = "Update tag" }
-        );
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        var request = new { Name = "Update tag" };
+        var missingResponse = await _client.PutAsJsonAsync("/api/tags/9999", request);
+        var response = await _client.PutAsJsonAsync("/api/tags/" + tag.Id, request);
+        await response.AssertNotFoundEquivalentToAsync(missingResponse);
+
+        var stored = await _context.Tags.AsNoTracking().SingleAsync(item => item.Id == tag.Id);
+        Assert.Equal(tag.Name, stored.Name);
     }
 
     [Fact]
@@ -241,7 +243,7 @@ public class TagsControllerTest : IDisposable
     }
 
     [Fact]
-    public async Task Delete_BelongsToOtherUsersTag_ReturnsForbidden()
+    public async Task Delete_BelongsToOtherUsersTag_ReturnsNotFoundWithoutDeletingIt()
     {
         var user = await UserFactory.CreateAsync(_context);
         var userB = await UserFactory.CreateAsync(_context);
@@ -249,8 +251,10 @@ public class TagsControllerTest : IDisposable
 
         _client.ActAsUser(user);
 
+        var missingResponse = await _client.DeleteAsync("/api/tags/9999");
         var response = await _client.DeleteAsync("/api/tags/" + tag.Id);
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        await response.AssertNotFoundEquivalentToAsync(missingResponse);
+        Assert.True(await _context.Tags.AsNoTracking().AnyAsync(item => item.Id == tag.Id));
     }
 
     [Fact]

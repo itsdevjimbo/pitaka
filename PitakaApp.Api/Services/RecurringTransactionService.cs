@@ -35,8 +35,16 @@ public class RecurringTransactionService(PitakaDbContext context, GetNextRunDate
             )
             .FirstOrDefaultAsync();
 
-    public async Task<RecurringTransaction?> GetTrackedByIdAsync(int id) =>
-        await _context.RecurringTransactions.Where(a => a.Id == id).FirstOrDefaultAsync();
+    public async Task<RecurringTransaction?> GetTrackedByIdForUserAsync(
+        int userId,
+        int id,
+        CancellationToken cancellationToken
+    ) =>
+        await _context
+            .RecurringTransactions.Where(transaction =>
+                transaction.Id == id && transaction.UserId == userId
+            )
+            .FirstOrDefaultAsync(cancellationToken);
 
     public async Task<bool> NameExistsForUserAsync(
         int userId,

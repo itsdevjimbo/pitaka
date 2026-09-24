@@ -29,11 +29,15 @@ public class GoalContributionService(PitakaDbContext context, ContributionGuards
             .Where(a => a.Id == id && a.Goal.UserId == user.Id)
             .FirstOrDefaultAsync();
 
-    public async Task<GoalContribution?> GetTrackedByIdAsync(int id) =>
+    public async Task<GoalContribution?> GetTrackedByIdForUserAsync(
+        int userId,
+        int id,
+        CancellationToken cancellationToken
+    ) =>
         await _context
             .GoalContributions.Include(gc => gc.Goal)
-            .Where(gc => gc.Id == id)
-            .FirstOrDefaultAsync();
+            .Where(gc => gc.Id == id && gc.Goal.UserId == userId)
+            .FirstOrDefaultAsync(cancellationToken);
 
     public async Task<GoalContribution> CreateAsync(
         Goal goal,

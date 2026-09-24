@@ -117,19 +117,22 @@ public class GoalContributionsController(
     }
 
     [HttpPut("{id}")]
-    public async Task<IActionResult> Update(int id, UpdateGoalContributionRequest request)
+    public async Task<IActionResult> Update(
+        int id,
+        UpdateGoalContributionRequest request,
+        CancellationToken cancellationToken
+    )
     {
         var user = _currentUserAccessor.User!;
-        var goalContribution = await _goalContributionService.GetTrackedByIdAsync(id);
+        var goalContribution = await _goalContributionService.GetTrackedByIdForUserAsync(
+            user.Id,
+            id,
+            cancellationToken
+        );
 
         if (goalContribution == null)
         {
             return NotFound();
-        }
-
-        if (goalContribution.Goal.UserId != user.Id)
-        {
-            return Forbid();
         }
 
         await _goalContributionService.UpdateAsync(goalContribution, request.ToInput());

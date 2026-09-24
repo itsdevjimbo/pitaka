@@ -1167,7 +1167,7 @@ public class BudgetsControllerTest : IDisposable
     }
 
     [Fact]
-    public async Task Update_OtherUsersBudget_ReturnsForbidden()
+    public async Task Update_OtherUsersBudget_ReturnsNotFoundWithoutChangingIt()
     {
         var userA = await UserFactory.CreateAsync(_context);
         var userB = await UserFactory.CreateAsync(_context);
@@ -1183,8 +1183,16 @@ public class BudgetsControllerTest : IDisposable
             StartDate = DateOnly.FromDateTime(DateTime.Now),
         };
 
+        var missingResponse = await _client.PutAsJsonAsync("/api/budgets/99999", request);
         var response = await _client.PutAsJsonAsync("/api/budgets/" + budget.Id, request);
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        await response.AssertNotFoundEquivalentToAsync(missingResponse);
+
+        var stored = await _context
+            .Budgets.AsNoTracking()
+            .SingleAsync(item => item.Id == budget.Id);
+        Assert.Equal(budget.Name, stored.Name);
+        Assert.Equal(budget.AmountLimit, stored.AmountLimit);
+        Assert.Equal(budget.Period, stored.Period);
     }
 
     [Fact]
@@ -1481,7 +1489,7 @@ public class BudgetsControllerTest : IDisposable
     }
 
     [Fact]
-    public async Task Delete_OtherUsersBudget_ReturnsForbidden()
+    public async Task Delete_OtherUsersBudget_ReturnsNotFoundWithoutDeletingIt()
     {
         var userA = await UserFactory.CreateAsync(_context);
         var userB = await UserFactory.CreateAsync(_context);
@@ -1489,8 +1497,10 @@ public class BudgetsControllerTest : IDisposable
 
         _client.ActAsUser(userA);
 
+        var missingResponse = await _client.DeleteAsync("api/budgets/99999");
         var response = await _client.DeleteAsync("api/budgets/" + budget.Id);
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        await response.AssertNotFoundEquivalentToAsync(missingResponse);
+        Assert.True(await _context.Budgets.AsNoTracking().AnyAsync(item => item.Id == budget.Id));
     }
 
     [Fact]

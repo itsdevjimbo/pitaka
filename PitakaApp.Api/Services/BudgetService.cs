@@ -18,8 +18,14 @@ public class BudgetService(PitakaDbContext context)
             .Where(a => a.Id == id && a.UserId == user.Id)
             .FirstOrDefaultAsync();
 
-    public async Task<Budget?> GetTrackedByIdAsync(int id) =>
-        await _context.Budgets.Where(a => a.Id == id).FirstOrDefaultAsync();
+    public async Task<Budget?> GetTrackedByIdForUserAsync(
+        int userId,
+        int id,
+        CancellationToken cancellationToken
+    ) =>
+        await _context
+            .Budgets.Where(budget => budget.Id == id && budget.UserId == userId)
+            .FirstOrDefaultAsync(cancellationToken);
 
     public async Task<bool> NameExistsForUserAsync(
         int userId,

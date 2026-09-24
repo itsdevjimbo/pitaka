@@ -46,9 +46,9 @@ own Categories. Reading a shared default does not grant permission to edit it. I
 integrity queries may deliberately consider references across Users after the target has
 been authorized; see `CategoryService`'s usage checks.
 
-Existing exceptions: Tags, Transactions, Goals, Budgets, Categories, recurring transactions,
-and the Contribution update path include unscoped lookups followed by 403 ownership checks.
-Preserve those response contracts until their migration is explicitly in scope.
+This ownership rule does not change two other 403 contracts: mutations of shared system-default
+Categories remain forbidden while their reads remain visible, and sign-in for an unconfirmed
+Profile remains forbidden as specified by [ADR 0012](adr/0012-email-confirmation-is-required.md).
 
 Linked split creation has a separate idempotent-operation contract: an unavailable source
 Transaction returns `409 transaction_missing` for a new operation, while a committed replay
