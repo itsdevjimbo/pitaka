@@ -37,14 +37,14 @@ public class PitakaWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
         builder.ConfigureAppConfiguration(
             (_, config) =>
             {
-                config.AddInMemoryCollection(
-                    new Dictionary<string, string?>
-                    {
-                        ["ConnectionStrings:DefaultConnection"] = TestConnectionString,
-                        ["Jwt:Key"] = TestJwtKey,
-                        ["RecurringTransaction:Enabled"] = "false",
-                    }
-                );
+                var settings = new Dictionary<string, string?>
+                {
+                    ["ConnectionStrings:DefaultConnection"] = TestConnectionString,
+                    ["Jwt:Key"] = TestJwtKey,
+                    ["RecurringTransaction:Enabled"] = "false",
+                };
+                ObjectStorageTestConfiguration.AddTo(settings);
+                config.AddInMemoryCollection(settings);
             }
         );
 

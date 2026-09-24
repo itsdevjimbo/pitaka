@@ -27,11 +27,16 @@ Pick one. The Docker loop needs nothing but Docker; the SDK loop needs a local .
 
    `MYSQL_ROOT_PASSWORD` and `JWT_KEY` can be any values for local development — just don't reuse anything real.
 
-2. Start the API and database:
+2. Start the API, database, mail sink, and private object store:
 
    ```bash
    docker compose up
    ```
+
+   Compose starts a private S3-compatible endpoint on `http://localhost:8333` and creates the
+   `pitaka-private` bucket automatically. The API reaches it at `http://seaweedfs:8333` on the
+   Compose network. Its data stays in the `pitaka_object_storage_data` volume across container
+   restarts.
 
    The database schema isn't created automatically — run the migrator once the first time (and again after pulling any new migrations):
 
@@ -43,6 +48,22 @@ Pick one. The Docker loop needs nothing but Docker; the SDK loop needs a local .
 
    Mail the API sends (currently just password-reset links) goes to the `smtp4dev` container, which delivers nothing onward and instead shows every message in a web UI at `http://localhost:5080`.
 
+### Check the API storage client in the Docker loop
+
+The `storage-sdk-check` helper uses the API's `AddObjectStorage` registration and injected AWS
+SDK client from a disposable container on the Compose network. Run this from the repository root:
+
+```bash
+docker compose --profile storage-tools run --rm storage-sdk-check write
+docker compose restart seaweedfs
+docker compose --profile storage-tools run --rm storage-sdk-check verify
+docker compose --profile storage-tools run --rm storage-sdk-check delete
+```
+
+`write` creates and reads a signed object, `verify` reads the same object after the service
+restart, and `delete` cleans it up. The check uses the API's configured client against
+`http://seaweedfs:8333`; it does not use a public object URL.
+
 ## The SDK loop
 
 This loop trades the zero-SDK guarantee for a step debugger and hot reload. It does **not** replace the Docker loop — the setup above is still the supported baseline. Use this one when you're debugging.
@@ -51,12 +72,18 @@ You need:
 
 - A local .NET 10 SDK.
 - A MySQL the API can reach. The simplest option is to start just the database from Compose — `docker compose up mysql` publishes it on `localhost:3306` — and leave the rest of the stack off.
+- The local object store. Start it with `docker compose up seaweedfs`; it publishes the S3 endpoint on `localhost:8333` and keeps data in the Compose volume.
 - An SMTP server to catch outgoing mail. Same approach as MySQL: `docker compose up smtp4dev` publishes its SMTP port on `localhost:2525` and its web UI on `http://localhost:5080`. The mail defaults in `appsettings.json` already point at `localhost:2525`, so this works with no extra configuration; override `Email__Host` / `Email__Port` if you run SMTP elsewhere.
 - A `DefaultConnection` connection string and a JWT key. Neither ships in `appsettings.json`; supply them with user secrets or environment variables, e.g.:
 
   ```bash
   export ConnectionStrings__DefaultConnection="Server=localhost;Port=3306;Database=pitaka;User=root;Password=<MYSQL_ROOT_PASSWORD>"
   export Jwt__Key="<any value for local dev>"
+  export ObjectStorage__Endpoint="http://localhost:8333"
+  export ObjectStorage__Region="us-east-1"
+  export ObjectStorage__BucketName="pitaka-private"
+  export ObjectStorage__AccessKeyId="pitaka-local"
+  export ObjectStorage__SecretAccessKey="pitaka-local-secret"
   export Email__Host="localhost"   # only if not using the shipped localhost:2525 default
   export Email__Port="2525"
   ```
@@ -71,6 +98,26 @@ dotnet run                          # http://localhost:5044
 dotnet run --launch-profile https   # also binds https://localhost:7272
 dotnet watch                        # same, with hot reload
 ```
+
+The storage credentials above are local-development values and must not be reused in production.
+For production, set all five `ObjectStorage__...` values from deployment or secret configuration;
+point `ObjectStorage__Endpoint` at the existing private S3-compatible service. The SDK loop uses
+`http://localhost:8333`; a process running in Compose uses `http://seaweedfs:8333`.
+
+### Check the API storage client in the SDK loop
+
+Start the local endpoint first, then run the helper from the repository root. It reads the same
+`ObjectStorage__...` settings and uses the same client registration as the API:
+
+```bash
+dotnet run --project tools/PitakaApp.StorageSmokeTest -- write
+docker compose restart seaweedfs
+dotnet run --project tools/PitakaApp.StorageSmokeTest -- verify
+dotnet run --project tools/PitakaApp.StorageSmokeTest -- delete
+```
+
+With the SDK loop settings above, the helper uses `http://localhost:8333`. The SDK and Docker
+checks leave no object behind after the final `delete` command.
 
 `ASPNETCORE_ENVIRONMENT` is `Development` under both launch profiles. In Development the HTTPS-redirect middleware is guarded off (see `Program.cs`), so a plain-HTTP caller on `http://localhost:5044` is served directly and never bounced to the `https` port's self-signed certificate — which is why `environment.ts` can keep pointing at `http://localhost:5044`.
 

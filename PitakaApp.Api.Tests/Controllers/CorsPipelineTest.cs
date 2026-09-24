@@ -200,6 +200,7 @@ public class CorsPipelineTest(PitakaWebApplicationFactory factory)
                         ["Jwt:ExpiryMinutes"] = "60",
                         ["RecurringTransaction:Enabled"] = "false",
                     };
+                    ObjectStorageTestConfiguration.AddTo(settings);
 
                     for (var i = 0; i < origins.Length; i++)
                     {

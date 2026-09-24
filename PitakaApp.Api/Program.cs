@@ -69,6 +69,7 @@ builder.Services.AddPitakaIdentity();
 builder.AddJwtAuthentication();
 builder.AddRecurringTransactionGeneration();
 builder.AddEmailSender();
+builder.AddObjectStorage();
 builder.AddPitakaCors();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();

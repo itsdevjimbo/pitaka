@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile
+      Include="../../PitakaApp.Api/Infra/ObjectStorageExtensions.cs"
+      Link="Infra/ObjectStorageExtensions.cs"
+    />
+    <Compile
+      Include="../../PitakaApp.Api/Options/ObjectStorageOption.cs"
+      Link="Options/ObjectStorageOption.cs"
+    />
+    <PackageReference Include="AWSSDK.S3" Version="4.0.103.4" />
+  </ItemGroup>
+</Project>
