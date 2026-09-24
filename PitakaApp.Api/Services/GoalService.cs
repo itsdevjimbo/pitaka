@@ -25,11 +25,15 @@ public class GoalService(PitakaDbContext context)
             ))
             .ToListAsync();
 
-    public async Task<Goal?> GetByIdForUser(User user, int id) =>
+    public async Task<Goal?> GetByIdForUserAsync(
+        User user,
+        int id,
+        CancellationToken cancellationToken = default
+    ) =>
         await _context
             .Goals.AsNoTracking()
             .Where(a => a.Id == id && a.UserId == user.Id)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(cancellationToken);
 
     public async Task<Goal?> GetTrackedByIdForUserAsync(
         int userId,

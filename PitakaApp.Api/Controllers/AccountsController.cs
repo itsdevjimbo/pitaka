@@ -49,10 +49,10 @@ public class AccountsController(
     }
 
     [HttpGet("{id}")]
-    public async Task<IActionResult> Show(int id)
+    public async Task<IActionResult> Show(int id, CancellationToken cancellationToken)
     {
         var user = _currentUserAccessor.User!;
-        var account = await _accountService.GetByIdForUserAsync(user, id);
+        var account = await _accountService.GetByIdForUserAsync(user, id, cancellationToken);
 
         if (account == null)
         {
@@ -127,17 +127,20 @@ public class AccountsController(
     }
 
     [HttpGet("{id}/transactions")]
-    public async Task<IActionResult> GetTransactions(int id)
+    public async Task<IActionResult> GetTransactions(int id, CancellationToken cancellationToken)
     {
         var user = _currentUserAccessor.User!;
-        var account = await _accountService.GetByIdForUserAsync(user, id);
+        var account = await _accountService.GetByIdForUserAsync(user, id, cancellationToken);
 
         if (account == null)
         {
             return NotFound();
         }
 
-        var transactions = await _transactionService.GetAllForAccount(account);
+        var transactions = await _transactionService.GetAllForAccountAsync(
+            account,
+            cancellationToken
+        );
         return Ok(TransactionResource.Collection(transactions));
     }
 }

@@ -77,10 +77,17 @@ public class TransactionsController(
     }
 
     [HttpPost]
-    public async Task<IActionResult> Post(CreateTransactionRequest request)
+    public async Task<IActionResult> Post(
+        CreateTransactionRequest request,
+        CancellationToken cancellationToken
+    )
     {
         var user = _currentUserAccessor.User!;
-        var account = await _accountService.GetByIdForUserAsync(user, request.AccountId);
+        var account = await _accountService.GetByIdForUserAsync(
+            user,
+            request.AccountId,
+            cancellationToken
+        );
 
         List<Tag>? tags = null;
         var distinctTagIds = request.TagIds?.Distinct().ToArray();
@@ -107,7 +114,8 @@ public class TransactionsController(
                 await _verifyTransactionCategory.VerifyAsync(
                     user,
                     categoryId,
-                    ExpectedCategoryType(request.Type)
+                    ExpectedCategoryType(request.Type),
+                    cancellationToken
                 )
             )
                 is { } rejection
@@ -118,9 +126,10 @@ public class TransactionsController(
 
         if (
             request.Type == Enums.TransactionType.Transfer
-            && !await _transactionService.IsValidTransferTransaction(
+            && !await _transactionService.IsValidTransferTransactionAsync(
                 user,
-                request.TransferToAccountId
+                request.TransferToAccountId,
+                cancellationToken
             )
         )
         {
@@ -132,7 +141,11 @@ public class TransactionsController(
 
         if (distinctTagIds != null)
         {
-            tags = await _tagService.GetByTagsIdsForUserAsync(user, distinctTagIds);
+            tags = await _tagService.GetByTagsIdsForUserAsync(
+                user,
+                distinctTagIds,
+                cancellationToken
+            );
         }
 
         if (tags?.Count != distinctTagIds?.Length)
@@ -143,7 +156,12 @@ public class TransactionsController(
             );
         }
 
-        var transaction = await _transactionService.CreateAsync(account, request.ToInput(), tags);
+        var transaction = await _transactionService.CreateAsync(
+            account,
+            request.ToInput(),
+            tags,
+            cancellationToken
+        );
         return StatusCode(StatusCodes.Status201Created, TransactionResource.FromModel(transaction));
     }
 

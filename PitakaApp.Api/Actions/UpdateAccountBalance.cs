@@ -9,11 +9,15 @@ public class UpdateAccountBalance(PitakaDbContext context)
 {
     private readonly PitakaDbContext _context = context;
 
-    public async Task<Account> ApplyTransaction(Transaction transaction)
+    public async Task<Account> ApplyTransactionAsync(
+        Transaction transaction,
+        CancellationToken cancellationToken = default
+    )
     {
         var accounts = await GetTrackedAccountsOrThrowAsync(
             transaction.AccountId,
-            transaction.TransferToAccountId
+            transaction.TransferToAccountId,
+            cancellationToken
         );
         var account = accounts[transaction.AccountId];
 
