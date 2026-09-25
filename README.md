@@ -96,6 +96,9 @@ installed only in the development stage. Neither is in the final image.
 docker build --target final -f PitakaApp.Api/Dockerfile -t pitaka-api:local .
 ```
 
+This builds the image locally. Publishing API images or EF migration bundles, and automating
+migrations before a production rollout, remain future work.
+
 ## Stack
 
 - ASP.NET Core (.NET 10)
