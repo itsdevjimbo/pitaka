@@ -54,7 +54,8 @@ for them with `pdotnet`.
    pdotnet ef database update
    ```
 
-   Compose startup does not run migrations. Run this command again after pulling new migrations.
+   This creates the schema on a fresh volume and applies new migrations after a pull. Compose
+   startup does not run migrations.
 
 ### Running .NET commands
 
@@ -80,8 +81,10 @@ watch build has a separate cache, so requested builds do not replace the files i
 `pdotnet` command may run at a time; a second invocation reports that the first is still running.
 If the stack is stopped, `pdotnet` reports that and leaves it stopped.
 
-The test fixtures use `pitaka_test` and `pitaka_test_realauth`, separate from the development
-database. The storage integration test uses SeaweedFS from the same stack.
+The test fixtures reset and migrate only `pitaka_test` and `pitaka_test_realauth`, separate from
+the development `pitaka` database. Each fixture checks its configured database name before any
+reset. Tests start only when requested with `pdotnet test`; the storage integration test uses
+SeaweedFS from the same stack.
 
 ### Building the deployable API image
 
