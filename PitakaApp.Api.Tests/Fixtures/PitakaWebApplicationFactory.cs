@@ -71,6 +71,10 @@ public class PitakaWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
     {
         using var scope = Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<PitakaDbContext>();
+        TestDatabaseGuard.EnsureDatabaseName(
+            context.Database.GetDbConnection().Database,
+            "pitaka_test"
+        );
 
         if (await context.Database.CanConnectAsync())
         {
