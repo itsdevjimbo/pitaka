@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+source_path="${BASH_SOURCE[0]}"
+while [[ -L "$source_path" ]]; do
+    source_dir="$(cd -P -- "$(dirname -- "$source_path")" >/dev/null 2>&1 && pwd)"
+    target="$(readlink "$source_path")"
+    if [[ "$target" == /* ]]; then
+        source_path="$target"
+    else
+        source_path="$source_dir/$target"
+    fi
+done
+
+script_dir="$(cd -P -- "$(dirname -- "$source_path")" >/dev/null 2>&1 && pwd)"
+repo_root="$(cd -P -- "$script_dir/.." >/dev/null 2>&1 && pwd)"
+wrapper="$repo_root/scripts/pdotnet"
+install_path="/usr/local/bin/pdotnet"
+
+if [[ -L "$install_path" ]] && [[ "$(readlink "$install_path")" == "$wrapper" ]]; then
+    printf 'pdotnet is already installed at %s\n' "$install_path"
+    exit 0
+fi
+
+if [[ -e "$install_path" || -L "$install_path" ]]; then
+    printf 'pdotnet: refusing to replace the existing %s\n' "$install_path" >&2
+    exit 1
+fi
+
+sudo ln -s "$wrapper" "$install_path"
+printf 'Installed %s -> %s\n' "$install_path" "$wrapper"
