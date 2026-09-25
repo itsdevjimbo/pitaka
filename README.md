@@ -96,8 +96,9 @@ installed only in the development stage. Neither is in the final image.
 docker build --target final -f PitakaApp.Api/Dockerfile -t pitaka-api:local .
 ```
 
-This builds the image locally. Publishing API images or EF migration bundles, and automating
-migrations before a production rollout, remain future work.
+This builds the API image locally. CI also publishes a matching API image and EF migration
+bundle for every validated `main` revision. See [publishing and smoke-testing images](docs/container-publishing.md)
+for registry setup, fixed image tags, and a disposable database smoke run.
 
 ## Stack
 

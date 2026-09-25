@@ -6,6 +6,16 @@ COPY . .
 RUN dotnet restore "PitakaApp.Api/PitakaApp.Api.csproj"
 RUN dotnet publish "PitakaApp.Api/PitakaApp.Api.csproj" -c Release -o /app/publish
 
+# Build the migration bundle from the same source as the API. BuildKit runs this
+# stage for each target platform, so the bundle matches the migration image's RID.
+FROM build AS migration-build
+RUN dotnet tool restore \
+    && dotnet ef migrations bundle \
+        --project "PitakaApp.Api/PitakaApp.Api.csproj" \
+        --startup-project "PitakaApp.Api/PitakaApp.Api.csproj" \
+        --configuration Release \
+        --output /out/efbundle
+
 # The local API runs from the SDK stage so source changes are watched live.
 # Compose bind-mounts the checkout at /workspace and mounts separate build
 # output and NuGet cache volumes for the watcher and requested commands.
@@ -21,7 +31,14 @@ ENV NUGET_PACKAGES=/watch/nuget/packages
 WORKDIR /workspace
 CMD ["dotnet", "watch", "--non-interactive", "--project", "PitakaApp.Api/PitakaApp.Api.csproj", "run", "--no-launch-profile", "--property:BaseIntermediateOutputPath=/watch/api/obj/", "--property:BaseOutputPath=/watch/api/bin/", "--property:DefaultItemExcludesInProjectFolder=**/obj/**"]
 
-# The final image contains only the ASP.NET runtime and published application.
+# The migration image is a framework-dependent EF bundle with the ASP.NET runtime.
+# It needs only a connection string at execution time, never a source tree or SDK.
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS migrations
+WORKDIR /app
+COPY --from=migration-build /out/efbundle ./efbundle
+ENTRYPOINT ["/app/efbundle"]
+
+# Keep the application image as the default Dockerfile target for contributors.
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 COPY --from=build /app/publish .
