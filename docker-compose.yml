@@ -2,6 +2,7 @@ name: pitaka
 
 services:
   api:
+    image: pitaka-api:development
     build:
       context: .
       dockerfile: PitakaApp.Api/Dockerfile
