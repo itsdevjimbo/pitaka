@@ -133,28 +133,28 @@ public class ProfilePictureControllerTest : IDisposable
     }
 
     [Fact]
+    public async Task UploadPicture_WhenReplacementIsInvalid_LeavesThePreviousPictureCurrent()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(user);
+
+        var previousPicture = await UploadCurrentPngAsync(user.Id, SKColors.MediumSeaGreen);
+
+        var rejected = await PutPictureAsync([1, 2, 3, 4], "invalid.png", "image/png");
+
+        Assert.Equal(HttpStatusCode.BadRequest, rejected.StatusCode);
+        Assert.True((await ReadProfileAsync()).HasPicture);
+        Assert.Equal(previousPicture.Id, (await ReadCurrentStoredPictureAsync(user.Id)).Id);
+        await AssertCurrentPngPictureColorAsync(SKColors.MediumSeaGreen);
+    }
+
+    [Fact]
     public async Task UploadPicture_WhenStorageWriteFails_LeavesThePreviousPictureCurrent()
     {
         var user = await UserFactory.CreateAsync(_context);
         _client.ActAsUser(user);
 
-        var initialUpload = await PutPictureAsync(
-            ProfilePictureTestImages.Create(SKEncodedImageFormat.Png, SKColors.MediumSeaGreen),
-            "old.png",
-            "image/png"
-        );
-        Assert.Equal(HttpStatusCode.NoContent, initialUpload.StatusCode);
-        var previous = await _context
-            .Users.AsNoTracking()
-            .Where(candidate => candidate.Id == user.Id)
-            .Select(candidate => candidate.PhotoId)
-            .SingleAsync();
-        Assert.NotNull(previous);
-        var previousObjectKey = await _context
-            .Files.AsNoTracking()
-            .Where(file => file.Id == previous)
-            .Select(file => file.ObjectKey)
-            .SingleAsync();
+        var previousPicture = await UploadCurrentPngAsync(user.Id, SKColors.MediumSeaGreen);
 
         _storage.PutFailure = new IOException("storage unavailable");
         try
@@ -169,19 +169,88 @@ public class ProfilePictureControllerTest : IDisposable
             var afterFailure = await _context
                 .Users.AsNoTracking()
                 .SingleAsync(candidate => candidate.Id == user.Id);
-            Assert.Equal(previous, afterFailure.PhotoId);
+            Assert.Equal(previousPicture.Id, afterFailure.PhotoId);
             Assert.True(afterFailure.HasPicture);
 
             var read = await _client.GetAsync("/api/profile/picture");
             Assert.Equal(HttpStatusCode.OK, read.StatusCode);
             Assert.Equal(
-                _storage.Read(previousObjectKey),
+                _storage.Read(previousPicture.ObjectKey),
                 await read.Content.ReadAsByteArrayAsync()
             );
         }
         finally
         {
             _storage.PutFailure = null;
+        }
+    }
+
+    [Fact]
+    public async Task UploadPicture_WhenProfileCommitFails_LeavesThePreviousPictureCurrentAndCleansCandidate()
+    {
+        var user = await UserFactory.CreateAsync(_context);
+        _client.ActAsUser(user);
+
+        var previousPicture = await UploadCurrentPngAsync(user.Id, SKColors.MediumSeaGreen);
+        var lastExistingFileId = await _context.Files.MaxAsync(file => (int?)file.Id) ?? 0;
+        await _context.Database.ExecuteSqlRawAsync(
+            "DROP TRIGGER IF EXISTS `fail_profile_picture_commit_test`"
+        );
+        await _context.Database.ExecuteSqlRawAsync(
+            "CREATE TRIGGER `fail_profile_picture_commit_test` BEFORE UPDATE ON `users` FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'forced Profile picture commit failure'"
+        );
+
+        try
+        {
+            var failedReplacement = await PutPictureAsync(
+                ProfilePictureTestImages.Create(SKEncodedImageFormat.Png, SKColors.Coral),
+                "replacement.png",
+                "image/png"
+            );
+            Assert.Equal(HttpStatusCode.InternalServerError, failedReplacement.StatusCode);
+
+            var afterFailure = await _context
+                .Users.AsNoTracking()
+                .SingleAsync(candidate => candidate.Id == user.Id);
+            Assert.Equal(previousPicture.Id, afterFailure.PhotoId);
+            Assert.True((await ReadProfileAsync()).HasPicture);
+            await AssertCurrentPngPictureColorAsync(SKColors.MediumSeaGreen);
+
+            var candidate = await _context
+                .Files.AsNoTracking()
+                .Where(file => file.Id > lastExistingFileId)
+                .SingleAsync();
+            Assert.Equal(StoredFileState.PendingDeletion, candidate.State);
+            Assert.NotNull(candidate.NextAttemptAt);
+            Assert.True(_storage.Contains(candidate.ObjectKey));
+
+            var cleanupAt = new DateTime(2026, 9, 25, 0, 0, 0, DateTimeKind.Utc);
+            var clock = new FakeTimeProvider(new DateTimeOffset(cleanupAt, TimeSpan.Zero));
+            await _context
+                .Files.Where(file => file.Id == candidate.Id)
+                .ExecuteUpdateAsync(setters =>
+                    setters.SetProperty(file => file.NextAttemptAt, cleanupAt)
+                );
+            var cleanup = new CleanupFiles(
+                _context,
+                _storage,
+                clock,
+                _scope.ServiceProvider.GetRequiredService<ILogger<CleanupFiles>>()
+            );
+
+            await cleanup.RunAsync(CancellationToken.None);
+
+            Assert.False(_storage.Contains(candidate.ObjectKey));
+            Assert.False(await _context.Files.AnyAsync(file => file.Id == candidate.Id));
+            Assert.True(_storage.Contains(previousPicture.ObjectKey));
+            Assert.Equal(previousPicture.Id, (await ReadCurrentStoredPictureAsync(user.Id)).Id);
+            await AssertCurrentPngPictureColorAsync(SKColors.MediumSeaGreen);
+        }
+        finally
+        {
+            await _context.Database.ExecuteSqlRawAsync(
+                "DROP TRIGGER IF EXISTS `fail_profile_picture_commit_test`"
+            );
         }
     }
 
@@ -219,56 +288,149 @@ public class ProfilePictureControllerTest : IDisposable
         var user = await UserFactory.CreateAsync(_context);
         _client.ActAsUser(user);
 
+        var previousPicture = await UploadCurrentPngAsync(user.Id, SKColors.MediumSeaGreen);
+
         var firstEntered = new TaskCompletionSource(
             TaskCreationOptions.RunContinuationsAsynchronously
         );
         var releaseFirst = new TaskCompletionSource(
             TaskCreationOptions.RunContinuationsAsynchronously
         );
-        var call = 0;
+        var putCallCount = 0;
         _storage.BeforePutAsync = async (_, _, _) =>
         {
-            if (Interlocked.Increment(ref call) == 1)
+            if (Interlocked.Increment(ref putCallCount) == 1)
             {
                 firstEntered.SetResult();
                 await releaseFirst.Task.WaitAsync(TimeSpan.FromSeconds(10));
             }
         };
 
+        Task<HttpResponseMessage>? firstUpload = null;
         try
         {
-            var firstUpload = PutPictureAsync(
+            firstUpload = PutPictureAsync(
                 ProfilePictureTestImages.Create(SKEncodedImageFormat.Png, SKColors.Firebrick),
                 "first.png",
                 "image/png"
             );
             await firstEntered.Task.WaitAsync(TimeSpan.FromSeconds(10));
 
+            _storage.DeleteFailure = new IOException("temporary object-store failure");
             var secondUpload = await PutPictureAsync(
                 ProfilePictureTestImages.Create(SKEncodedImageFormat.Png, SKColors.RoyalBlue),
                 "second.png",
                 "image/png"
             );
             Assert.Equal(HttpStatusCode.NoContent, secondUpload.StatusCode);
+            var secondPicture = await ReadCurrentStoredPictureAsync(user.Id);
+            Assert.True((await ReadProfileAsync()).HasPicture);
+            await AssertCurrentPngPictureColorAsync(SKColors.RoyalBlue);
 
             releaseFirst.SetResult();
             Assert.Equal(HttpStatusCode.NoContent, (await firstUpload).StatusCode);
+            Assert.True((await ReadProfileAsync()).HasPicture);
+            await AssertCurrentPngPictureColorAsync(SKColors.Firebrick);
 
-            var current = await _context
-                .Users.AsNoTracking()
-                .Where(candidate => candidate.Id == user.Id)
-                .Select(candidate => candidate.Photo!.ObjectKey)
-                .SingleAsync();
-            Assert.NotNull(current);
-            using var decoded = SKBitmap.Decode(_storage.Read(current!));
-            Assert.Equal(SKColors.Firebrick, decoded!.GetPixel(0, 0));
+            var currentPicture = await ReadCurrentStoredPictureAsync(user.Id);
+
+            var cleanupAt = new DateTime(2026, 9, 25, 0, 0, 0, DateTimeKind.Utc);
+            await _context
+                .Files.Where(file => file.Id == previousPicture.Id || file.Id == secondPicture.Id)
+                .ExecuteUpdateAsync(setters =>
+                    setters.SetProperty(file => file.NextAttemptAt, cleanupAt)
+                );
+            var clock = new FakeTimeProvider(new DateTimeOffset(cleanupAt, TimeSpan.Zero));
+            var cleanup = new CleanupFiles(
+                _context,
+                _storage,
+                clock,
+                _scope.ServiceProvider.GetRequiredService<ILogger<CleanupFiles>>()
+            );
+
+            await cleanup.RunAsync(CancellationToken.None);
+
+            _context.ChangeTracker.Clear();
+            var supersededPictures = await _context
+                .Files.AsNoTracking()
+                .Where(file => file.Id == previousPicture.Id || file.Id == secondPicture.Id)
+                .ToListAsync();
+            Assert.Equal(2, supersededPictures.Count);
+            Assert.All(
+                supersededPictures,
+                picture =>
+                {
+                    Assert.Equal(StoredFileState.PendingDeletion, picture.State);
+                    Assert.Equal(1, picture.DeletionAttempts);
+                    Assert.True(picture.NextAttemptAt > clock.GetUtcNow().UtcDateTime);
+                }
+            );
+            Assert.True(_storage.Contains(previousPicture.ObjectKey));
+            Assert.True(_storage.Contains(secondPicture.ObjectKey));
+
+            _storage.DeleteFailure = null;
+            await _context
+                .Files.Where(file => file.Id == previousPicture.Id || file.Id == secondPicture.Id)
+                .ExecuteUpdateAsync(setters =>
+                    setters.SetProperty(file => file.NextAttemptAt, clock.GetUtcNow().UtcDateTime)
+                );
+            await cleanup.RunAsync(CancellationToken.None);
+
+            Assert.False(_storage.Contains(previousPicture.ObjectKey));
+            Assert.False(_storage.Contains(secondPicture.ObjectKey));
+            Assert.True(_storage.Contains(currentPicture.ObjectKey));
+            Assert.DoesNotContain(currentPicture.ObjectKey, _storage.DeletedKeys);
+            await AssertCurrentPngPictureColorAsync(SKColors.Firebrick);
         }
         finally
         {
             releaseFirst.TrySetResult();
+            if (firstUpload is not null)
+            {
+                try
+                {
+                    await firstUpload.WaitAsync(TimeSpan.FromSeconds(10));
+                }
+                catch (Exception) when (firstUpload.IsFaulted || firstUpload.IsCanceled) { }
+            }
+
             _storage.BeforePutAsync = null;
+            _storage.DeleteFailure = null;
         }
     }
+
+    private async Task<StoredPicture> ReadCurrentStoredPictureAsync(int userId) =>
+        await _context
+            .Users.AsNoTracking()
+            .Where(candidate => candidate.Id == userId)
+            .Select(candidate => new StoredPicture(
+                candidate.PhotoId!.Value,
+                candidate.Photo!.ObjectKey
+            ))
+            .SingleAsync();
+
+    private async Task<StoredPicture> UploadCurrentPngAsync(int userId, SKColor color)
+    {
+        var response = await PutPictureAsync(
+            ProfilePictureTestImages.Create(SKEncodedImageFormat.Png, color),
+            "previous.png",
+            "image/png"
+        );
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        return await ReadCurrentStoredPictureAsync(userId);
+    }
+
+    private async Task AssertCurrentPngPictureColorAsync(SKColor expectedColor)
+    {
+        var response = await _client.GetAsync("/api/profile/picture");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("image/png", response.Content.Headers.ContentType!.MediaType);
+        Assert.Equal("no-store, no-cache, max-age=0", response.Headers.CacheControl!.ToString());
+        using var decoded = SKBitmap.Decode(await response.Content.ReadAsByteArrayAsync());
+        Assert.Equal(expectedColor, decoded!.GetPixel(0, 0));
+    }
+
+    private sealed record StoredPicture(int Id, string ObjectKey);
 
     [Fact]
     public async Task RemovePicture_ClearsPresenceAndCanBeRetried()
