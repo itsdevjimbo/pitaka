@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+set -eo pipefail
+
+source_path="${BASH_SOURCE[0]}"
+while [[ -L "$source_path" ]]; do
+    source_dir="$(cd -P -- "$(dirname -- "$source_path")" >/dev/null 2>&1 && pwd)"
+    target="$(readlink "$source_path")"
+    if [[ "$target" == /* ]]; then
+        source_path="$target"
+    else
+        source_path="$source_dir/$target"
+    fi
+done
+
+script_dir="$(cd -P -- "$(dirname -- "$source_path")" >/dev/null 2>&1 && pwd)"
+source "$script_dir/lib/repo-root.sh"
+repo_root="$(pitaka_repo_root_from_script_dir "$script_dir")"
+caller_dir="$(pwd -P)"
+
+if [[ "$caller_dir" == "$repo_root" ]]; then
+    relative_dir=""
+elif [[ "$caller_dir" == "$repo_root/"* ]]; then
+    relative_dir="${caller_dir#"$repo_root"/}"
+else
+    printf 'pdotnet: run this command from a directory inside %s\n' "$repo_root" >&2
+    exit 2
+fi
+
+container_working_dir="/workspace"
+if [[ -n "$relative_dir" ]]; then
+    container_working_dir="/workspace/$relative_dir"
+fi
+
+dotnet_args=("$@")
+if [[ "${dotnet_args[0]-}" == "ef" ]]; then
+    has_project=false
+    has_startup_project=false
+    for argument in "${dotnet_args[@]:1}"; do
+        case "$argument" in
+            --project|-p|--project=*|-p=*) has_project=true ;;
+            --startup-project|--startup-project=*) has_startup_project=true ;;
+        esac
+    done
+
+    ef_args=(ef)
+    if [[ "$has_project" == false ]]; then
+        ef_args+=(--project /workspace/PitakaApp.Api/PitakaApp.Api.csproj)
+    fi
+    if [[ "$has_startup_project" == false ]]; then
+        ef_args+=(--startup-project /workspace/PitakaApp.Api/PitakaApp.Api.csproj)
+    fi
+    ef_args+=("${dotnet_args[@]:1}")
+    dotnet_args=("${ef_args[@]}")
+fi
+
+compose=(docker compose --project-directory "$repo_root" -f "$repo_root/docker-compose.yml")
+if ! running_services="$("${compose[@]}" ps --status running --services)"; then
+    printf 'pdotnet: could not check whether the API stack is running\n' >&2
+    exit 1
+fi
+if ! printf '%s\n' "$running_services" | grep -Fxq api; then
+    printf "pdotnet: the API service is stopped; start it with 'docker compose up' from %s\n" "$repo_root" >&2
+    exit 1
+fi
+
+exec_args=("${compose[@]}" exec)
+if [[ ! -t 0 || ! -t 1 ]]; then
+    exec_args+=(-T)
+fi
+
+set +e
+"${exec_args[@]}" \
+    --user "$(id -u):$(id -g)" \
+    --env HOME=/tmp/pitaka-pdotnet-home \
+    --env DOTNET_CLI_HOME=/tmp/pitaka-pdotnet-cli \
+    --env NUGET_PACKAGES=/pdotnet/nuget \
+    --workdir "$container_working_dir" \
+    api flock --nonblock --close --conflict-exit-code 75 /tmp/pitaka-pdotnet.lock dotnet "${dotnet_args[@]}"
+status=$?
+set -e
+
+if [[ "$status" -eq 75 ]]; then
+    printf 'pdotnet: another pdotnet command is already running\n' >&2
+fi
+exit "$status"

@@ -9,127 +9,88 @@ API contracts: [private-resource ownership and 404 responses](docs/api/ownership
 [Linked Contributions](docs/api/linked-contributions.md), plus
 [private Profile pictures](docs/api/profile-pictures.md).
 
-## Two dev loops
+## Docker development loop
 
-There are two supported ways to run the API, and they carry different guarantees:
+Docker Compose is the supported contributor workflow. You need Docker with the Compose plugin;
+you do not need a host .NET SDK or a host MySQL installation. Compose starts exactly four
+long-running services: the API, MySQL, SeaweedFS, and smtp4dev. The API runs from the SDK stage
+with the checkout mounted and watches source changes. Tests and migrations run only when you ask
+for them with `pdotnet`.
 
-- **The Docker loop** (below) is the one the setup instructions describe. Its guarantee is that Docker with Compose is the *only* thing you need installed — no local .NET SDK, no local MySQL. Everything, including running tests and generating migrations, happens through containers. It serves the API at `http://pitaka.localhost`.
-- **[The SDK loop](#the-sdk-loop)** runs the API with `dotnet run` against your own machine's SDK. It exists for the step debugger and hot reload, which the containerised loop cannot offer. It serves the API at `http://localhost:5044` (and `https://localhost:7272` under the `https` launch profile). This is the address Pitaka Web's `environment.ts` points at.
+### Setup
 
-Pick one. The Docker loop needs nothing but Docker; the SDK loop needs a local .NET SDK and a reachable MySQL.
-
-## Setup — the Docker loop
-
-1. Copy the environment template and fill in your own values:
+1. Copy the environment template:
 
    ```bash
    cp .env.example .env
    ```
 
-   `MYSQL_ROOT_PASSWORD` and `JWT_KEY` can be any values for local development — just don't reuse anything real.
+   The template contains local-only example values. `JWT_KEY` must be at least 32 characters.
+   Do not reuse production values.
 
-2. Start the API, database, mail sink, and private object store:
+2. Install the checked-in `pdotnet` wrapper once:
+
+   ```bash
+   ./scripts/install-pdotnet
+   ```
+
+   The installer creates `/usr/local/bin/pdotnet` as a symlink to this checkout, so `sudo` may
+   ask for your administrator password. Keep the checkout in place after installing it.
+
+3. Start the stack:
 
    ```bash
    docker compose up
    ```
 
-   Compose starts a private S3-compatible endpoint on `http://localhost:8333` and creates the
-   `pitaka-private` bucket automatically. The API reaches it at `http://seaweedfs:8333` on the
-   Compose network. Its data stays in the `pitaka_object_storage_data` volume across container
-   restarts.
+   The API is at `http://pitaka.localhost`. Source edits are picked up while it runs. Password
+   reset and other API mail is captured in smtp4dev's web UI at `http://localhost:5080`; it is not
+   delivered onward. The private S3-compatible storage endpoint is available at
+   `http://localhost:8333`, and its data persists in a Compose volume.
 
-   The database schema isn't created automatically — run the migrator once the first time (and again after pulling any new migrations):
+4. Create or update the local database schema explicitly:
 
    ```bash
-   docker compose run --rm migrator
+   pdotnet ef database update
    ```
 
-3. The API is now available at `http://pitaka.localhost`. No DNS setup needed — `.localhost` is a reserved TLD that every OS and browser resolves to `127.0.0.1` automatically.
+   Compose startup does not run migrations. Run this command again after pulling new migrations.
 
-   Mail the API sends (currently just password-reset links) goes to the `smtp4dev` container, which delivers nothing onward and instead shows every message in a web UI at `http://localhost:5080`.
+### Running .NET commands
 
-## The SDK loop
-
-This loop trades the zero-SDK guarantee for a step debugger and hot reload. It does **not** replace the Docker loop — the setup above is still the supported baseline. Use this one when you're debugging.
-
-You need:
-
-- A local .NET 10 SDK.
-- A MySQL the API can reach. The simplest option is to start just the database from Compose — `docker compose up mysql` publishes it on `localhost:3306` — and leave the rest of the stack off.
-- The local object store. Start it with `docker compose up seaweedfs`; it publishes the S3 endpoint on `localhost:8333` and keeps data in the Compose volume.
-- An SMTP server to catch outgoing mail. Same approach as MySQL: `docker compose up smtp4dev` publishes its SMTP port on `localhost:2525` and its web UI on `http://localhost:5080`. The mail defaults in `appsettings.json` already point at `localhost:2525`, so this works with no extra configuration; override `Email__Host` / `Email__Port` if you run SMTP elsewhere.
-- A `DefaultConnection` connection string and a JWT key. Neither ships in `appsettings.json`; supply them with user secrets or environment variables, e.g.:
-
-  ```bash
-  export ConnectionStrings__DefaultConnection="Server=localhost;Port=3306;Database=pitaka;User=root;Password=<MYSQL_ROOT_PASSWORD>"
-  export Jwt__Key="<any value for local dev>"
-  export ObjectStorage__Endpoint="http://localhost:8333"
-  export ObjectStorage__Region="us-east-1"
-  export ObjectStorage__BucketName="pitaka-private"
-  export ObjectStorage__AccessKeyId="pitaka-local"
-  export ObjectStorage__SecretAccessKey="pitaka-local-secret"
-  export Email__Host="localhost"   # only if not using the shipped localhost:2525 default
-  export Email__Port="2525"
-  ```
-
-Apply migrations the same way as the Docker loop (`docker compose run --rm migrator`), or run `dotnet ef database update` from `PitakaApp.Api/` against the same connection string.
-
-Run it:
+`pdotnet` sends a `dotnet` command to the running API container. Run it from any directory in
+the checkout; it keeps that directory, forwards arguments and input, and does not start the stack
+for you. For example:
 
 ```bash
-cd PitakaApp.Api
-dotnet run                          # http://localhost:5044
-dotnet run --launch-profile https   # also binds https://localhost:7272
-dotnet watch                        # same, with hot reload
+# From the repository root
+pdotnet build PitakaApp.Api/PitakaApp.Api.csproj
+pdotnet test PitakaApp.Api.Tests/PitakaApp.Api.Tests.csproj
+
+# From PitakaApp.Api/
+pdotnet ef migrations add AddSomething
+
+# From PitakaApp.Api.Tests/
+pdotnet test
 ```
 
-The storage credentials above are local-development values and must not be reused in production.
-For production, set all five `ObjectStorage__...` values from deployment or secret configuration;
-point `ObjectStorage__Endpoint` at the existing private S3-compatible service. The SDK loop uses
-`http://localhost:8333`; a process running in Compose uses `http://seaweedfs:8333`.
+EF commands without `--project` or `--startup-project` use `PitakaApp.Api`; explicit values are
+respected. Generated migrations and requested build outputs are in the host checkout. The API
+watch build has a separate cache, so requested builds do not replace the files it is using. One
+`pdotnet` command may run at a time; a second invocation reports that the first is still running.
+If the stack is stopped, `pdotnet` reports that and leaves it stopped.
 
-`ASPNETCORE_ENVIRONMENT` is `Development` under both launch profiles. In Development the HTTPS-redirect middleware is guarded off (see `Program.cs`), so a plain-HTTP caller on `http://localhost:5044` is served directly and never bounced to the `https` port's self-signed certificate — which is why `environment.ts` can keep pointing at `http://localhost:5044`.
+The test fixtures use `pitaka_test` and `pitaka_test_realauth`, separate from the development
+database. The storage integration test uses SeaweedFS from the same stack.
 
-## Running tests
+### Building the deployable API image
 
-```bash
-docker compose run --rm test
-```
-
-This runs the full suite, including the storage integration test. Compose starts MySQL and
-SeaweedFS for the test container; the storage test writes an object, reads it back, then deletes
-it. A plain `dotnet test` also includes it, so when using the SDK loop, start MySQL and SeaweedFS
-and set the test connection string and `ObjectStorage__...` settings first.
-
-`test` (like `api` and `migrator`) copies your source into the image at *build* time — it doesn't see changes automatically. If you've changed code since the image was last built, rebuild first or the suite will silently run against stale source:
+The Dockerfile's default final stage is the deployable image. It contains the published API on
+the ASP.NET runtime image. The SDK is used by the build and development stages; `dotnet-ef` is
+installed only in the development stage. Neither is in the final image.
 
 ```bash
-docker compose build test && docker compose run --rm test
-```
-
-## Working with migrations
-
-Applying migrations (what you already ran in setup) and generating new ones are two different services, because generating a migration needs to write a real file back onto your machine — see [`docker-compose.yml`](docker-compose.yml) for why `dev` uses a bind mount instead of a build-time copy like the other services.
-
-**Apply migrations:**
-
-```bash
-docker compose run --rm migrator
-```
-
-**Generate a new migration**, after changing a model:
-
-```bash
-docker compose run --rm dev dotnet ef migrations add SomeMigrationName
-```
-
-The generated files land directly in `PitakaApp.Api/Migrations/`, ready to commit.
-
-**Remove the most recent (not-yet-applied) migration:**
-
-```bash
-docker compose run --rm dev dotnet ef migrations remove
+docker build --target final -f PitakaApp.Api/Dockerfile -t pitaka-api:local .
 ```
 
 ## Stack
@@ -137,3 +98,5 @@ docker compose run --rm dev dotnet ef migrations remove
 - ASP.NET Core (.NET 10)
 - Entity Framework Core, MySQL (via Pomelo)
 - JWT authentication
+- SeaweedFS for private S3-compatible object storage
+- smtp4dev for local mail capture

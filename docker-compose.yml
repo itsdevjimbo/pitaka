@@ -1,35 +1,49 @@
+name: pitaka
+
 services:
   api:
+    image: pitaka-api:development
     build:
-      context: ./PitakaApp.Api
+      context: .
+      dockerfile: PitakaApp.Api/Dockerfile
+      target: development
+    working_dir: /workspace
     ports:
       - "80:8080"
+    volumes:
+      - .:/workspace
+      - pitaka_api_watch_artifacts:/watch
+      - pitaka_pdotnet_nuget:/pdotnet/nuget
     environment:
-      - ASPNETCORE_ENVIRONMENT=${ENVIRONMENT:-Production}
-      - ConnectionStrings__DefaultConnection=Server=mysql;Port=3306;Database=pitaka;User=root;Password=${MYSQL_ROOT_PASSWORD}
-      - Jwt__Key=${JWT_KEY}
-      - Email__Host=smtp4dev
-      - Email__Port=25
-      - ObjectStorage__Endpoint=http://seaweedfs:8333
-      - ObjectStorage__Region=${OBJECT_STORAGE_REGION:-us-east-1}
-      - ObjectStorage__BucketName=${OBJECT_STORAGE_BUCKET:-pitaka-private}
-      - ObjectStorage__AccessKeyId=${OBJECT_STORAGE_ACCESS_KEY_ID}
-      - ObjectStorage__SecretAccessKey=${OBJECT_STORAGE_SECRET_ACCESS_KEY}
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://0.0.0.0:8080
+      DOTNET_USE_POLLING_FILE_WATCHER: "1"
+      ConnectionStrings__DefaultConnection: Server=mysql;Port=3306;Database=pitaka;User=root;Password=${MYSQL_ROOT_PASSWORD}
+      TEST_DB_CONNECTION: Server=mysql;Port=3306;Database=pitaka_test;User=root;Password=${MYSQL_ROOT_PASSWORD}
+      REALAUTH_TEST_DB_CONNECTION: Server=mysql;Port=3306;Database=pitaka_test_realauth;User=root;Password=${MYSQL_ROOT_PASSWORD}
+      Jwt__Key: ${JWT_KEY}
+      Email__Host: smtp4dev
+      Email__Port: 25
+      ObjectStorage__Endpoint: http://seaweedfs:8333
+      ObjectStorage__Region: ${OBJECT_STORAGE_REGION:-us-east-1}
+      ObjectStorage__BucketName: ${OBJECT_STORAGE_BUCKET:-pitaka-private}
+      ObjectStorage__AccessKeyId: ${OBJECT_STORAGE_ACCESS_KEY_ID}
+      ObjectStorage__SecretAccessKey: ${OBJECT_STORAGE_SECRET_ACCESS_KEY}
     depends_on:
       mysql:
         condition: service_healthy
-      smtp4dev:
-        condition: service_started
       seaweedfs:
         condition: service_healthy
+      smtp4dev:
+        condition: service_started
 
   seaweedfs:
     image: chrislusf/seaweedfs:4.47
     command: ["mini", "-dir=/data"]
     environment:
-      - AWS_ACCESS_KEY_ID=${OBJECT_STORAGE_ACCESS_KEY_ID}
-      - AWS_SECRET_ACCESS_KEY=${OBJECT_STORAGE_SECRET_ACCESS_KEY}
-      - S3_BUCKET=${OBJECT_STORAGE_BUCKET:-pitaka-private}
+      AWS_ACCESS_KEY_ID: ${OBJECT_STORAGE_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${OBJECT_STORAGE_SECRET_ACCESS_KEY}
+      S3_BUCKET: ${OBJECT_STORAGE_BUCKET:-pitaka-private}
     ports:
       - "8333:8333"
     volumes:
@@ -48,8 +62,8 @@ services:
   mysql:
     image: mysql:8
     environment:
-      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
-      - MYSQL_DATABASE=pitaka
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: pitaka
     ports:
       - "3306:3306"
     volumes:
@@ -60,74 +74,14 @@ services:
       timeout: 5s
       retries: 10
 
-  # Local SMTP sink. Catches every mail the API sends and shows it in a web UI
-  # instead of delivering it anywhere. Its SMTP port is reachable inside the
-  # Compose network as smtp4dev:25 (what the api service points at); the web UI
-  # is published on the host at http://localhost:5080.
   smtp4dev:
     image: rnwood/smtp4dev:v3
     ports:
       - "5080:80"
       - "2525:25"
 
-  test:
-    build:
-      context: .
-      dockerfile: PitakaApp.Api.Tests/Dockerfile
-    environment:
-      - TEST_DB_CONNECTION=Server=mysql;Port=3306;Database=pitaka_test;User=root;Password=${MYSQL_ROOT_PASSWORD}
-      - REALAUTH_TEST_DB_CONNECTION=Server=mysql;Port=3306;Database=pitaka_test_realauth;User=root;Password=${MYSQL_ROOT_PASSWORD}
-      - ObjectStorage__Endpoint=http://seaweedfs:8333
-      - ObjectStorage__Region=${OBJECT_STORAGE_REGION:-us-east-1}
-      - ObjectStorage__BucketName=${OBJECT_STORAGE_BUCKET:-pitaka-private}
-      - ObjectStorage__AccessKeyId=${OBJECT_STORAGE_ACCESS_KEY_ID}
-      - ObjectStorage__SecretAccessKey=${OBJECT_STORAGE_SECRET_ACCESS_KEY}
-    depends_on:
-      mysql:
-        condition: service_healthy
-      seaweedfs:
-        condition: service_healthy
-
-  migrator:
-    build:
-      context: ./PitakaApp.Api
-      target: build
-    entrypoint: ["dotnet", "ef", "database", "update"]
-    environment:
-      - ConnectionStrings__DefaultConnection=Server=mysql;Port=3306;Database=pitaka;User=root;Password=${MYSQL_ROOT_PASSWORD}
-    depends_on:
-      mysql:
-        condition: service_healthy
-
-  # General-purpose SDK shell with the live source bind-mounted (not baked in via
-  # COPY like the other services), so anything it writes — a new migration file,
-  # a csproj change from `dotnet add package` — lands back on the host as a real
-  # file. Invoked ad hoc, e.g.:
-  #   docker compose run --rm dev dotnet ef migrations add SomeMigrationName
-  dev:
-    build:
-      context: ./PitakaApp.Api
-      target: build
-    volumes:
-      - ./PitakaApp.Api:/src
-      # Keep the image's own restored obj/bin (built for the container's Linux/NuGet
-      # cache) instead of letting the bind mount above replace them with the host's —
-      # host obj/bin point at host-only package paths, which broke `dotnet ef` here.
-      - /src/obj
-      - /src/bin
-    environment:
-      - ConnectionStrings__DefaultConnection=Server=mysql;Port=3306;Database=pitaka;User=root;Password=${MYSQL_ROOT_PASSWORD}
-      - ObjectStorage__Endpoint=http://seaweedfs:8333
-      - ObjectStorage__Region=${OBJECT_STORAGE_REGION:-us-east-1}
-      - ObjectStorage__BucketName=${OBJECT_STORAGE_BUCKET:-pitaka-private}
-      - ObjectStorage__AccessKeyId=${OBJECT_STORAGE_ACCESS_KEY_ID}
-      - ObjectStorage__SecretAccessKey=${OBJECT_STORAGE_SECRET_ACCESS_KEY}
-    depends_on:
-      mysql:
-        condition: service_healthy
-      seaweedfs:
-        condition: service_healthy
-
 volumes:
+  pitaka_api_watch_artifacts:
   pitaka_mysql_data:
+  pitaka_pdotnet_nuget:
   pitaka_object_storage_data:

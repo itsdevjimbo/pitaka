@@ -1,8 +1,10 @@
 ---
-status: accepted
+status: superseded
 ---
 
 # Support both the Docker and the SDK dev loop
+
+Superseded by [ADR 0019](0019-docker-only-contributor-loop.md) as part of issues #183 and #184.
 
 PR #43 containerised local development and the README sells it plainly: install Docker, nothing else. The API is served at `http://pitaka.localhost` by five compose services. Meanwhile Pitaka Web's `environment.ts` points at `http://localhost:5044`, the `dotnet run` Kestrel profile — a second dev loop the README does not document.
 
