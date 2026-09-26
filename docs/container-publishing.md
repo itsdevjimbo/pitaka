@@ -1,11 +1,11 @@
 # Published API and migration images
 
-The `main` push workflow runs the existing formatting, build, and test checks on the pushed
-commit before publishing. Pull requests and other branches only run validation. Publication
-builds both images from that same commit for `linux/amd64` and `linux/arm64`, then pulls the
-published pair into a disposable MySQL, SeaweedFS, and smtp4dev stack. The migration bundle
-must complete and the API must answer at `/openapi/v1.json` before the workflow moves either
-`main` image tag.
+The `Code Quality and Tests` workflow runs formatting, build, and test checks. After a
+successful push to `main`, the separate `Build and Deploy` workflow publishes images from that
+same tested commit. Pull requests and other branches only run validation. Publication builds
+both images for `linux/amd64` and `linux/arm64`, then pulls the published pair into a disposable
+MySQL, SeaweedFS, and smtp4dev stack. The migration bundle must complete and the API must answer
+at `/openapi/v1.json` before the workflow moves either `main` image tag.
 
 The images are public:
 
