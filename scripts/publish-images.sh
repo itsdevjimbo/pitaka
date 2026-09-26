@@ -13,7 +13,6 @@ fi
 platforms="linux/amd64,linux/arm64"
 sha_tag="sha-$commit"
 api_image="jimbodev0530/pitaka-api"
-migrations_image="jimbodev0530/pitaka-migrations"
 
 fail() {
     printf 'publish-images: %s\n' "$1" >&2
@@ -40,36 +39,24 @@ registry_tag_exists() {
     esac
 }
 
-publish_fixed_tag() {
-    local image="$1"
-    local dockerfile_target="$2"
+if registry_tag_exists "$api_image" "$sha_tag"; then
+    printf 'Reusing existing fixed image %s:%s after verification.\n' "$api_image" "$sha_tag"
+else
+    printf 'Building %s:%s for %s.\n' "$api_image" "$sha_tag" "$platforms"
+    docker buildx build \
+        --file PitakaApp.Api/Dockerfile \
+        --target final \
+        --platform "$platforms" \
+        --label "org.opencontainers.image.revision=$commit" \
+        --annotation "index:org.opencontainers.image.revision=$commit" \
+        --tag "$api_image:$sha_tag" \
+        --push \
+        .
+fi
 
-    if registry_tag_exists "$image" "$sha_tag"; then
-        printf 'Reusing existing fixed image %s:%s after verification.\n' "$image" "$sha_tag"
-    else
-        printf 'Building %s:%s for %s.\n' "$image" "$sha_tag" "$platforms"
-        docker buildx build \
-            --file PitakaApp.Api/Dockerfile \
-            --target "$dockerfile_target" \
-            --platform "$platforms" \
-            --label "org.opencontainers.image.revision=$commit" \
-            --annotation "index:org.opencontainers.image.revision=$commit" \
-            --tag "$image:$sha_tag" \
-            --push \
-            .
-    fi
-
-    pitaka_validate_image "$image" "$sha_tag" "$commit"
-}
-
-publish_fixed_tag "$api_image" final
-publish_fixed_tag "$migrations_image" migrations
-
-# Do not move either alias until both fixed artifacts are available and verified.
 pitaka_validate_image "$api_image" "$sha_tag" "$commit"
-pitaka_validate_image "$migrations_image" "$sha_tag" "$commit"
 
-# Exercise the exact artifacts from Docker Hub against disposable dependencies
-# before moving either alias.
+# Exercise the exact artifact from Docker Hub against disposable dependencies
+# before moving the main alias.
 ./scripts/smoke-published-images.sh "$commit"
-printf 'Published and smoke-tested a verified fixed image pair for %s.\n' "$commit"
+printf 'Published and smoke-tested the verified API image for %s.\n' "$commit"

@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   publish:
-    name: Publish API and migration images
+    name: Publish API image
     if: >-
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'push' &&
@@ -32,13 +32,13 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Publish and verify the fixed image pair
+      - name: Publish and verify the fixed API image
         env:
           GITHUB_SHA: ${{ github.event.workflow_run.head_sha }}
         run: ./scripts/publish-images.sh
 
   advance-main-tags:
-    name: Advance moving main image tags
+    name: Advance the moving API image tag
     needs: publish
     if: >-
       github.event.workflow_run.conclusion == 'success' &&

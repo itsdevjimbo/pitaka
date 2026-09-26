@@ -11,7 +11,6 @@ if ! pitaka_is_full_commit_sha "$commit"; then
 fi
 
 api_image="jimbodev0530/pitaka-api"
-migrations_image="jimbodev0530/pitaka-migrations"
 
 resolve_main() {
     local revision
@@ -23,39 +22,33 @@ resolve_main() {
     printf '%s\n' "$revision"
 }
 
-fixed_pair_is_valid() {
+fixed_image_is_valid() {
     local revision="$1"
-    pitaka_validate_image "$api_image" "sha-$revision" "$revision" \
-        && pitaka_validate_image "$migrations_image" "sha-$revision" "$revision"
+    pitaka_validate_image "$api_image" "sha-$revision" "$revision"
 }
 
 advance_tags_to() {
     local revision="$1"
     local sha_tag="sha-$revision"
 
-    # Docker Hub does not make the two moving-tag writes atomic. The caller
-    # verifies both immutable artifacts before writing either moving tag.
+    # The caller verifies the immutable artifact before moving the alias.
     docker buildx imagetools create \
         --annotation "index:org.opencontainers.image.revision=$revision" \
         --tag "$api_image:main" "$api_image:$sha_tag"
-    docker buildx imagetools create \
-        --annotation "index:org.opencontainers.image.revision=$revision" \
-        --tag "$migrations_image:main" "$migrations_image:$sha_tag"
 
     pitaka_validate_image "$api_image" main "$revision"
-    pitaka_validate_image "$migrations_image" main "$revision"
 }
 
 target="$(resolve_main)"
-if [[ "$target" != "$commit" ]] && ! fixed_pair_is_valid "$target"; then
-    printf 'Leaving main tags unchanged: %s is no longer origin/main, and the current main image pair is not ready.\n' \
+if [[ "$target" != "$commit" ]] && ! fixed_image_is_valid "$target"; then
+    printf 'Leaving the main tag unchanged: %s is no longer origin/main, and its API image is not ready.\n' \
         "$commit"
     exit 0
 fi
 
 for attempt in 1 2 3; do
-    if ! fixed_pair_is_valid "$target"; then
-        printf 'update-main-image-tags: the current main image pair %s is not ready; refusing to advance aliases\n' \
+    if ! fixed_image_is_valid "$target"; then
+        printf 'update-main-image-tags: the API image for %s is not ready; refusing to advance the main tag\n' \
             "$target" >&2
         exit 1
     fi
@@ -64,7 +57,7 @@ for attempt in 1 2 3; do
 
     current_main="$(resolve_main)"
     if [[ "$current_main" == "$target" ]]; then
-        printf 'Advanced both main image tags to %s.\n' "$target"
+        printf 'Advanced the API main tag to %s.\n' "$target"
         exit 0
     fi
 

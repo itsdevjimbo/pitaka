@@ -88,17 +88,19 @@ SeaweedFS from the same stack.
 
 ### Building the deployable API image
 
-The Dockerfile's default final stage is the deployable image. It contains the published API on
-the ASP.NET runtime image. The SDK is used by the build and development stages; `dotnet-ef` is
-installed only in the development stage. Neither is in the final image.
+The Dockerfile's default final stage is the deployable image. It contains the published API
+and its EF migration bundle on the ASP.NET runtime image. The SDK and `dotnet-ef` are used only
+in the build and development stages. Run migrations as an explicit one-time container step by
+overriding the image entrypoint with `/app/efbundle`; the API keeps its normal entrypoint.
 
 ```bash
 docker build --target final -f PitakaApp.Api/Dockerfile -t pitaka-api:local .
 ```
 
-This builds the API image locally. CI also publishes a matching API image and EF migration
-bundle for every validated `main` revision. See [publishing and smoke-testing images](docs/container-publishing.md)
-for registry setup, fixed image tags, and a disposable database smoke run.
+This builds the API image locally. CI publishes one multi-architecture API image, tagged for
+each validated `main` revision, containing both the API and EF migration bundle. See
+[publishing and smoke-testing images](docs/container-publishing.md) for registry setup, fixed
+image tags, and a disposable database smoke run.
 
 ## Stack
 

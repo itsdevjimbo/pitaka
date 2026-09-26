@@ -9,10 +9,12 @@ published application artifacts, applying release migrations, or recovering depl
 ## Solution
 
 Publish public, multi-architecture images after successful validation of each repository's
-main updates and eligible version tags. Provide a separate, manually operated local
-deployment using those images, available at http://localhost:8080, with persistent
-MySQL and private object storage plus a local email inbox. Run a matching migration
-container before starting the selected API version. Document upgrades and manual recovery.
+main updates and eligible version tags. The API image contains both the API and its EF Core
+migration bundle. Provide a separate, manually operated local deployment using those images,
+available at http://localhost:8080, with persistent MySQL and private object storage plus a
+local email inbox. Run the bundle as a one-time container step by overriding the selected API
+image's entrypoint, then start the API service with that same image tag. Document upgrades and
+manual recovery.
 
 ## User Stories
 
@@ -31,7 +33,7 @@ container before starting the selected API version. Document upgrades and manual
 13. As a developer, I want fixed commit and release image tags, so that I can select the same artifacts again.
 14. As a maintainer, I want retried publications to preserve fixed tags, so that retries cannot silently replace published artifacts.
 15. As a maintainer, I want overlapping builds to preserve main's publication order, so that a late older build does not replace a newer published build.
-16. As a maintainer, I want API and migration images published as a matching pair, so that a partial upload is not reported as a usable release.
+16. As a developer, I want the API image to contain its migration bundle, so that one immutable API tag selects both the migration and runtime artifacts.
 17. As a developer, I want to select API and web versions independently, so that I can deploy an explicit pair without requiring matching version numbers.
 18. As a developer, I want deployment to pull application images without compiling locally, so that I practice running the artifacts produced by CI.
 19. As a contributor, I want the existing development workflow preserved, so that deployment simulation does not change the source-watching loop.
@@ -59,8 +61,9 @@ container before starting the selected API version. Document upgrades and manual
 
 - Scope spans the API repository, itsdevjimbo/pitaka, and the web repository,
   itsdevjimbo/pitaka-web. The API repository owns the deployment configuration and
-  operating instructions. Each repository publishes only its own artifacts; the API
-  repository additionally publishes migrations. This is a cross-repository feature.
+  operating instructions. The API repository publishes one `pitaka-api` image that
+  contains the runtime and migration bundle; the web repository publishes `pitaka-web`.
+  This is a cross-repository feature.
 - Extend existing GitHub Actions validation and publishing behavior for pushes to
   main and eligible version-tag pushes. PRs retain validation without publishing.
   Main updates publish regardless of merge style; branch policy should require PRs.
@@ -71,28 +74,30 @@ container before starting the selected API version. Document upgrades and manual
 - Run the repository's existing checks against the exact selected revision before
   publishing. Tag runs must use valid comparison inputs for existing web standards
   checks rather than assuming a branch-push or PR event payload.
-- Publish public Docker Hub repositories jimbodev0530/pitaka-api,
-  jimbodev0530/pitaka-web, and jimbodev0530/pitaka-migrations. Each supports
-  linux/arm64 and linux/amd64. Configure publishing credentials in CI secret storage;
-  document registry prerequisites without committing credentials.
+- Publish public Docker Hub repositories jimbodev0530/pitaka-api and
+  jimbodev0530/pitaka-web. Each supports linux/arm64 and linux/amd64. Configure
+  publishing credentials in CI secret storage; document registry prerequisites
+  without committing credentials.
 - Main publications expose sha-<commit> and a moving main tag. Release publications
   expose the matching Git version tag. Commit and release tags are never reassigned
   to different artifacts. A retry must reuse an existing verified artifact or fail
   clearly on a conflict; it must not overwrite a fixed tag with a rebuilt digest.
 - Older main runs must not replace a newer published main build. Historical release
-  tags do not change the moving main tag. Preserve enough source-revision information
-  to identify the commit behind each image and verify matching API/migration artifacts.
-- API and migration images use the same source commit and version selection. Both
-  must be available before API publication is declared successful or moving main
-  tags advance. Registry uploads and separate tag updates are not atomic: detect
-  incomplete/mismatched pairs, report failure, and require a verified pair for deployment.
+  tags do not change the moving main tag. Preserve source-revision information to
+  identify the commit behind each image and verify its platforms.
+- The API image contains the framework-dependent EF Core migration bundle for the
+  same source revision. Smoke-check that bundle by running the API image with
+  `/app/efbundle` as its overridden entrypoint, then verify that the API starts and
+  responds. A single API image tag selects both operations; do not publish or match
+  a separate migration image.
 - Build the API's deployable runtime stage. Build and serve the web's production
   static assets in a deployable image with browser-route fallback and an internal
   reverse proxy for /api. The browser uses relative API requests, preserving the
   existing API routes. The image must not depend on the current placeholder API URL.
 - Provide a separate deployment Compose configuration with explicit API/web image
-  selections, MySQL, SeaweedFS, smtp4dev, and a one-shot migration service. API and web
-  versions need not match each other; API and migration versions must match.
+  selections, MySQL, SeaweedFS, smtp4dev, and a one-shot migration service. The migration
+  service overrides the selected API image's entrypoint and uses the exact same API tag
+  as the API service. API and web versions need not match each other.
   Local deployment does not build application source or require a host .NET/Node SDK.
 - Preserve ADR 0019's contributor workflow: its source mounts, SDK watcher, four
   ordinary services, and explicitly requested development migrations remain a separate
@@ -109,10 +114,11 @@ container before starting the selected API version. Document upgrades and manual
   a local environment file with documented placeholders. Exclude real secrets from
   source control, image layers, and published build output. No new domain schema or
   public business API contract is required by this feature.
-- Build an EF Core migration bundle in CI and package it as the migration image
-  for each supported architecture. Execute it against the ready deployment database
-  as an explicit, manually initiated deployment step. Successful completion exits
-  the container; it is not a continuously running service or API-startup migration.
+- Build an EF Core migration bundle in CI and include it in the API image for each
+  supported architecture. Execute it against the ready deployment database as an
+  explicit, manually initiated one-time container step, overriding the image entrypoint
+  with `/app/efbundle`. Successful completion exits the container; it is not a
+  continuously running service or API-startup migration.
 - Initial deployment prepares configuration and dependencies, applies migrations,
   then starts the API and web. Upgrades pull and validate all selected artifacts,
   stop the existing API/web, run the selected migration, and start the selected
@@ -134,7 +140,8 @@ container before starting the selected API version. Document upgrades and manual
   Use isolated disposable data. Do not build a new general-purpose test framework.
 - Verify publishing through actual workflow runs and Docker Hub artifacts: main and
   eligible version-tag publication, failed-check gating, tag ancestry restrictions,
-  fixed image tags, matching API/migration revisions, and ARM64/AMD64 manifests.
+  fixed image tags, the API image's revision, and ARM64/AMD64 manifests. Verify its
+  migration bundle and API with the disposable publication smoke check.
   Review retry and concurrency behavior; a framework simulating every GitHub event
   or registry failure is not required. Native or emulated architecture smoke runs
   can supplement manifest inspection when available.
@@ -177,6 +184,7 @@ container before starting the selected API version. Document upgrades and manual
   repository's GitHub tracker with ready-for-agent. A later task breakdown may link
   implementation work in both repositories; this specification does not authorize
   treating API-only implementation as completion.
-- Existing validation is already present in both repositories. The API has a runtime
-  image but no migration runner; the web needs container packaging and currently embeds
-  a production API placeholder. These are the principal gaps this work addresses.
+- Existing validation is already present in both repositories. The API now publishes
+  one image containing its runtime and migration bundle; the web still needs container
+  packaging and currently embeds a production API placeholder. Those remain gaps for
+  the later local-deployment work.

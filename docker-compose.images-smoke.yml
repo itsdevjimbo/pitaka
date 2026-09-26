@@ -25,8 +25,9 @@ services:
       smtp4dev:
         condition: service_started
 
-  migrations:
-    image: ${MIGRATIONS_IMAGE:?Set MIGRATIONS_IMAGE to the matching migration SHA image}
+  migration:
+    image: ${API_IMAGE:?Set API_IMAGE to the fixed API SHA image}
+    entrypoint: ["/app/efbundle"]
     environment:
       ConnectionStrings__DefaultConnection: Server=mysql;Port=3306;Database=pitaka;User=root;Password=pitaka-smoke-only
     depends_on:

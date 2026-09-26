@@ -17,8 +17,8 @@ This document is design input for a later specification, not an implementation.
   explicit API and web versions; their version numbers may differ.
 - Publication must pass the existing checks, including when a version tag targets
   an older commit.
-- Docker Hub images will be public under `jimbodev0530`: `pitaka-api`,
-  `pitaka-web`, and `pitaka-migrations`.
+- Docker Hub images will be public under `jimbodev0530`: `pitaka-api` and
+  `pitaka-web`. The API image contains both the API and its EF Core migration bundle.
 - Images must support ARM64 and AMD64.
 - Local deployment initially uses one HTTP origin, forwarding `/api` requests to
   the API container. HTTPS is deferred.
@@ -28,9 +28,10 @@ This document is design input for a later specification, not an implementation.
 - A separate deployment Compose file in the API repository pulls published API
   and web images and runs MySQL, SeaweedFS, and smtp4dev. Deployment data uses
   persistent volumes separate from development data.
-- Migrations run as an explicit deployment step in a dedicated container with
-  an EF Core migration bundle, built and versioned alongside the API. The database
-  must be ready first; the new API starts only after migration succeeds. A failed
+- Migrations run as an explicit one-time deployment step in a dedicated container
+  using the selected API image tag and overriding its entrypoint with
+  `/app/efbundle`. The API service uses that same selected API tag. The database
+  must be ready first; the API starts only after migration succeeds. A failed
   migration stops the deployment procedure.
 - Local upgrades permit downtime. Pull all selected images before stopping the
   existing API and web, apply migrations, then start the selected application
@@ -43,10 +44,11 @@ This document is design input for a later specification, not an implementation.
   `pitaka.localhost`.
   Configuration comes from a local environment file; secrets are excluded from
   Git and published images.
-- An API publication succeeds only when the API and matching migration images
-  are available. Do not advance `main` until both exist. Deployment must pull
-  both successfully before stopping the running application. A partial upload
-  is not a usable release; this does not imply atomic registry uploads.
+- An API publication succeeds only when the single API image passes its revision,
+  architecture, and migration/API smoke checks. The migration bundle and API are
+  selected by one image tag, so there is no separate migration image to match.
+  Deployment must pull the selected API and web images before stopping the running
+  application.
 - Release Git tags use `vMAJOR.MINOR.PATCH` (for example, `v1.2.0`). Prerelease
   tags such as `v1.2.0-beta.1` are outside the initial scope; main builds provide
   images for trying unreleased changes.
@@ -55,7 +57,8 @@ This document is design input for a later specification, not an implementation.
 
 - A main merge and a valid version tag publish images. Failed checks and tags
   outside `main` history do not publish images.
-- Published application and migration images support ARM64 and AMD64.
+- Published API and web images support ARM64 and AMD64. The API image's migration
+  bundle runs from the same architecture-specific image as the API.
 - A fresh local deployment runs pulled images without locally building application
   code.
 - Registration, email confirmation, sign-in, recording an expense, and uploading
@@ -66,12 +69,17 @@ This document is design input for a later specification, not an implementation.
 
 - API and web live in separate repositories: `itsdevjimbo/pitaka` and
   `itsdevjimbo/pitaka-web`.
-- Both repositories already validate changes in CI; neither publishes images.
+- Both repositories validate changes in CI. The API repository publishes one
+  `pitaka-api` image containing the API and migration bundle; web image publication
+  remains part of the later local-deployment work.
 - The API has a runtime Dockerfile stage. The web has no Dockerfile and embeds
   an API URL during its build.
 - The API depends on MySQL, private object storage (SeaweedFS), and SMTP.
 - The current development Compose setup is governed by ADR 0019. Its API uses
   SDK tooling and explicit migrations; the runtime image has no EF CLI.
+- The future deployment selects one API image tag for both its migration job and
+  API service. This does not change the separate contributor workflow, which keeps
+  its SDK watcher and explicitly requested development migrations.
 - The local machine uses ARM64.
 
 ## Design confirmation
