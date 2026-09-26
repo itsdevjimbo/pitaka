@@ -50,17 +50,8 @@ builder.Services.AddOpenApi(options =>
 builder.Services.AddDbContext<PitakaDbContext>(
     (serviceProvider, options) =>
     {
-        var connectionString = serviceProvider
-            .GetRequiredService<IConfiguration>()
-            .GetConnectionString("DefaultConnection");
-        options
-            .UseMySql(connectionString, ServerVersion.AutoDetect(connectionString))
-            .UseSnakeCaseNamingConvention()
-            .UseSeeding((context, _) => DbSeeder.Seed(context))
-            .UseAsyncSeeding(
-                async (context, _, cancellationToken) =>
-                    await DbSeeder.SeedAsync(context, cancellationToken)
-            );
+        var configuration = serviceProvider.GetRequiredService<IConfiguration>();
+        PitakaDbContextConfiguration.Configure(options, configuration);
     }
 );
 builder.Services.AddSingleton(TimeProvider.System);

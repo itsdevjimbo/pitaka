@@ -1,0 +1,67 @@
+name: pitaka-published-image-smoke
+
+services:
+  api:
+    image: ${API_IMAGE:?Set API_IMAGE to the fixed API SHA image}
+    ports:
+      - "18080:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://0.0.0.0:8080
+      ConnectionStrings__DefaultConnection: Server=mysql;Port=3306;Database=pitaka;User=root;Password=pitaka-smoke-only
+      Jwt__Key: pitaka-smoke-only-signing-key-never-use-in-deployment
+      Email__Host: smtp4dev
+      Email__Port: 25
+      ObjectStorage__Endpoint: http://seaweedfs:8333
+      ObjectStorage__Region: us-east-1
+      ObjectStorage__BucketName: pitaka-private
+      ObjectStorage__AccessKeyId: pitaka-smoke-only
+      ObjectStorage__SecretAccessKey: pitaka-smoke-only-secret
+    depends_on:
+      mysql:
+        condition: service_healthy
+      seaweedfs:
+        condition: service_healthy
+      smtp4dev:
+        condition: service_started
+
+  migration:
+    image: ${API_IMAGE:?Set API_IMAGE to the fixed API SHA image}
+    entrypoint: ["/app/efbundle"]
+    environment:
+      ConnectionStrings__DefaultConnection: Server=mysql;Port=3306;Database=pitaka;User=root;Password=pitaka-smoke-only
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  mysql:
+    image: mysql:8
+    environment:
+      MYSQL_ROOT_PASSWORD: pitaka-smoke-only
+      MYSQL_DATABASE: pitaka
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.47
+    command: ["mini", "-dir=/data"]
+    environment:
+      AWS_ACCESS_KEY_ID: pitaka-smoke-only
+      AWS_SECRET_ACCESS_KEY: pitaka-smoke-only-secret
+      S3_BUCKET: pitaka-private
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -S --spider -O /dev/null http://localhost:8333/ 2>&1 | grep -q 'HTTP/1.1 403 Forbidden'",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  smtp4dev:
+    image: rnwood/smtp4dev:v3
