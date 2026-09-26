@@ -1,9 +1,37 @@
 # Pitaka artifact publishing and deployment plan
 
-Status: revised plan, 2026-09-26. Planning only; implementation is deferred.
+Status: confirmed local design, 2026-09-26. Planning only; implementation is deferred.
 This revision supersedes the earlier plan's web-image handoff and its placement of
 local deployment Compose in the API repository. Web storage and retention are resolved by web ADR 0018; the production platform
-and deploy-repository setup remain open decisions.
+and production deployment setup remain open decisions.
+
+## Decisions confirmed during issue #190 review
+
+- The separate deployment repository will be `itsdevjimbo/pitaka-deploy`.
+  Its initial local workflow applies a selected revision with an explicit command;
+  a Git commit alone does not update the running environment.
+- API SemVer publication is deferred. Local deployment selects the existing API
+  image by digest, with its source SHA recorded.
+- Local web selection may use either a named 14-day Actions candidate or a
+  promoted GitHub Release asset. The version record identifies the exact source,
+  artifact, and checksum. Expiry of a candidate fails clearly.
+- Local deployment data persists across routine container replacement. Recovery
+  exercises use disposable data: back up database and uploads before a migration,
+  retain the current and previous backup, and run a restore drill. Production
+  backup frequency and retention remain undecided.
+- Protect API digests used by active environments and the last three successful
+  production versions. Deletion of an unreferenced digest requires manual review;
+  an age rule awaits measured registry usage.
+- The proposer of a deployment revision records web/API compatibility evidence
+  and migration impact for review. Local smoke tests verify the selected pair
+  before recording a successful rollout.
+- The current work designs a local simulation of production. Production hosting,
+  operations, and costs will be decided separately.
+- A failed migration leaves the API offline for explicit repair or restore. The
+  procedure never restarts an older API or reverses schema changes automatically.
+- Keep the previously successful, verified web bytes locally while that version
+  is a rollback target, even if its Actions candidate expires. Record their
+  checksum and remove them only after the version is no longer protected.
 
 ## 1. Evidence and boundaries
 
@@ -56,7 +84,7 @@ and 0019 were also read.
   that an environment has deployed an image. No production host or Kubernetes
   target is established by the inspected plan and files.
 
-### Retained decisions and proposed changes
+### Retained decisions and confirmed scope
 
 Retain independent web/API versions, a local browser origin of
 `http://localhost:8080`, ARM64/AMD64 support for runtime images, explicit migrations,
@@ -65,7 +93,7 @@ and manual database/upload backup and restore procedures. Local HTTPS remains de
 
 Replace the previous requirement that both applications publish deployable images:
 web publishes static bytes; API continues publishing its container image. Move
-operational routing and environment composition into a separate deploy repository.
+operational routing and environment composition into `itsdevjimbo/pitaka-deploy`.
 The existing API contributor workflow and image smoke stack remain API concerns.
 This preserves [ADR 0019](adr/0019-docker-only-contributor-loop.md); replacing its
 four-service contributor loop with the deployment stack would contradict that ADR
@@ -73,7 +101,7 @@ and is outside this proposal.
 
 The previous plan proposed `vMAJOR.MINOR.PATCH` publication for commits in main
 history, with checks rerun for historical commits and no prerelease tags. The
-inspected workflows only establish main publication. API release-tag support remains an open scope decision; web version-tag
+inspected workflows only establish main publication. API release-tag support is deferred; web version-tag
 promotion is confirmed in ADR 0018 and web #293. For release publication, validate ancestry and checks before publication, never move a fixed
 version, and never let a historical release move the `main` alias backward.
 
@@ -101,7 +129,7 @@ not claim the publishing workflows are implemented.
 | --- | --- | --- |
 | `pitaka-web` | Angular source, app tests/checks, production build, artifact provenance and publication | Static archive associated with the full web source SHA; checksum and build metadata |
 | `pitaka-api` (currently the `pitaka` repository) | API source, CI, runtime Dockerfile, migration bundle, image publication and image smoke checks | `jimbodev0530/pitaka-api:sha-<API-SHA>` plus immutable image index digest; API and migration bundle are one version |
-| Proposed `pitaka-deploy` | Local Compose, environment version selections, Nginx routing, runtime configuration, deployment procedures, promotion and rollback | Consumes exact web artifact and API image; commits desired state and configuration only |
+| `itsdevjimbo/pitaka-deploy` | Local Compose, environment version selections, Nginx routing, runtime configuration, deployment procedures, promotion and rollback | Consumes exact web artifact and API image; commits desired state and configuration only |
 
 The deploy repo must not contain generated Angular bundles, API binaries, downloaded
 archives, image tarballs, runtime data, or plaintext secrets. Downloads belong in an
@@ -120,7 +148,8 @@ If a retry finds different bytes for an existing version, fail rather than overw
 
 Each environment version record should contain:
 
-- Web source SHA, durable asset URL/object key, asset identity, and SHA-256.
+- Web source SHA, artifact source and locator (Actions run/artifact ID or GitHub
+  Release asset URL), asset identity, and SHA-256.
 - API source SHA, human-readable tag, and image index digest, consumed as
   `jimbodev0530/pitaka-api@sha256:<recorded-digest>`.
 - Nginx and supporting service image digests, configuration revision, external
@@ -138,12 +167,15 @@ and credentials when an artifact is private. No Angular or .NET compilation is n
 1. Check out a chosen deploy-repo revision and choose the full web SHA and API
    digest recorded for that environment. Resolve the web SHA to its published
    manifest; reject a manifest for another commit.
-2. Download that exact web archive from durable storage. For short-lived testing,
-   an Actions artifact is acceptable: identify the successful main run by
+2. Download that exact web archive from its recorded source: a promoted GitHub
+   Release asset or, for short-lived testing, an Actions candidate. For Actions,
+   identify the successful main run by
    `head_sha`, then select its artifact ID/name explicitly, never “latest run.”
    Private/cross-repository downloads need appropriate read credentials. If it
    has expired, fail clearly or retrieve the recorded durable copy; do not silently
-   substitute a different SHA or rebuild a supposed identical release.
+   substitute a different SHA or rebuild a supposed identical release. Retain
+   locally verified bytes for the previously successful version while it is a
+   rollback target, even after the remote candidate expires.
 3. Verify SHA-256 before extraction; reject unsafe archive paths and extract into
    a versioned staging directory outside Git. Require `index.html`. Retain the
    previous directory for rollback and avoid overwriting files being served.
@@ -157,7 +189,8 @@ and credentials when an artifact is private. No Angular or .NET compilation is n
 6. For an upgrade, back up database and uploads, then stop application traffic and
    the API before schema changes. Run a one-time migration container using the
    exact selected API digest and entrypoint `/app/efbundle`. A failed migration
-   halts the procedure and leaves the application stopped for investigation.
+   halts the procedure and leaves the application stopped for explicit repair or
+   restore. Never restart an older API or reverse schema changes automatically.
 7. Start API and Nginx only after migration succeeds. Set the API to listen on
    container port 8080 and Nginx `API_UPSTREAM=http://api:8080`. Limit template
    substitution to `API_UPSTREAM` to preserve Nginx variables. Publish Nginx on
@@ -169,6 +202,8 @@ and credentials when an artifact is private. No Angular or .NET compilation is n
 9. Check SPA refreshes, `/api` and `/api/...` routing, API error preservation,
    registration/confirmation/sign-in, an expense, and a Profile picture upload.
    Record the deployed versions only after readiness and smoke checks succeed.
+   A deploy revision is applied by an explicit local command; committing it does
+   not update the running environment.
 
 Routing contract: `/` and client routes serve Angular; exact `/api` and prefix
 `/api/` proxy to the API, preserving URI and query string. API 404/500 responses
@@ -245,8 +280,10 @@ Confirmed web policy: Actions retains disposable candidates for 14 days; a candi
 must be copied unchanged into durable storage before promotion. Keep all active
 environment versions, the last three successful production versions, and promoted builds for at least 90 days from their latest promotion, including
 repeat promotion and failed deployment attempts. Deletion is manually reviewed;
-retain builds if deployment records are unavailable. API-image retention beyond
-active/rollback requirements still needs a separate policy.
+retain builds if deployment records are unavailable. Protect API digests used by
+active environments and the last three successful production versions. Deletion
+of any unreferenced digest requires manual review; choose an age rule only after
+measuring registry usage.
 Never apply age-only deletion to referenced artifacts or API digests. Expired
 unpromoted builds cannot be promised downloadable by SHA; every-main durable storage is not required. Production tag promotion fails when
 no copy exists; a rebuild cannot recover or replace the selected artifact identity.
@@ -265,8 +302,8 @@ requirements are known; verify its official pricing at that decision point.
 
 All steps below are future work; this change updates only this plan.
 
-1. Apply the confirmed public GitHub Releases and web retention decision; settle
-   deploy repo name, API retention, and production requirements. Preserve current publications during transition.
+1. Apply the confirmed public GitHub Releases and web retention decision; create
+   `itsdevjimbo/pitaka-deploy`. Preserve current publications during transition.
 2. Extend web CI to package its checked production output with SHA/checksum metadata
    and publish it. Enforce trusted main publication and least-privilege credentials.
    Gate candidate promotion on complete artifact verification. If temporary web
@@ -277,8 +314,8 @@ All steps below are future work; this change updates only this plan.
    instructions. Transfer runtime routing ownership out of web. Keep app CI and
    app artifact publishing in their respective source repositories.
 4. Retain API image publication and architecture/migration checks. Capture the
-   published digest for consumption. Implement web release promotion in web #293; confirm API release-tag scope
-   and apply the ancestry/check rules above; never reinterpret the moving alias as promotion.
+   published digest for consumption. Implement web release promotion in web #293.
+   API SemVer publication is deferred; never reinterpret the moving alias as promotion.
 5. Demonstrate fresh local deployment without app builds, independent SHA selection,
    SPA refresh/API errors, authentication email links, expense entry and Profile
    picture upload, persistence across replacement, successful upgrade, failed
@@ -301,10 +338,12 @@ All steps below are future work; this change updates only this plan.
   multi-instance/background-job behavior need validation; do not invent defaults.
 - **Storage/access:** Web uses public immutable Releases for production-selected
   builds and the confirmed 14/90-day policy above. Confirm actual account quotas
-  and enable immutability during implementation. API image retention and database/
-  upload backup retention still need policies.
-- **Release process:** Web version-tag promotion is confirmed. Is API SemVer
-  publication still needed alongside SHA publication? Who approves production pairs and validates web/API compatibility?
+  and enable immutability during implementation. Production database/upload backup
+  frequency and retention remain undecided. Local recovery exercises use disposable
+  data, retain the current and previous coordinated backup, and test a restore.
+- **Release process:** Web version-tag promotion is confirmed. API SemVer is
+  deferred. The deploy revision proposer records web/API compatibility evidence
+  and migration impact for review; local smoke tests verify the pair before success.
 - **Operational risks:** Deleted artifacts prevent rollback; source SHA alone does
   not prove identical builds; registry throttling can block pulls; a failed schema
   change can require restore. Prefetch and verify before downtime, retain referenced
