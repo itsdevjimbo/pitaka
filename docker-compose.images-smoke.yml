@@ -40,7 +40,13 @@ services:
       MYSQL_ROOT_PASSWORD: pitaka-smoke-only
       MYSQL_DATABASE: pitaka
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      # Check the same TCP endpoint used by the API; localhost's socket can
+      # answer while the MySQL image is still initializing its database.
+      test:
+        [
+          "CMD-SHELL",
+          "MYSQL_PWD=\"$${MYSQL_ROOT_PASSWORD}\" mysql --protocol=TCP --host=127.0.0.1 --user=root --database=\"$${MYSQL_DATABASE}\" --execute='SELECT 1' >/dev/null",
+        ]
       interval: 5s
       timeout: 5s
       retries: 20
