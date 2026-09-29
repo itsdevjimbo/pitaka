@@ -42,6 +42,8 @@ jobs:
       - run: dotnet tool restore
       - run: dotnet csharpier check .
       - run: dotnet build --no-restore
+      - name: Test image publication contract
+        run: ./scripts/tests/image-publication-test.sh
       - name: Start SeaweedFS
         run: |
           docker run --detach --name seaweedfs --publish 8333:8333 \

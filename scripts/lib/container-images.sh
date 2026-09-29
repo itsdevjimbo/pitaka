@@ -4,38 +4,58 @@ pitaka_is_full_commit_sha() {
     [[ "$1" =~ ^[[:xdigit:]]{40}$ ]]
 }
 
-pitaka_validate_image() {
-    local image="$1"
-    local tag="$2"
-    local expected_commit="$3"
-    local reference="$image:$tag"
-    local index revision platforms_found
+pitaka_read_image_identity() {
+    local reference="$1"
+    local expected_commit="$2"
+    local manifest
 
-    index="$(docker buildx imagetools inspect --raw "$reference")" \
+    manifest="$(docker buildx imagetools inspect --format '{{json .Manifest}}' "$reference")" \
         || {
             printf 'container-images: could not inspect %s\n' "$reference" >&2
             return 1
         }
 
-    revision="$(jq -er '.annotations["org.opencontainers.image.revision"] // empty' <<<"$index")" \
-        || {
-            printf 'container-images: %s has no source-revision annotation\n' "$reference" >&2
-            return 1
-        }
-    if [[ "$revision" != "$expected_commit" ]]; then
-        printf 'container-images: %s points to source %s, expected %s\n' \
-            "$reference" "$revision" "$expected_commit" >&2
-        return 1
-    fi
+    jq -e \
+        --arg reference "$reference" \
+        --arg expected_commit "$expected_commit" \
+        '
+            def digest: test("^sha256:[0-9a-f]{64}$");
+            def platform_manifests:
+                [.manifests[]? | select(.platform.os == "linux")];
 
-    platforms_found="$(jq -er '[.manifests[]?.platform | select(.os == "linux") | .architecture] | unique | sort | join(",")' <<<"$index")" \
-        || {
-            printf 'container-images: %s has no readable platform manifest list\n' "$reference" >&2
-            return 1
-        }
-    if [[ "$platforms_found" != "amd64,arm64" ]]; then
-        printf 'container-images: %s supports [%s], expected linux/amd64 and linux/arm64\n' \
-            "$reference" "$platforms_found" >&2
-        return 1
-    fi
+            if .annotations["org.opencontainers.image.revision"] != $expected_commit then
+                error(
+                    "\($reference) does not report expected source revision \($expected_commit)"
+                )
+            elif (.digest | type != "string" or (digest | not)) then
+                error("\($reference) has no valid index digest")
+            elif (
+                (platform_manifests | length) != 2 or
+                (platform_manifests | map(.platform.architecture) | sort) != ["amd64", "arm64"] or
+                (platform_manifests | any(.digest | type != "string" or (digest | not)))
+            ) then
+                error(
+                    "\($reference) must contain exactly one linux/amd64 and one linux/arm64 manifest"
+                )
+            else
+                {
+                    sourceRevision: $expected_commit,
+                    indexDigest: .digest,
+                    platforms: (
+                        platform_manifests
+                        | map({key: "linux/\(.platform.architecture)", value: .digest})
+                        | from_entries
+                    )
+                }
+            end
+        ' <<<"$manifest"
+}
+
+pitaka_validate_image() {
+    local image="$1"
+    local tag="$2"
+    local expected_commit="$3"
+    local reference="$image:$tag"
+
+    pitaka_read_image_identity "$reference" "$expected_commit" >/dev/null
 }

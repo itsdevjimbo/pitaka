@@ -3,6 +3,7 @@ name: pitaka-published-image-smoke
 services:
   api:
     image: ${API_IMAGE:?Set API_IMAGE to the fixed API SHA image}
+    platform: ${API_PLATFORM:?Set API_PLATFORM to linux/amd64 or linux/arm64}
     ports:
       - "18080:8080"
     environment:
@@ -27,6 +28,7 @@ services:
 
   migration:
     image: ${API_IMAGE:?Set API_IMAGE to the fixed API SHA image}
+    platform: ${API_PLATFORM:?Set API_PLATFORM to linux/amd64 or linux/arm64}
     entrypoint: ["/app/efbundle"]
     environment:
       ConnectionStrings__DefaultConnection: Server=mysql;Port=3306;Database=pitaka;User=root;Password=pitaka-smoke-only
