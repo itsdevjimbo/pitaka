@@ -215,9 +215,12 @@ layer:
 | Pure calculations | Direct unit tests with explicit inputs |
 | Persistence, constraints, atomicity, and concurrency | Integration tests against real MySQL, using independent scopes where needed |
 
-Use xUnit and descriptive `Operation_Scenario_Outcome` test names. Keep tests under the
-matching production area. Reuse the database collection fixtures and per-test Users; avoid
-introducing another fixture that resets a database used by concurrently running tests.
+Use xUnit and descriptive `Operation_Scenario_Outcome` test names for .NET behavior. A Bash
+script or GitHub Actions workflow may use a Bash acceptance test when its process calls,
+environment, and exit status are the public interface under test. Print a descriptive scenario
+name for each case and run the script from CI. Keep tests under the matching production area.
+Reuse the database collection fixtures and per-test Users; avoid introducing another fixture
+that resets a database used by concurrently running tests.
 
 Use factory `Make` methods for unpersisted entities and `CreateAsync` for persisted setup.
 Factories should respect domain construction paths, such as `Account.Open`.

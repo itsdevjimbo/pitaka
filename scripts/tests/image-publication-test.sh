@@ -41,7 +41,11 @@ case "${1:-} ${2:-} ${3:-}" in
             printf '%s\n' "${PITAKA_TEST_TAG_MANIFEST:-$PITAKA_TEST_MANIFEST}"
         fi
         ;;
-    "image inspect --format")
+    "image inspect --platform")
+        if [[ "${4:-}" != "${API_PLATFORM:-}" ]] || [[ "${5:-}" != "--format" ]]; then
+            printf 'unexpected docker arguments: %s\n' "$*" >&2
+            exit 1
+        fi
         printf '%s\n' "$PITAKA_TEST_RUNTIME_REVISION"
         ;;
     "compose --project-name "*)
@@ -118,11 +122,28 @@ manifest="$(jq -cn \
         ]
     }')"
 
-actual="$fixture_directory/identity.json"
+run_publisher() {
+    local evidence_path="$1"
+    shift
+
+    env \
+        PATH="$fixture_directory/bin:$PATH" \
+        PITAKA_TEST_MANIFEST="$manifest" \
+        PITAKA_TEST_RUNTIME_REVISION="$commit" \
+        GITHUB_SHA="$commit" \
+        GITHUB_REPOSITORY="itsdevjimbo/pitaka" \
+        GITHUB_RUN_ID="12345" \
+        GITHUB_RUN_ATTEMPT="2" \
+        PITAKA_EVIDENCE_PATH="$evidence_path" \
+        "$@" \
+        "$repository_root/scripts/publish-images.sh"
+}
+
+actual_identity_path="$fixture_directory/identity.json"
 PATH="$fixture_directory/bin:$PATH" \
     PITAKA_TEST_MANIFEST="$manifest" \
     "$repository_root/scripts/inspect-published-image.sh" \
-    "jimbodev0530/pitaka-api:sha-$commit" "$commit" >"$actual"
+    "jimbodev0530/pitaka-api:sha-$commit" "$commit" >"$actual_identity_path"
 
 jq -e \
     --arg revision "$commit" \
@@ -137,7 +158,7 @@ jq -e \
             "linux/amd64": $amd64_digest,
             "linux/arm64": $arm64_digest
         }
-    ' "$actual" >/dev/null
+    ' "$actual_identity_path" >/dev/null
 
 printf 'image-publication-test: fixed image identity is captured.\n'
 
@@ -174,16 +195,10 @@ contradictory_pinned_manifest="$(jq \
 
 publisher_error="$fixture_directory/publisher-error.txt"
 set +e
-PATH="$fixture_directory/bin:$PATH" \
-    PITAKA_TEST_MANIFEST="$manifest" \
+run_publisher "$fixture_directory/contradictory-evidence.json" \
     PITAKA_TEST_TAG_MANIFEST="$manifest" \
     PITAKA_TEST_PINNED_MANIFEST="$contradictory_pinned_manifest" \
-    GITHUB_SHA="$commit" \
-    GITHUB_REPOSITORY="itsdevjimbo/pitaka" \
-    GITHUB_RUN_ID="12345" \
-    GITHUB_RUN_ATTEMPT="2" \
-    PITAKA_EVIDENCE_PATH="$fixture_directory/evidence.json" \
-    "$repository_root/scripts/publish-images.sh" >"$fixture_directory/publisher-output.txt" 2>"$publisher_error"
+    >"$fixture_directory/publisher-output.txt" 2>"$publisher_error"
 publisher_status=$?
 set -e
 
@@ -212,20 +227,17 @@ if ! grep -q "API_IMAGE=jimbodev0530/pitaka-api@$index_digest API_PLATFORM=linux
     sed -n '1,120p' "$docker_log" >&2
     exit 1
 fi
+if ! grep -q "docker image inspect --platform linux/arm64" "$docker_log"; then
+    printf 'runtime revision inspection did not select linux/arm64 explicitly\n' >&2
+    exit 1
+fi
 
 printf 'image-publication-test: smoke is digest-pinned with an explicit platform.\n'
 
 : >"$docker_log"
-PATH="$fixture_directory/bin:$PATH" \
+run_publisher "$fixture_directory/evidence.json" \
     PITAKA_TEST_DOCKER_LOG="$docker_log" \
-    PITAKA_TEST_MANIFEST="$manifest" \
-    PITAKA_TEST_RUNTIME_REVISION="$commit" \
-    GITHUB_SHA="$commit" \
-    GITHUB_REPOSITORY="itsdevjimbo/pitaka" \
-    GITHUB_RUN_ID="12345" \
-    GITHUB_RUN_ATTEMPT="2" \
-    PITAKA_EVIDENCE_PATH="$fixture_directory/evidence.json" \
-    "$repository_root/scripts/publish-images.sh" >/dev/null
+    >/dev/null
 
 for platform in linux/amd64 linux/arm64; do
     if ! grep -q "API_IMAGE=jimbodev0530/pitaka-api@$index_digest API_PLATFORM=$platform docker compose" \
@@ -327,17 +339,9 @@ for failure in migration:linux/amd64 api:linux/arm64; do
     fi
 
     set +e
-    env \
-        PATH="$fixture_directory/bin:$PATH" \
-        PITAKA_TEST_MANIFEST="$manifest" \
-        PITAKA_TEST_RUNTIME_REVISION="$commit" \
+    run_publisher "$failure_evidence" \
         "$failure_environment=$failure_platform" \
-        GITHUB_SHA="$commit" \
-        GITHUB_REPOSITORY="itsdevjimbo/pitaka" \
-        GITHUB_RUN_ID="12345" \
-        GITHUB_RUN_ATTEMPT="2" \
-        PITAKA_EVIDENCE_PATH="$failure_evidence" \
-        "$repository_root/scripts/publish-images.sh" >/dev/null 2>"$failure_error"
+        >/dev/null 2>"$failure_error"
     failure_status=$?
     set -e
 
@@ -359,20 +363,14 @@ moved_tag_manifest="$(jq \
     <<<"$manifest")"
 tag_state_file="$fixture_directory/tag-state"
 movement_error="$fixture_directory/movement-error.txt"
+movement_evidence="$fixture_directory/movement-evidence.json"
 set +e
-PATH="$fixture_directory/bin:$PATH" \
-    PITAKA_TEST_MANIFEST="$manifest" \
+run_publisher "$movement_evidence" \
     PITAKA_TEST_TAG_MANIFEST="$manifest" \
     PITAKA_TEST_PINNED_MANIFEST="$manifest" \
     PITAKA_TEST_MOVED_TAG_MANIFEST="$moved_tag_manifest" \
     PITAKA_TEST_TAG_STATE_FILE="$tag_state_file" \
-    PITAKA_TEST_RUNTIME_REVISION="$commit" \
-    GITHUB_SHA="$commit" \
-    GITHUB_REPOSITORY="itsdevjimbo/pitaka" \
-    GITHUB_RUN_ID="12345" \
-    GITHUB_RUN_ATTEMPT="2" \
-    PITAKA_EVIDENCE_PATH="$fixture_directory/evidence.json" \
-    "$repository_root/scripts/publish-images.sh" >/dev/null 2>"$movement_error"
+    >/dev/null 2>"$movement_error"
 movement_status=$?
 set -e
 
@@ -383,6 +381,10 @@ fi
 if ! grep -q 'fixed tag changed while smoke tests were running' "$movement_error"; then
     printf 'fixed tag movement failed for the wrong reason:\n' >&2
     sed -n '1,120p' "$movement_error" >&2
+    exit 1
+fi
+if [[ -e "$movement_evidence" ]]; then
+    printf 'fixed tag movement still produced successful evidence\n' >&2
     exit 1
 fi
 

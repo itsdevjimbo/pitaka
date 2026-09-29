@@ -32,6 +32,7 @@ printf 'Pulling the fixed API image for %s on %s.\n' "$commit" "$platform"
 "${compose[@]}" pull
 
 revision="$(docker image inspect \
+    --platform "$platform" \
     --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$api_image")"
 if [[ "$revision" != "$commit" ]]; then
     printf 'Image %s on %s reports source %s, expected %s.\n' \

@@ -73,7 +73,7 @@ fi
 # Exercise the exact artifact from Docker Hub against disposable dependencies
 # before moving the main alias.
 for platform in linux/amd64 linux/arm64; do
-    ./scripts/smoke-published-images.sh "$commit" "$index_digest" "$platform"
+    "$script_directory/smoke-published-images.sh" "$commit" "$index_digest" "$platform"
 done
 
 post_smoke_tag_identity="$(pitaka_read_image_identity "$api_image:$sha_tag" "$commit")"
