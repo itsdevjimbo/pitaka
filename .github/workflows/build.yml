@@ -35,7 +35,17 @@ jobs:
       - name: Publish and verify the fixed API image
         env:
           GITHUB_SHA: ${{ github.event.workflow_run.head_sha }}
+          PITAKA_EVIDENCE_PATH: ${{ runner.temp }}/api-smoke-evidence-${{ github.run_id }}-${{ github.run_attempt }}.json
         run: ./scripts/publish-images.sh
+
+      - name: Upload API smoke evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-smoke-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/api-smoke-evidence-${{ github.run_id }}-${{ github.run_attempt }}.json
+          if-no-files-found: error
+          retention-days: 14
+          overwrite: false
 
   advance-main-tags:
     name: Advance the moving API image tag
