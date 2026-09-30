@@ -58,8 +58,9 @@ identity through both the fixed tag and `repository@sha256:<index-digest>`.
 ## Run the published image against disposable data
 
 With Docker Engine, Docker Compose, QEMU support for the non-native platform, and `curl`
-installed, run the smoke script for each platform using the index digest returned by the
-inspector:
+installed, and Docker CLI 28.1.0 or newer, run the smoke script for each platform using the
+index digest returned by the inspector. The publisher workflow pins Docker 29.8.1 because the
+runtime-label check uses `docker image inspect --platform` to select each image variant:
 
 ```bash
 ./scripts/smoke-published-images.sh \
