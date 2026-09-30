@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
 import { spawnSync } from 'node:child_process';
@@ -18,10 +19,12 @@ const PROMOTE_JOB_NAME = 'Advance the moving API image tag';
 const UPLOAD_STEP_NAME = 'Upload API smoke evidence';
 const SELECTION_JOB_NAME = 'Select verified current-main API image';
 const EVIDENCE_MAX_BYTES = 16_384;
+const RECEIPT_MAX_BYTES = 16_384;
 const API_FIELDS = ['repository', 'sourceSha', 'sourceTag', 'image', 'digest', 'platform'];
 const REQUIRED_PLATFORMS = ['linux/amd64', 'linux/arm64'];
 const FULL_SHA = /^[a-f0-9]{40}$/;
 const SHA256 = /^sha256:[a-f0-9]{64}$/;
+const SHA256_HEX = /^[a-f0-9]{64}$/;
 const MAX_WRITE_ATTEMPTS = 3;
 
 class SelectionError extends Error {
@@ -49,6 +52,7 @@ export async function runSelectionPhase(phase) {
     saveState(statePath, state);
 
     const workflowInfo = await loadWorkflowInfo(sourceRepository);
+    state.selectionWorkflowId = workflowInfo.selection.id;
     const triggerRun = await verifyTriggerRun(sourceRepository, workflowInfo, trigger);
     state.trigger = {
       ...trigger,
@@ -102,13 +106,21 @@ export function writeFinalSummary() {
     process.env.PITAKA_APP_TOKEN_OUTCOME,
     process.env.PITAKA_DEPLOY_CHECKOUT_OUTCOME,
     process.env.PITAKA_APPLY_OUTCOME,
+    process.env.PITAKA_RECEIPT_OUTCOME,
+    process.env.PITAKA_RECEIPT_UPLOAD_OUTCOME,
   ];
   const failedStep = phaseOutcomes.some((value) => value === 'failure' || value === 'cancelled');
+  const receiptStepFailed = [process.env.PITAKA_RECEIPT_OUTCOME, process.env.PITAKA_RECEIPT_UPLOAD_OUTCOME]
+    .some((value) => value === 'failure' || value === 'cancelled');
+  const receiptMissing = process.env.PITAKA_APPLY_OUTCOME === 'success' &&
+    (process.env.PITAKA_RECEIPT_OUTCOME !== 'success' || process.env.PITAKA_RECEIPT_UPLOAD_OUTCOME !== 'success');
   const incomplete = !['applied', 'already current', 'validly superseded', 'failed'].includes(state.outcome);
-  if (incomplete && (failedStep || phaseOutcomes.some((value) => value === 'skipped'))) {
+  if (failedStep || receiptMissing || (incomplete && phaseOutcomes.some((value) => value === 'skipped'))) {
     state.outcome = 'failed';
-    state.error = state.error ?? 'The handoff stopped after candidate verification and before a final deploy selection was read back.';
-    state.recovery = state.recovery ?? 'Review the failed App or deploy checkout step, then rerun reconciliation with the same successful promoter run ID and attempt.';
+    state.error = state.error ?? (receiptStepFailed || receiptMissing
+      ? 'The API selection was read back, but its handoff receipt could not be published.'
+      : 'The handoff stopped before a final deploy selection and provenance receipt were verified.');
+    state.recovery = state.recovery ?? 'Review the failed App, deploy checkout, or receipt step; then rerun reconciliation with a successful promoter run ID and attempt.';
   }
 
   const summaryPath = process.env.GITHUB_STEP_SUMMARY;
@@ -120,6 +132,27 @@ export function writeFinalSummary() {
     const annotation = message.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
     process.stdout.write(`::error title=API image selection handoff::${annotation}\n`);
   }
+}
+
+export function writeRunReceipt() {
+  const state = readState(getStatePath());
+  if (!state || !['applied', 'already current', 'validly superseded'].includes(state.outcome)) {
+    throw new SelectionError('A successful handoff state is required before writing its provenance receipt.');
+  }
+  const receipt = {
+    schemaVersion: 1,
+    runId: String(process.env.GITHUB_RUN_ID ?? ''),
+    attempt: positiveInteger(process.env.GITHUB_RUN_ATTEMPT ?? '1', 'handoff attempt'),
+    workflowId: state.selectionWorkflowId,
+    jobName: SELECTION_JOB_NAME,
+    commits: state.commitReceipts ?? [],
+  };
+  if (!/^\d+$/.test(receipt.runId) || !Number.isSafeInteger(receipt.workflowId)) {
+    throw new SelectionError('The successful handoff run identity is incomplete for its provenance receipt.');
+  }
+  const receiptPath = process.env.PITAKA_HANDOFF_RECEIPT ?? `${getStatePath()}.receipt.json`;
+  fs.mkdirSync(path.dirname(receiptPath), { recursive: true });
+  fs.writeFileSync(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`, { mode: 0o600 });
 }
 
 async function selectAndUpdate(sourceRepository, workflowInfo, trigger, state, deployCheckout, appIdentity) {
@@ -137,7 +170,7 @@ async function selectAndUpdate(sourceRepository, workflowInfo, trigger, state, d
     const snapshot = await readDeploySnapshot(deployCheckout);
     try {
       state.previousApi ??= snapshot.record.api;
-      await validateApiChangeHistory(sourceRepository, workflowInfo, snapshot, appIdentity, triggerInfo);
+      await validateApiChangeHistory(sourceRepository, workflowInfo, snapshot, appIdentity, triggerInfo, state);
 
       const evaluation = await evaluateSelection(sourceRepository, workflowInfo, snapshot.record, candidate, state);
       state.finalApi = evaluation.record.api;
@@ -158,7 +191,7 @@ async function selectAndUpdate(sourceRepository, workflowInfo, trigger, state, d
       const nextRecord = { ...snapshot.record, api: evaluation.api };
       await validateCompleteRecord(snapshot.validatorPath, nextRecord, snapshot.tempDirectory);
       const content = `${JSON.stringify(nextRecord, null, 2)}\n`;
-      const message = makeCommitMessage(trigger, candidate.publisher, candidate.identity);
+      const message = makeCommitMessage(trigger, candidate.publisher, candidate.identity, content);
 
       const latestCandidate = await resolveCandidate(sourceRepository, workflowInfo, true);
       if (
@@ -196,18 +229,30 @@ async function selectAndUpdate(sourceRepository, workflowInfo, trigger, state, d
       state.writeAttempts = writeAttempts;
       state.finalApi = evaluation.api;
       state.outcome = 'writing';
+      state.pendingCommit = {
+        api: evaluation.api,
+        recordDigest: sha256(content),
+        trigger: triggerInfo,
+        publisher: candidate.publisher,
+        uncertain: false,
+      };
       saveState(getStatePath(), state);
 
       try {
-        await writeDeployRecord(snapshot.blobSha, content, message, appIdentity);
+        const response = await writeDeployRecord(snapshot.blobSha, content, message, appIdentity);
+        registerCommitReceipt(state, response?.commit?.sha, evaluation.api, content, triggerInfo, candidate.publisher);
+        state.pendingCommit = null;
         pendingWrite = evaluation.api;
       } catch (error) {
         if (!error.retryable) {
           throw error;
         }
-        pendingWrite = error.status === undefined || error.status >= 500 ? evaluation.api : null;
+        const uncertain = error.status === undefined || error.status >= 500;
+        pendingWrite = uncertain ? evaluation.api : null;
+        state.pendingCommit = uncertain ? { ...state.pendingCommit, uncertain: true } : null;
         await delay(Math.min(250 * writeAttempts, 1_000));
       }
+      saveState(getStatePath(), state);
 
       // The next pass re-reads candidate identities and the latest deploy record.
       // This read-back resolves accepted writes and uncertain responses before a retry.
@@ -337,7 +382,8 @@ async function findPublisherEvidence(sourceRepository, workflowInfo, sha, fixedI
         throw new SelectionError(`Publisher run ${run.id} attempt ${attemptNumber} has duplicate smoke evidence artifacts.`);
       }
       const artifact = matchingArtifacts[0];
-      if (artifact.expired || !artifact.expires_at || Date.parse(artifact.expires_at) <= Date.now()) continue;
+      const expiresAt = Date.parse(artifact.expires_at ?? '');
+      if (artifact.expired || !Number.isFinite(expiresAt) || expiresAt <= currentTimeMilliseconds()) continue;
       validateArtifactMetadata(artifact, run, attemptNumber, sha);
       const evidence = downloadEvidence(sourceRepository, run.id, attemptNumber, artifactName);
       validateEvidence(evidence, sourceRepository, sha, run.id, attemptNumber);
@@ -409,16 +455,19 @@ async function requireSuccessfulSourceChecks(sourceRepository, workflowInfo, sha
     `repos/${sourceRepository}/actions/workflows/tests.yml/runs?branch=main&event=push&head_sha=${sha}&per_page=100`,
   );
   const runs = boundedList(response, `source checks for ${sha}`);
-  const found = runs.some((run) =>
-    run.workflow_id === workflowInfo.tests.id &&
-    run.name === TEST_WORKFLOW_NAME &&
-    run.event === 'push' &&
-    run.conclusion === 'success' &&
-    run.head_branch === 'main' &&
-    run.head_sha === sha &&
-    run.head_repository?.full_name === sourceRepository &&
-    (!beforeTime || !run.created_at || Date.parse(run.created_at) <= Date.parse(beforeTime)),
-  );
+  const found = runs.some((run) => {
+    const runTime = Date.parse(run.created_at ?? '');
+    const boundTime = Date.parse(beforeTime ?? '');
+    return run.workflow_id === workflowInfo.tests.id &&
+      run.name === TEST_WORKFLOW_NAME &&
+      run.event === 'push' &&
+      run.conclusion === 'success' &&
+      run.head_branch === 'main' &&
+      run.head_sha === sha &&
+      run.head_repository?.full_name === sourceRepository &&
+      Number.isFinite(runTime) &&
+      (!beforeTime || (Number.isFinite(boundTime) && runTime <= boundTime));
+  });
   if (!found) {
     throw new SelectionError(`No successful Code Quality and Tests push run to main proves source ${sha}.`, {
       recovery: 'Wait for the source SHA to pass Code Quality and Tests, then rerun the Build and Deploy promoter handoff.',
@@ -471,6 +520,7 @@ function validateArtifactMetadata(artifact, run, attempt, sha) {
   if (
     !Number.isSafeInteger(artifact.id) ||
     artifact.expired !== false ||
+    !Number.isSafeInteger(artifact.size_in_bytes) ||
     artifact.size_in_bytes <= 0 ||
     artifact.size_in_bytes > EVIDENCE_MAX_BYTES ||
     workflowRun?.id !== run.id ||
@@ -487,29 +537,39 @@ function validateArtifactMetadata(artifact, run, attempt, sha) {
 }
 
 function downloadEvidence(repository, runId, attempt, artifactName) {
+  return downloadJsonArtifact(
+    repository,
+    runId,
+    artifactName,
+    `api-smoke-evidence-${runId}-${attempt}.json`,
+    EVIDENCE_MAX_BYTES,
+    `publisher evidence for run ${runId} attempt ${attempt}`,
+  );
+}
+
+function downloadJsonArtifact(repository, runId, artifactName, expectedFilename, maxBytes, description) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'pitaka-api-evidence-'));
   try {
     const result = spawnSync('gh', [
       'run', 'download', String(runId), '--repo', repository, '--name', artifactName, '--dir', directory,
     ], { encoding: 'utf8', env: ghEnvironment(process.env.GITHUB_TOKEN), maxBuffer: 2 * 1024 * 1024 });
     if (result.status !== 0) {
-      throw new SelectionError(`Could not download the unexpired publisher evidence for run ${runId} attempt ${attempt}.`, {
-        recovery: 'Check that the named smoke artifact is still available, then create a fresh successful publisher attempt if it expired or was removed.',
+      throw new SelectionError(`Could not download the unexpired ${description}.`, {
+        recovery: 'Check that the required workflow artifact is still available; rerun the workflow if it expired or was removed.',
       });
     }
     const files = listFilesSafely(directory);
-    const expectedFilename = `api-smoke-evidence-${runId}-${attempt}.json`;
     if (files.length !== 1 || path.basename(files[0]) !== expectedFilename) {
-      throw new SelectionError(`Publisher evidence artifact ${artifactName} must contain exactly ${expectedFilename}.`);
+      throw new SelectionError(`Artifact ${artifactName} must contain exactly ${expectedFilename}.`);
     }
     const stat = fs.statSync(files[0]);
-    if (stat.size <= 0 || stat.size > EVIDENCE_MAX_BYTES) {
-      throw new SelectionError(`Publisher evidence ${expectedFilename} exceeds the ${EVIDENCE_MAX_BYTES}-byte limit.`);
+    if (stat.size <= 0 || stat.size > maxBytes) {
+      throw new SelectionError(`${description} exceeds the ${maxBytes}-byte limit.`);
     }
     try {
       return JSON.parse(fs.readFileSync(files[0], 'utf8'));
     } catch {
-      throw new SelectionError(`Publisher evidence ${expectedFilename} is not valid JSON.`);
+      throw new SelectionError(`${description} is not valid JSON.`);
     }
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
@@ -630,7 +690,7 @@ async function validateCompleteRecord(validatorPath, record, directory, existing
   }
 }
 
-async function validateApiChangeHistory(sourceRepository, workflowInfo, snapshot, appIdentity, triggerInfo) {
+async function validateApiChangeHistory(sourceRepository, workflowInfo, snapshot, appIdentity, triggerInfo, state) {
   const commits = runGit(snapshot.checkout, ['log', '--format=%H', 'refs/remotes/origin/main', '--', 'versions/local.json'])
     .split('\n').filter(Boolean);
   if (commits.length > 5000) {
@@ -650,13 +710,13 @@ async function validateApiChangeHistory(sourceRepository, workflowInfo, snapshot
         recovery: 'Review the API-changing deploy commit; an initial seed is allowed only in the root commit.',
       });
     }
-    await validateAutomaticApiCommit(sourceRepository, workflowInfo, snapshot.checkout, commit, current, appIdentity, triggerInfo);
+    await validateAutomaticApiCommit(sourceRepository, workflowInfo, snapshot.checkout, commit, current, appIdentity, triggerInfo, state);
     return;
   }
   throw new SelectionError('Could not find the deploy commit that established the current API selection.');
 }
 
-async function validateAutomaticApiCommit(sourceRepository, workflowInfo, checkout, commit, record, appIdentity, triggerInfo) {
+async function validateAutomaticApiCommit(sourceRepository, workflowInfo, checkout, commit, record, appIdentity, triggerInfo, state) {
   const metadata = runGit(checkout, ['show', '-s', '--format=%an%x00%ae%x00%cn%x00%ce%x00%B', commit]);
   const [authorName, authorEmail, committerName, committerEmail, ...messageParts] = metadata.split('\0');
   const message = messageParts.join('\0');
@@ -678,17 +738,45 @@ async function validateAutomaticApiCommit(sourceRepository, workflowInfo, checko
   }
   const ownRunId = process.env.GITHUB_RUN_ID;
   const ownAttempt = Number(process.env.GITHUB_RUN_ATTEMPT ?? '1');
-  if (parsed.handoffRunId === ownRunId && parsed.handoffAttempt <= ownAttempt) {
+  if (parsed.handoffRunId === ownRunId && parsed.handoffAttempt === ownAttempt) {
     if (parsed.triggerRunId !== triggerInfo.id || parsed.triggerAttempt !== triggerInfo.attempt) {
       throw new SelectionError('The deploy read-back commit metadata does not match this handoff run.');
+    }
+    const actualRecordDigest = sha256(`${JSON.stringify(record, null, 2)}\n`);
+    if (parsed.recordDigest !== actualRecordDigest) {
+      throw new SelectionError('The deploy read-back commit content does not match its handoff record digest.');
     }
     const proof = await verifyImageProof(sourceRepository, workflowInfo, record.api.sourceSha, record.api.digest, false);
     if (parsed.publisherRunId !== proof.publisher.runId || parsed.publisherAttempt !== proof.publisher.attempt) {
       throw new SelectionError('The deploy read-back commit publisher metadata does not match its verified image evidence.');
     }
-    return;
+    const expectedReceipt = {
+      commitSha: commit,
+      api: record.api,
+      recordDigest: parsed.recordDigest,
+      trigger: { id: parsed.triggerRunId, attempt: parsed.triggerAttempt },
+      publisher: { runId: parsed.publisherRunId, attempt: parsed.publisherAttempt },
+    };
+    const knownReceipt = (state.commitReceipts ?? []).find((receipt) => receipt.commitSha === commit);
+    if (knownReceipt && isDeepStrictEqual(knownReceipt, expectedReceipt)) return;
+    const pending = state.pendingCommit;
+    if (
+      pending?.uncertain === true &&
+      isDeepStrictEqual(pending.api, record.api) &&
+      pending.recordDigest === parsed.recordDigest &&
+      pending.trigger?.id === parsed.triggerRunId &&
+      pending.trigger?.attempt === parsed.triggerAttempt &&
+      pending.publisher?.runId === parsed.publisherRunId &&
+      pending.publisher?.attempt === parsed.publisherAttempt
+    ) {
+      registerCommitReceipt(state, commit, record.api, `${JSON.stringify(record, null, 2)}\n`, triggerInfo, proof.publisher);
+      state.pendingCommit = null;
+      saveState(getStatePath(), state);
+      return;
+    }
+    throw new SelectionError(`Deploy commit ${commit.slice(0, 12)} does not match a Contents API write attempted by this handoff run.`);
   }
-  await verifyPastHandoffRun(sourceRepository, workflowInfo, parsed.handoffRunId, parsed.handoffAttempt);
+  await verifyPastHandoffRun(sourceRepository, workflowInfo, parsed.handoffRunId, parsed.handoffAttempt, commit, record, parsed);
 }
 
 function parseCommitDetails(message) {
@@ -704,7 +792,8 @@ function parseCommitDetails(message) {
   const publisherAttempt = message.match(/^Publisher: Build and Deploy run [0-9]+, attempt ([1-9][0-9]*)$/m)?.[1];
   const sourceSha = value('source', /^API source SHA: ([a-f0-9]{40})$/m);
   const digest = value('digest', /^API index digest: (sha256:[a-f0-9]{64})$/m);
-  if (!handoffRunId || !triggerRunId || !publisherRunId || !sourceSha || !digest) return null;
+  const recordDigest = value('record', /^API record SHA-256: ([a-f0-9]{64})$/m);
+  if (!handoffRunId || !triggerRunId || !publisherRunId || !sourceSha || !digest || !recordDigest) return null;
   return {
     handoffRunId,
     handoffAttempt: Number(handoffAttempt),
@@ -714,10 +803,11 @@ function parseCommitDetails(message) {
     publisherAttempt: Number(publisherAttempt),
     sourceSha,
     digest,
+    recordDigest,
   };
 }
 
-async function verifyPastHandoffRun(repository, workflowInfo, runId, attempt) {
+async function verifyPastHandoffRun(repository, workflowInfo, runId, attempt, commit, record, parsed) {
   const run = await getRunAttempt(repository, runId, attempt);
   if (
     run.workflow_id !== workflowInfo.selection.id ||
@@ -733,6 +823,82 @@ async function verifyPastHandoffRun(repository, workflowInfo, runId, attempt) {
   const jobs = await getRunJobs(repository, runId, attempt);
   if (findUnique(jobs, SELECTION_JOB_NAME).conclusion !== 'success') {
     throw new SelectionError(`Prior API-changing deploy commit's handoff run ${runId} did not finish successfully.`);
+  }
+  await verifyHandoffReceipt(repository, workflowInfo, run, attempt, commit, record, parsed);
+}
+
+async function verifyHandoffReceipt(repository, workflowInfo, run, attempt, commit, record, parsed) {
+  const artifactName = `api-selection-receipt-${run.id}-${attempt}`;
+  const response = await ghApi(`repos/${repository}/actions/runs/${run.id}/artifacts?per_page=100`);
+  const artifacts = boundedList(response, `handoff receipts for run ${run.id}`);
+  const matching = artifacts.filter((artifact) => artifact.name === artifactName);
+  if (matching.length !== 1) {
+    throw new SelectionError(`Prior API-changing deploy commit ${commit.slice(0, 12)} has no unique handoff receipt artifact.`);
+  }
+  const artifact = matching[0];
+  const expiresAt = Date.parse(artifact.expires_at ?? '');
+  const runMetadata = artifact.workflow_run;
+  if (
+    artifact.expired !== false ||
+    !Number.isFinite(expiresAt) ||
+    expiresAt <= currentTimeMilliseconds() ||
+    !Number.isSafeInteger(artifact.id) ||
+    !Number.isSafeInteger(artifact.size_in_bytes) ||
+    artifact.size_in_bytes <= 0 ||
+    artifact.size_in_bytes > RECEIPT_MAX_BYTES ||
+    runMetadata?.id !== run.id ||
+    runMetadata?.repository_id !== run.repository?.id ||
+    runMetadata?.head_sha !== run.head_sha ||
+    runMetadata?.head_branch !== 'main' ||
+    runMetadata?.head_repository?.full_name !== repository
+  ) {
+    throw new SelectionError(`Prior API-changing deploy commit ${commit.slice(0, 12)} has untrusted or expired receipt metadata.`);
+  }
+  const receipt = downloadJsonArtifact(
+    repository,
+    run.id,
+    artifactName,
+    `${artifactName}.json`,
+    RECEIPT_MAX_BYTES,
+    `handoff receipt for run ${run.id} attempt ${attempt}`,
+  );
+  assertExactKeys(receipt, ['attempt', 'commits', 'jobName', 'runId', 'schemaVersion', 'workflowId'], 'handoff receipt');
+  if (
+    receipt.schemaVersion !== 1 ||
+    receipt.runId !== String(run.id) ||
+    receipt.attempt !== attempt ||
+    receipt.workflowId !== workflowInfo.selection.id ||
+    receipt.jobName !== SELECTION_JOB_NAME ||
+    !Array.isArray(receipt.commits) ||
+    receipt.commits.length < 1 ||
+    receipt.commits.length > MAX_WRITE_ATTEMPTS
+  ) {
+    throw new SelectionError(`Handoff receipt artifact for run ${run.id} does not match its successful workflow metadata.`);
+  }
+  const matches = receipt.commits.filter((entry) => entry?.commitSha === commit);
+  if (matches.length !== 1) {
+    throw new SelectionError(`Handoff receipt for run ${run.id} does not identify deploy commit ${commit.slice(0, 12)}.`);
+  }
+  const entry = matches[0];
+  assertExactKeys(entry, ['api', 'commitSha', 'publisher', 'recordDigest', 'trigger'], 'handoff receipt commit');
+  assertExactKeys(entry.trigger, ['attempt', 'id'], 'handoff receipt trigger');
+  assertExactKeys(entry.publisher, ['attempt', 'runId'], 'handoff receipt publisher');
+  if (
+    !FULL_SHA.test(entry.commitSha ?? '') ||
+    !isExactApiObject(entry.api) ||
+    !SHA256_HEX.test(entry.recordDigest ?? '') ||
+    !isDeepStrictEqual(entry.api, record.api) ||
+    entry.recordDigest !== parsed.recordDigest ||
+    entry.trigger.id !== parsed.triggerRunId ||
+    entry.trigger.attempt !== parsed.triggerAttempt ||
+    entry.publisher.runId !== parsed.publisherRunId ||
+    entry.publisher.attempt !== parsed.publisherAttempt
+  ) {
+    throw new SelectionError(`Handoff receipt for run ${run.id} does not match deploy commit ${commit.slice(0, 12)} and its API selection.`);
+  }
+  const actualDigest = sha256(`${JSON.stringify(record, null, 2)}\n`);
+  if (entry.recordDigest !== actualDigest) {
+    throw new SelectionError(`Handoff receipt for run ${run.id} does not match the complete deploy record in commit ${commit.slice(0, 12)}.`);
   }
 }
 
@@ -771,10 +937,10 @@ async function writeDeployRecord(blobSha, content, message, appIdentity) {
     '--field', `committer[name]=${appIdentity.slug}[bot]`,
     '--field', `committer[email]=${appIdentity.email}`,
   ];
-  await ghApi(`repos/${DEPLOY_REPOSITORY}/contents/versions/local.json`, { token: process.env.DEPLOY_APP_TOKEN, args: fields });
+  return ghApi(`repos/${DEPLOY_REPOSITORY}/contents/versions/local.json`, { token: process.env.DEPLOY_APP_TOKEN, args: fields });
 }
 
-function makeCommitMessage(trigger, publisher, identity) {
+function makeCommitMessage(trigger, publisher, identity, content) {
   return [
     'Select verified API image for local deployment',
     '',
@@ -783,7 +949,29 @@ function makeCommitMessage(trigger, publisher, identity) {
     `Publisher: Build and Deploy run ${publisher.runId}, attempt ${publisher.attempt}`,
     `API source SHA: ${identity.sourceRevision}`,
     `API index digest: ${identity.indexDigest}`,
+    `API record SHA-256: ${sha256(content)}`,
   ].join('\n');
+}
+
+function registerCommitReceipt(state, commitSha, api, content, trigger, publisher) {
+  requireFullSha(commitSha, 'Contents API commit SHA');
+  const receipt = {
+    commitSha,
+    api,
+    recordDigest: sha256(content),
+    trigger: { id: trigger.id, attempt: trigger.attempt },
+    publisher: { runId: publisher.runId, attempt: publisher.attempt },
+  };
+  state.commitReceipts ??= [];
+  const existing = state.commitReceipts.find((entry) => entry.commitSha === commitSha);
+  if (existing && !isDeepStrictEqual(existing, receipt)) {
+    throw new SelectionError(`Contents API commit ${commitSha.slice(0, 12)} conflicts with its recorded handoff receipt.`);
+  }
+  if (!existing) state.commitReceipts.push(receipt);
+}
+
+function sha256(value) {
+  return createHash('sha256').update(value).digest('hex');
 }
 
 async function resolveTrigger() {
@@ -794,8 +982,8 @@ async function resolveTrigger() {
     const eventPath = process.env.GITHUB_EVENT_PATH;
     if (eventPath && fs.existsSync(eventPath)) {
       const payload = JSON.parse(fs.readFileSync(eventPath, 'utf8'));
-      runId = String(payload.workflow_run?.id ?? '');
-      attemptValue = String(payload.workflow_run?.run_attempt ?? '');
+      runId = String(payload.workflow_run?.id ?? runId ?? '');
+      attemptValue = String(payload.workflow_run?.run_attempt ?? attemptValue ?? '');
     }
   } else if (eventName === 'workflow_dispatch') {
     runId = process.env.INPUT_TRIGGER_RUN_ID ?? runId;
@@ -940,12 +1128,22 @@ function positiveInteger(value, name) {
   return parsed;
 }
 
+function currentTimeMilliseconds() {
+  const fixtureTime = process.env.PITAKA_TEST_NOW_MS;
+  if (fixtureTime === undefined) return Date.now();
+  const parsed = Number(fixtureTime);
+  if (!Number.isSafeInteger(parsed) || parsed < 0) {
+    throw new SelectionError('PITAKA_TEST_NOW_MS must be a non-negative epoch millisecond value.');
+  }
+  return parsed;
+}
+
 function requireFullSha(value, name) {
   if (!FULL_SHA.test(value ?? '')) throw new SelectionError(`${name} must be a lowercase full Git SHA.`);
 }
 
 function emptyState() {
-  return { trigger: null, publisher: null, sourceSha: null, indexDigest: null, previousApi: null, finalApi: null, writeAttempts: 0, outcome: 'not started' };
+  return { trigger: null, publisher: null, sourceSha: null, indexDigest: null, previousApi: null, finalApi: null, writeAttempts: 0, outcome: 'not started', commitReceipts: [] };
 }
 
 function getStatePath() {
@@ -965,17 +1163,21 @@ function formatSummary(state) {
   const selection = (value) => value ? `\n\n\`\`\`json\n${JSON.stringify(value, null, 2)}\n\`\`\`` : 'not established';
   const trigger = state.trigger ? `Build and Deploy run ${state.trigger.id}, attempt ${state.trigger.attempt}` : 'not verified';
   const publisher = state.publisher ? `Build and Deploy run ${state.publisher.runId}, attempt ${state.publisher.attempt}` : 'not verified';
+  const finalPublisher = state.supersedingPublisher ?? state.publisher;
+  const finalPublisherText = finalPublisher ? `Build and Deploy run ${finalPublisher.runId}, attempt ${finalPublisher.attempt}` : 'not verified';
   return [
     '## API image selection handoff',
     '',
     `- Trigger: ${trigger}`,
-    `- Publisher proof: ${publisher}`,
-    `- Selected source SHA: ${state.sourceSha ?? 'not verified'}`,
-    `- Fixed index digest: ${state.indexDigest ?? 'not verified'}`,
+    `- Candidate publisher proof: ${publisher}`,
+    `- Final selection publisher proof: ${finalPublisherText}`,
+    `- Candidate source SHA: ${state.sourceSha ?? 'not verified'}`,
+    `- Candidate fixed index digest: ${state.indexDigest ?? 'not verified'}`,
     `- Previous API selection:${selection(state.previousApi)}`,
     `- Final API selection:${selection(state.finalApi)}`,
     `- Contents API write attempts: ${state.writeAttempts ?? 0}`,
     `- Outcome: ${state.outcome}`,
+    ...(state.error ? [`- Error: ${state.error}`] : []),
     `- Recovery: ${state.recovery ?? 'Review the handoff run and dispatch reconciliation with a successful promoter run ID and attempt if needed.'}`,
     '',
     'This changes the local desired API image selection. It does not apply the running local stack.',

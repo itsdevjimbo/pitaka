@@ -113,6 +113,11 @@ Each run writes a job summary. An unresolved handoff fails its own workflow and 
 publication result intact. Updating this record changes desired local inputs; it does not apply
 the running local stack.
 
+Each successful handoff also uploads a 90-day receipt that names the exact API-changing deploy
+commit and complete API selection. Later handoffs require that receipt to recognize the App
+commit; a missing or expired receipt stops automatic selection for review. Keep the `pitaka`
+repository's Actions artifact retention at 90 days so these history receipts remain available.
+
 ### App configuration and recovery
 
 Install the shared GitHub App only on `itsdevjimbo/pitaka-deploy` with repository Contents

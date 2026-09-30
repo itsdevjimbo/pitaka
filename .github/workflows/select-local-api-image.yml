@@ -78,6 +78,24 @@ jobs:
           PITAKA_HANDOFF_STATE: ${{ runner.temp }}/pitaka-api-selection-state.json
         run: node scripts/select-local-api-image.mjs apply
 
+      - name: Write handoff provenance receipt
+        id: receipt
+        if: steps.apply.outcome == 'success'
+        env:
+          PITAKA_HANDOFF_STATE: ${{ runner.temp }}/pitaka-api-selection-state.json
+          PITAKA_HANDOFF_RECEIPT: ${{ runner.temp }}/pitaka-api-selection-receipt.json
+        run: node scripts/select-local-api-image.mjs receipt
+
+      - name: Upload handoff provenance receipt
+        id: receipt_upload
+        if: steps.receipt.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-selection-receipt-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/pitaka-api-selection-receipt.json
+          if-no-files-found: error
+          retention-days: 90
+
       - name: Write handoff summary
         if: always()
         env:
@@ -86,4 +104,6 @@ jobs:
           PITAKA_APP_TOKEN_OUTCOME: ${{ steps.app_token.outcome }}
           PITAKA_DEPLOY_CHECKOUT_OUTCOME: ${{ steps.deploy_checkout.outcome }}
           PITAKA_APPLY_OUTCOME: ${{ steps.apply.outcome }}
+          PITAKA_RECEIPT_OUTCOME: ${{ steps.receipt.outcome }}
+          PITAKA_RECEIPT_UPLOAD_OUTCOME: ${{ steps.receipt_upload.outcome }}
         run: node scripts/select-local-api-image.mjs report

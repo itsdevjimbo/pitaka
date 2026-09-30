@@ -1,15 +1,17 @@
 #!/usr/bin/env node
-import { runSelectionPhase, writeFinalSummary } from './lib/api-local-selection.mjs';
+import { runSelectionPhase, writeFinalSummary, writeRunReceipt } from './lib/api-local-selection.mjs';
 
 const phase = process.argv[2];
-if (!['verify', 'apply', 'report'].includes(phase)) {
-  process.stderr.write('Usage: node scripts/select-local-api-image.mjs <verify|apply|report>\n');
+if (!['verify', 'apply', 'receipt', 'report'].includes(phase)) {
+  process.stderr.write('Usage: node scripts/select-local-api-image.mjs <verify|apply|receipt|report>\n');
   process.exit(2);
 }
 
 try {
   if (phase === 'report') {
     writeFinalSummary();
+  } else if (phase === 'receipt') {
+    writeRunReceipt();
   } else {
     await runSelectionPhase(phase);
   }

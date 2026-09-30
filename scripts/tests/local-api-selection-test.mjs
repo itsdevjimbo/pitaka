@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -16,7 +17,7 @@ const amd64Digest = `sha256:${'a'.repeat(64)}`;
 const arm64Digest = `sha256:${'b'.repeat(64)}`;
 
 test('selects the verified current-main index and preserves the rest of the deploy record', (t) => {
-  const fixture = makeFixture(t);
+  const fixture = makeFixture(t, { workflowRunPayload: { workflow_run: { id: 100 } } });
   const initialRecord = fixture.initialRecord;
 
   const result = runSelection(fixture);
@@ -33,6 +34,18 @@ test('selects the verified current-main index and preserves the rest of the depl
   });
   assert.deepEqual({ ...selected, api: initialRecord.api }, initialRecord);
   assert.equal(result.stdout.includes('token'), false);
+
+  const receiptResult = spawnSync('node', [commandPath, 'receipt'], {
+    cwd: repositoryRoot,
+    env: fixture.env,
+    encoding: 'utf8',
+  });
+  assert.equal(receiptResult.status, 0, receiptResult.stderr);
+  const receipt = JSON.parse(fs.readFileSync(`${fixture.statePath}.receipt.json`, 'utf8'));
+  assert.equal(receipt.workflowId, 44);
+  assert.equal(receipt.commits.length, 1);
+  assert.equal(receipt.commits[0].commitSha, git(fixture.deployCheckout, ['rev-parse', 'origin/main']));
+  assert.deepEqual(receipt.commits[0].api, selected.api);
 
   const repeated = runSelection(fixture);
   assert.equal(repeated.status, 0, repeated.stderr);
@@ -191,6 +204,16 @@ test('fails for an unrecognized API-changing deploy edit', (t) => {
   assert.equal(fs.readFileSync(fixture.putLog, 'utf8'), '');
 });
 
+test('rejects a bot-attributed API edit that only cites another successful handoff run', (t) => {
+  const fixture = makeFixture(t, { forgedApiEdit: true });
+
+  const result = runSelection(fixture);
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /no unique handoff receipt artifact/i);
+  assert.equal(fs.readFileSync(fixture.putLog, 'utf8'), '');
+});
+
 test('fails when the same source SHA is recorded with a different digest', (t) => {
   const fixture = makeFixture(t, { apiSha: sourceSha, apiDigest: `sha256:${'d'.repeat(64)}` });
 
@@ -201,9 +224,10 @@ test('fails when the same source SHA is recorded with a different digest', (t) =
   assert.equal(fs.readFileSync(fixture.putLog, 'utf8'), '');
 });
 
-test('rejects an expired publisher artifact and a fixed tag that contradicts the smoke evidence', async (t) => {
+test('rejects expired or malformed publisher artifact metadata and contradictory smoke evidence', async (t) => {
   for (const options of [
     { expiredEvidence: true },
+    { invalidEvidenceExpiry: true },
     { evidenceDigest: `sha256:${'f'.repeat(64)}` },
   ]) {
     const fixture = makeFixture(t, options);
@@ -303,6 +327,34 @@ test('writes a complete failure summary and error annotation', (t) => {
   assert.match(fs.readFileSync(summaryPath, 'utf8'), /Recovery:/);
 });
 
+test('fails the handoff if the successful selection receipt cannot be uploaded', (t) => {
+  const fixture = makeFixture(t);
+  const summaryPath = path.join(fixture.directory, 'receipt-summary.md');
+  fixture.env.GITHUB_STEP_SUMMARY = summaryPath;
+  const result = runSelection(fixture);
+  assert.equal(result.status, 0, result.stderr);
+
+  const report = spawnSync('node', [commandPath, 'report'], {
+    cwd: repositoryRoot,
+    env: {
+      ...fixture.env,
+      PITAKA_VERIFY_OUTCOME: 'success',
+      PITAKA_APP_TOKEN_OUTCOME: 'success',
+      PITAKA_DEPLOY_CHECKOUT_OUTCOME: 'success',
+      PITAKA_APPLY_OUTCOME: 'success',
+      PITAKA_RECEIPT_OUTCOME: 'success',
+      PITAKA_RECEIPT_UPLOAD_OUTCOME: 'failure',
+    },
+    encoding: 'utf8',
+  });
+
+  assert.equal(report.status, 0, report.stderr);
+  assert.match(report.stdout, /::error title=API image selection handoff::/);
+  assert.match(fs.readFileSync(summaryPath, 'utf8'), /Outcome: failed/);
+  assert.match(fs.readFileSync(summaryPath, 'utf8'), /receipt could not be published/i);
+  assert.equal(readRemoteRecord(fixture).api.sourceSha, sourceSha);
+});
+
 function makeFixture(t, options = {}) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'pitaka-api-selection-test-'));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
@@ -318,6 +370,8 @@ function makeFixture(t, options = {}) {
   const statePath = path.join(directory, 'state.json');
   const mainShaPath = path.join(directory, 'main-sha.txt');
   const mainRefCountPath = path.join(directory, 'main-ref-count.txt');
+  const eventPath = path.join(directory, 'event.json');
+  const selectionReceiptPath = path.join(directory, 'selection-receipt.json');
   fs.mkdirSync(bin, { recursive: true });
 
   const initialDigest = options.apiDigest ?? (options.apiSha === sourceSha ? indexDigest : `sha256:${'2'.repeat(64)}`);
@@ -362,6 +416,7 @@ function makeFixture(t, options = {}) {
   fs.writeFileSync(putLog, '');
   fs.writeFileSync(mainShaPath, sourceSha);
   fs.writeFileSync(mainRefCountPath, '0');
+  if (options.workflowRunPayload) fs.writeFileSync(eventPath, JSON.stringify(options.workflowRunPayload));
 
   git(directory, ['init', '--bare', '--initial-branch=main', origin]);
   const seed = path.join(directory, 'seed');
@@ -387,17 +442,36 @@ function makeFixture(t, options = {}) {
   git(directory, ['clone', origin, deployCheckout]);
   git(deployCheckout, ['config', 'user.name', 'pitaka-deploy[bot]']);
   git(deployCheckout, ['config', 'user.email', '123+pitaka-deploy[bot]@users.noreply.github.com']);
-  if (options.manualApiEdit) {
+  if (options.manualApiEdit || options.forgedApiEdit) {
     const manuallySelected = makeDeployRecord('2222222222222222222222222222222222222222', `sha256:${'e'.repeat(64)}`);
     manuallySelected.configuration = initialRecord.configuration;
     manuallySelected.web = initialRecord.web;
     manuallySelected.images = initialRecord.images;
     manuallySelected.anotherNonApiField = initialRecord.anotherNonApiField;
     fs.writeFileSync(path.join(deployCheckout, 'versions', 'local.json'), `${JSON.stringify(manuallySelected, null, 2)}\n`);
-    git(deployCheckout, ['config', 'user.name', 'operator']);
-    git(deployCheckout, ['config', 'user.email', 'operator@example.com']);
+    if (options.forgedApiEdit) {
+      git(deployCheckout, ['config', 'user.name', 'pitaka-deploy[bot]']);
+      git(deployCheckout, ['config', 'user.email', '123+pitaka-deploy[bot]@users.noreply.github.com']);
+    } else {
+      git(deployCheckout, ['config', 'user.name', 'operator']);
+      git(deployCheckout, ['config', 'user.email', 'operator@example.com']);
+    }
     git(deployCheckout, ['add', 'versions/local.json']);
-    git(deployCheckout, ['commit', '-m', 'Pin API image manually']);
+    if (options.forgedApiEdit) {
+      const forgedMessage = [
+        'Select verified API image for local deployment',
+        '',
+        'Handoff: Select local API image run 350, attempt 1',
+        'Trigger: Build and Deploy run 100, attempt 1',
+        'Publisher: Build and Deploy run 200, attempt 1',
+        'API source SHA: ' + manuallySelected.api.sourceSha,
+        'API index digest: ' + manuallySelected.api.digest,
+        'API record SHA-256: ' + 'a'.repeat(64),
+      ].join('\n');
+      git(deployCheckout, ['commit', '-m', forgedMessage]);
+    } else {
+      git(deployCheckout, ['commit', '-m', 'Pin API image manually']);
+    }
     git(deployCheckout, ['push', 'origin', 'main']);
   }
 
@@ -420,6 +494,8 @@ function makeFixture(t, options = {}) {
       ...process.env,
       PATH: `${bin}${path.delimiter}${process.env.PATH}`,
       GITHUB_REPOSITORY: 'itsdevjimbo/pitaka',
+      GITHUB_EVENT_NAME: options.workflowRunPayload ? 'workflow_run' : '',
+      GITHUB_EVENT_PATH: options.workflowRunPayload ? eventPath : '',
       GITHUB_TOKEN: 'source-token-test',
       DEPLOY_APP_TOKEN: 'deploy-token-test',
       DEPLOY_APP_SLUG: 'pitaka-deploy',
@@ -432,7 +508,8 @@ function makeFixture(t, options = {}) {
       PITAKA_TEST_ORIGIN: origin,
     PITAKA_TEST_PUT_LOG: putLog,
     PITAKA_TEST_MAIN_SHA_FILE: mainShaPath,
-    PITAKA_TEST_MAIN_REF_COUNT_FILE: mainRefCountPath,
+      PITAKA_TEST_MAIN_REF_COUNT_FILE: mainRefCountPath,
+      PITAKA_TEST_SELECTION_RECEIPT_FILE: selectionReceiptPath,
       PITAKA_TEST_EVIDENCE: evidencePath,
       PITAKA_TEST_SOURCE_SHA: sourceSha,
       PITAKA_TEST_ADVANCE_MAIN_SHA: options.advanceMainAfterWriteSha ?? '',
@@ -449,12 +526,14 @@ function makeFixture(t, options = {}) {
       PITAKA_TEST_ALIAS_MANIFEST: aliasManifestPath,
       PITAKA_TEST_REPO_ID: '99',
       PITAKA_TEST_EXPIRED: String(Boolean(options.expiredEvidence)),
+      PITAKA_TEST_INVALID_EXPIRY: String(Boolean(options.invalidEvidenceExpiry)),
+      PITAKA_TEST_NOW_MS: String(Date.parse('2026-09-30T00:00:00Z')),
       PITAKA_TEST_MISSING_EVIDENCE: String(Boolean(options.missingEvidence)),
       PITAKA_TEST_WRITE_MODE: options.writeMode ?? '',
       PITAKA_TEST_COMPARE_STATUS: options.compareStatus ?? 'ahead',
       PITAKA_TEST_COMPARE_STATUSES: JSON.stringify(options.compareStatuses ?? {}),
       PITAKA_TEST_PROMOTER_FAILURE: String(Boolean(options.promoterFailure)),
-      PITAKA_TEST_MANUAL_API_EDIT: String(Boolean(options.manualApiEdit)),
+      PITAKA_TEST_MANUAL_API_EDIT: String(Boolean(options.manualApiEdit || options.forgedApiEdit)),
       PITAKA_TEST_ARTIFACT_ID: '501',
       PITAKA_TEST_PUBLISHER_RUN_ID: '200',
       PITAKA_TEST_RUN_ATTEMPT: '1',
@@ -562,6 +641,7 @@ const ghStub = `#!/usr/bin/env node
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { createHash } = require('node:crypto');
 const { spawnSync } = require('node:child_process');
 
 const args = process.argv.slice(2);
@@ -606,12 +686,16 @@ const allJobs = [
 
 if (!api && args[0] === 'run' && args[1] === 'download') {
   const runId = args[2];
-  const proof = proofForRun(runId);
-  if (!proof) process.exit(2);
   const outputIndex = args.indexOf('--dir');
   const nameIndex = args.indexOf('--name');
   const artifactName = args[nameIndex + 1];
   fs.mkdirSync(args[outputIndex + 1], { recursive: true });
+  if (runId === '350' && artifactName === 'api-selection-receipt-350-1' && fs.existsSync(process.env.PITAKA_TEST_SELECTION_RECEIPT_FILE)) {
+    fs.copyFileSync(process.env.PITAKA_TEST_SELECTION_RECEIPT_FILE, path.join(args[outputIndex + 1], artifactName + '.json'));
+    process.exit(0);
+  }
+  const proof = proofForRun(runId);
+  if (!proof) process.exit(2);
   fs.copyFileSync(proof.evidencePath, path.join(args[outputIndex + 1], artifactName + '.json'));
   process.exit(0);
 }
@@ -667,12 +751,25 @@ const attemptMatch = endpoint.match(/\\/actions\\/runs\\/([0-9]+)\\/attempts\\/(
 if (attemptMatch) respond(run(attemptMatch[1]));
 const artifactMatch = endpoint.match(/\\/actions\\/runs\\/([0-9]+)\\/artifacts/);
 if (artifactMatch) {
+  if (artifactMatch[1] === '350') {
+    const receiptPath = process.env.PITAKA_TEST_SELECTION_RECEIPT_FILE;
+    const artifacts = fs.existsSync(receiptPath) ? [{
+      id: 777,
+      name: 'api-selection-receipt-350-1',
+      expired: false,
+      size_in_bytes: fs.statSync(receiptPath).size,
+      expires_at: '2099-10-14T00:00:00Z',
+      workflow_run: { id: 350, repository_id: 99, head_sha: sourceSha, head_branch: 'main', head_repository: { full_name: repo } },
+    }] : [];
+    respond({ total_count: artifacts.length, artifacts });
+  }
   const proof = proofForRun(artifactMatch[1]);
   const artifacts = !proof || process.env.PITAKA_TEST_MISSING_EVIDENCE === 'true' ? [] : [{
     id: Number(proof.artifactId ?? 501),
     name: 'api-smoke-evidence-' + proof.runId + '-' + proof.attempt,
     expired: Boolean(proof.expired), size_in_bytes: 1024,
-    expires_at: proof.expired ? '2000-10-14T00:00:00Z' : '2099-10-14T00:00:00Z',
+    expires_at: process.env.PITAKA_TEST_INVALID_EXPIRY === 'true' ? 'not-a-date' :
+      proof.expired ? '2000-10-14T00:00:00Z' : '2099-10-14T00:00:00Z',
     workflow_run: { id: Number(proof.runId), repository_id: 99, head_sha: proof.sha, head_branch: 'main', head_repository: { full_name: repo } },
   }];
   respond({ total_count: artifacts.length, artifacts });
@@ -762,6 +859,7 @@ if (method >= 0 && args[method + 1] === 'PUT' && endpoint.includes('/contents/ve
   if (commit.status !== 0) throw new Error(commit.stderr);
   const push = spawnSync('git', ['push', 'origin', 'main'], { cwd: cloned, encoding: 'utf8' });
   if (push.status !== 0) throw new Error(push.stderr);
+  const writtenCommitSha = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: cloned, encoding: 'utf8' }).stdout.trim();
   if (writeMode === 'commit-then-supersede') {
     const supersedingProof = proofs.find((proof) => proof.sha !== sourceSha);
     if (!supersedingProof) throw new Error('superseding proof is missing');
@@ -785,6 +883,7 @@ if (method >= 0 && args[method + 1] === 'PUT' && endpoint.includes('/contents/ve
       'Publisher: Build and Deploy run ' + supersedingProof.runId + ', attempt ' + supersedingProof.attempt,
       'API source SHA: ' + supersedingProof.sha,
       'API index digest: ' + supersedingProof.digest,
+      'API record SHA-256: ' + createHash('sha256').update(JSON.stringify(next, null, 2) + '\\n').digest('hex'),
     ].join('\\n');
     const followup = spawnSync('git', [
       '-c', 'user.name=pitaka-deploy[bot]',
@@ -794,6 +893,21 @@ if (method >= 0 && args[method + 1] === 'PUT' && endpoint.includes('/contents/ve
     if (followup.status !== 0) throw new Error(followup.stderr);
     const followupPush = spawnSync('git', ['push', 'origin', 'main'], { cwd: cloned, encoding: 'utf8' });
     if (followupPush.status !== 0) throw new Error(followupPush.stderr);
+    const supersedingCommitSha = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: cloned, encoding: 'utf8' }).stdout.trim();
+    fs.writeFileSync(process.env.PITAKA_TEST_SELECTION_RECEIPT_FILE, JSON.stringify({
+      schemaVersion: 1,
+      runId: '350',
+      attempt: 1,
+      workflowId: 44,
+      jobName: 'Select verified current-main API image',
+      commits: [{
+        commitSha: supersedingCommitSha,
+        api: next.api,
+        recordDigest: createHash('sha256').update(JSON.stringify(next, null, 2) + '\\n').digest('hex'),
+        trigger: { id: '120', attempt: 1 },
+        publisher: { runId: String(supersedingProof.runId), attempt: supersedingProof.attempt },
+      }],
+    }));
   }
   if (writeMode === 'commit-then-main-advance' && attemptNumber === 1) {
     const nextProof = proofs.find((proof) => proof.sha === process.env.PITAKA_TEST_ADVANCE_MAIN_SHA);
@@ -806,7 +920,7 @@ if (method >= 0 && args[method + 1] === 'PUT' && endpoint.includes('/contents/ve
     process.stderr.write('gh: response lost after commit (HTTP 503)\\n');
     process.exit(1);
   }
-  respond({ commit: { sha: 'test-commit' } });
+  respond({ commit: { sha: writtenCommitSha } });
 }
 
 process.stderr.write('unexpected gh request: ' + args.join(' ') + '\\n');
