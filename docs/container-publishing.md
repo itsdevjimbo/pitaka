@@ -1,8 +1,9 @@
 # Published API image
 
-The `Code Quality and Tests` workflow runs formatting, build, and test checks. After a
-successful push to `main`, the separate `Build and Deploy` workflow publishes an image from that
-same tested commit. Pull requests and other branches only run validation. The API image supports
+The `Code Quality and Tests` workflow runs application formatting, build, and test checks.
+`Build and Deploy` runs only after that workflow succeeds on `main`, including a pull request
+merge, and publishes an image from the same tested commit. Pull requests and other branches do
+not trigger image publishing. The API image supports
 `linux/amd64` and `linux/arm64` and contains both the API and its EF Core migration bundle. The
 workflow resolves the fixed tag to its image-index digest, then pulls that exact digest into
 disposable MySQL, SeaweedFS, and smtp4dev stacks for both `linux/amd64` and `linux/arm64`. On each
@@ -57,8 +58,9 @@ identity through both the fixed tag and `repository@sha256:<index-digest>`.
 ## Run the published image against disposable data
 
 With Docker Engine, Docker Compose, QEMU support for the non-native platform, and `curl`
-installed, run the smoke script for each platform using the index digest returned by the
-inspector:
+installed, and Docker CLI 28.1.0 or newer, run the smoke script for each platform using the
+index digest returned by the inspector. The publisher workflow pins Docker 29.8.1 because the
+runtime-label check uses `docker image inspect --platform` to select each image variant:
 
 ```bash
 ./scripts/smoke-published-images.sh \
