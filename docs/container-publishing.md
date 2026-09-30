@@ -1,9 +1,9 @@
 # Published API image
 
-The `Code Quality and Tests` workflow runs application formatting, build, and test checks. The
-separate `Build and Deploy` workflow validates the image publication contract on pull requests.
-After a successful push to `main`, it validates that contract again and publishes an image from
-the same tested commit. Pull requests and other branches do not publish. The API image supports
+The `Code Quality and Tests` workflow runs application formatting, build, and test checks.
+`Build and Deploy` runs only after that workflow succeeds on `main`, including a pull request
+merge, and publishes an image from the same tested commit. Pull requests and other branches do
+not trigger image publishing. The API image supports
 `linux/amd64` and `linux/arm64` and contains both the API and its EF Core migration bundle. The
 workflow resolves the fixed tag to its image-index digest, then pulls that exact digest into
 disposable MySQL, SeaweedFS, and smtp4dev stacks for both `linux/amd64` and `linux/arm64`. On each

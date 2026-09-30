@@ -319,7 +319,7 @@ for expected_workflow_line in \
     fi
 done
 
-printf 'image-publication-test: evidence upload is mandatory and covered by pull request CI.\n'
+printf 'image-publication-test: evidence upload is mandatory in the publisher workflow.\n'
 
 for failure in migration:linux/amd64 api:linux/arm64; do
     failure_kind="${failure%%:*}"
