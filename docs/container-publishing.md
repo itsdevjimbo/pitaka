@@ -126,8 +126,37 @@ variable and `DEPLOY_APP_PRIVATE_KEY` secret. The workflow creates a short-lived
 to `pitaka-deploy`, after it verifies publication and registry evidence. The workflow's own
 `GITHUB_TOKEN` has Actions and Contents read permission only.
 
-For recovery, run `Select local API image` manually and provide the ID and attempt of a successful
-`Build and Deploy` promoter run. The same metadata, image evidence, ancestry checks, conditional
-write, and read-back rules apply. Do not supply a SHA, digest, or JSON record as authority. A
-direct API-changing edit without recognized handoff provenance stops automatic selection for
-review. Controlled manual pinning is not part of this workflow.
+To rotate the App key, generate a replacement private key in the GitHub App settings and update
+`DEPLOY_APP_PRIVATE_KEY` in the `pitaka` repository Actions secrets. Confirm a selection workflow
+can create its deploy-scoped token, then revoke the old key. Keep the private key and installation
+tokens out of the repository and workflow logs.
+
+When a selection handoff fails for a transient Contents API or network error, rerun the failed
+`Select local API image` workflow run. The rerun verifies the same successful triggering
+`Build and Deploy` run and attempt, then rechecks the live-main candidate and its independent
+publisher evidence. To reconcile against a specific successful publisher attempt, open `Select
+local API image` in Actions, choose **Run workflow** on the default branch, and enter only these
+inputs:
+
+- `trigger_run_id`: the numeric run ID of a successful `Build and Deploy` run.
+- `trigger_run_attempt`: the positive attempt number whose publisher and promoter jobs both
+  succeeded.
+
+The handoff confirms that run belongs to this repository's `Build and Deploy` workflow, came from
+a push to `main`, and completed both required jobs successfully. It then resolves the live `main`
+candidate and that SHA's own publisher evidence. A workflow rerun or manual dispatch cannot waive
+missing, expired, or contradictory smoke evidence. If evidence for the current `main` SHA has
+expired or is missing, first produce a fresh successful `Build and Deploy` publish-and-smoke
+attempt for that same SHA and unchanged fixed digest; use that run ID and attempt if manual
+reconciliation is still needed.
+
+Both automatic handoff and manual reconciliation use the same eligibility, ancestry, API-only
+write, retry, read-back, and reporting path. The run summary identifies the triggering and
+publisher attempts, previous and final API selections, write count, outcome, and recovery action.
+Failures emit an error annotation and fail the handoff while leaving publication status unchanged.
+Never provide pasted API JSON, image URLs, a bare SHA, or a digest as selection authority. A direct
+API-changing edit without recognized handoff provenance stops selection for review. Controlled
+manual pinning is not part of this workflow.
+
+The record selects desired local inputs only. Applying those inputs and changing the running local
+stack remain a separate, explicit deployment operation.

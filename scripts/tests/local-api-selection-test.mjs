@@ -53,6 +53,62 @@ test('selects the verified current-main index and preserves the rest of the depl
   assert.equal(writeCount(fixture), 1);
 });
 
+test('manual reconciliation uses the successful run ID and attempt through the shared selection path', (t) => {
+  const fixture = makeFixture(t);
+  const summaryPath = path.join(fixture.directory, 'manual-summary.md');
+  fixture.env.GITHUB_EVENT_NAME = 'workflow_dispatch';
+  fixture.env.INPUT_TRIGGER_RUN_ID = '100';
+  fixture.env.INPUT_TRIGGER_RUN_ATTEMPT = '1';
+  fixture.env.GITHUB_STEP_SUMMARY = summaryPath;
+
+  const result = runSelection(fixture);
+
+  assert.equal(result.status, 0, result.stderr);
+  const state = JSON.parse(fs.readFileSync(fixture.statePath, 'utf8'));
+  assert.equal(state.trigger.id, '100');
+  assert.equal(state.trigger.attempt, 1);
+  assert.deepEqual(state.publisher, { runId: '200', attempt: 1 });
+  assert.equal(state.outcome, 'applied');
+  assert.equal(state.writeAttempts, 1);
+  assert.equal(readRemoteRecord(fixture).api.sourceSha, sourceSha);
+
+  const report = spawnSync('node', [commandPath, 'report'], {
+    cwd: repositoryRoot,
+    env: fixture.env,
+    encoding: 'utf8',
+  });
+  assert.equal(report.status, 0, report.stderr);
+  const summary = fs.readFileSync(summaryPath, 'utf8');
+  assert.match(summary, /Trigger: Build and Deploy run 100, attempt 1/);
+  assert.match(summary, /Candidate publisher proof: Build and Deploy run 200, attempt 1/);
+  assert.match(summary, /Contents API write attempts: 1/);
+  assert.match(summary, /Outcome: applied/);
+  assert.match(summary, /does not apply the running local stack/i);
+});
+
+test('manual reconciliation rejects pasted records and non-run references as selection authority', (t) => {
+  const invalidRunIds = [
+    'https://github.com/itsdevjimbo/pitaka/actions/runs/100',
+    sourceSha,
+    indexDigest,
+    JSON.stringify({ api: { sourceSha, digest: indexDigest } }),
+  ];
+
+  for (const runId of invalidRunIds) {
+    const fixture = makeFixture(t);
+    fixture.env.GITHUB_EVENT_NAME = 'workflow_dispatch';
+    fixture.env.INPUT_TRIGGER_RUN_ID = runId;
+    fixture.env.INPUT_TRIGGER_RUN_ATTEMPT = '1';
+
+    const result = runSelection(fixture);
+
+    assert.notEqual(result.status, 0, `run ID ${runId} should be rejected`);
+    assert.match(result.stderr, /run ID and positive attempt are required/i);
+    assert.deepEqual(readRemoteRecord(fixture), fixture.initialRecord);
+    assert.equal(fs.readFileSync(fixture.putLog, 'utf8'), '');
+  }
+});
+
 test('rejects evidence bound to another publisher attempt without writing', (t) => {
   const fixture = makeFixture(t, { evidenceAttempt: 2 });
 
@@ -297,8 +353,11 @@ test('fails closed when the selected source is unrelated to current main', (t) =
   assert.equal(fs.readFileSync(fixture.putLog, 'utf8'), '');
 });
 
-test('ignores a completed publisher when its promoter did not succeed', (t) => {
+test('manual reconciliation rejects a run when its promoter did not succeed', (t) => {
   const fixture = makeFixture(t, { promoterFailure: true });
+  fixture.env.GITHUB_EVENT_NAME = 'workflow_dispatch';
+  fixture.env.INPUT_TRIGGER_RUN_ID = '100';
+  fixture.env.INPUT_TRIGGER_RUN_ATTEMPT = '1';
 
   const result = runSelection(fixture);
 
