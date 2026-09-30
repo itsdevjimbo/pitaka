@@ -96,3 +96,38 @@ The publisher job uploads the record as
 upload failure fails the publisher job, so the moving-tag job cannot start. Consumers must still
 corroborate the record against the GitHub run and fresh registry reads; the artifact is the
 publisher's bounded result record, not a substitute for those checks.
+
+## Automatic local API selection
+
+After a successful `Build and Deploy` run finishes its promoter, the separate `Select local API
+image` workflow verifies the triggering run and jobs through GitHub, resolves the current `main`
+SHA, and finds that SHA's successful publisher attempt and smoke artifact. It checks the artifact
+against fresh reads of the fixed SHA tag, its digest-pinned index, and the moving `main` alias.
+The alias index digest may differ; the source revision and both platform child digests must match.
+
+The handoff uses the canonical `pitaka-deploy` version validator. It changes only the six-field
+`api` selection in `versions/local.json`, preserves every other field, and updates `main` through
+the Contents API with the version-file blob SHA as its compare-and-swap precondition. It orders
+selections by source commit ancestry and makes at most three fresh read/evaluate/write attempts.
+Each run writes a job summary. An unresolved handoff fails its own workflow and leaves the API
+publication result intact. Updating this record changes desired local inputs; it does not apply
+the running local stack.
+
+Each successful handoff also uploads a 90-day receipt that names the exact API-changing deploy
+commit and complete API selection. Later handoffs require that receipt to recognize the App
+commit; a missing or expired receipt stops automatic selection for review. Keep the `pitaka`
+repository's Actions artifact retention at 90 days so these history receipts remain available.
+
+### App configuration and recovery
+
+Install the shared GitHub App only on `itsdevjimbo/pitaka-deploy` with repository Contents
+read/write permission. In the `pitaka` repository Actions settings, set the `DEPLOY_APP_CLIENT_ID`
+variable and `DEPLOY_APP_PRIVATE_KEY` secret. The workflow creates a short-lived token restricted
+to `pitaka-deploy`, after it verifies publication and registry evidence. The workflow's own
+`GITHUB_TOKEN` has Actions and Contents read permission only.
+
+For recovery, run `Select local API image` manually and provide the ID and attempt of a successful
+`Build and Deploy` promoter run. The same metadata, image evidence, ancestry checks, conditional
+write, and read-back rules apply. Do not supply a SHA, digest, or JSON record as authority. A
+direct API-changing edit without recognized handoff provenance stops automatic selection for
+review. Controlled manual pinning is not part of this workflow.

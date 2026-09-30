@@ -34,6 +34,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Verify local API image handoff behavior
+        run: node --test scripts/tests/local-api-selection-test.mjs
+
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
