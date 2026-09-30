@@ -1,6 +1,7 @@
 name: Build and Deploy
 
 on:
+  pull_request:
   workflow_run:
     workflows: ["Code Quality and Tests"]
     types: [completed]
@@ -9,9 +10,29 @@ permissions:
   contents: read
 
 jobs:
+  image-publication-contract:
+    name: Image publication contract
+    if: >-
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.event.workflow_run.head_sha }}
+
+      - name: Test image publication contract
+        run: ./scripts/tests/image-publication-test.sh
+
   publish:
     name: Publish API image
+    needs: image-publication-contract
     if: >-
+      github.event_name == 'workflow_run' &&
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.head_branch == 'main' &&
@@ -51,6 +72,7 @@ jobs:
     name: Advance the moving API image tag
     needs: publish
     if: >-
+      github.event_name == 'workflow_run' &&
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.head_branch == 'main' &&

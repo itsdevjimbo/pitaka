@@ -319,12 +319,6 @@ for expected_workflow_line in \
     fi
 done
 
-if ! grep -Fq 'run: ./scripts/tests/image-publication-test.sh' \
-    "$repository_root/.github/workflows/tests.yml"; then
-    printf 'pull request CI does not run the image publication acceptance test\n' >&2
-    exit 1
-fi
-
 printf 'image-publication-test: evidence upload is mandatory and covered by pull request CI.\n'
 
 for failure in migration:linux/amd64 api:linux/arm64; do
